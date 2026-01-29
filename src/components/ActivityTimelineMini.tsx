@@ -90,6 +90,16 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
         }
     };
 
+    const getDisplayValue = (value: any): string => {
+        if (!value) return 'Empty';
+        // Handle indicator values
+        if (value.current_value !== undefined) return String(value.current_value);
+        // Handle org_objective/business outcome values
+        if (value.value !== undefined) return value.value || 'Empty';
+        // Handle other structures
+        return JSON.stringify(value);
+    };
+
     const getRAGColor = (status: string) => {
         switch (status) {
             case 'green': return 'bg-green-500/10 text-green-700 border-green-500/20';
@@ -153,15 +163,15 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
                                 </p>
                             )}
 
-                            {/* Value Change */}
-                            {log.entity_type === 'indicator' && log.action === 'update' && (
+                            {/* Value Change - for any update with old/new values */}
+                            {log.action === 'update' && (log.old_value || log.new_value) && (
                                 <div className="flex items-center gap-1 text-xs">
                                     <span className="font-mono text-muted-foreground">
-                                        {log.old_value?.current_value ?? 'Empty'}
+                                        {getDisplayValue(log.old_value)}
                                     </span>
                                     <ArrowRight className="h-2.5 w-2.5 text-muted-foreground" />
                                     <span className="font-mono text-primary font-medium">
-                                        {log.new_value?.current_value}
+                                        {getDisplayValue(log.new_value)}
                                     </span>
                                 </div>
                             )}
