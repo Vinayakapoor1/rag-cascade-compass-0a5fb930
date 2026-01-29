@@ -1,77 +1,128 @@
 
-# Plan: Fix Data Entry Flow Consistency
+
+# Plan: Fix Dashboard Data Display and Verify Data Entry Flow
 
 ## Problem Summary
-There are two data entry paths with inconsistent behavior:
-1. **DataEntryDialog** (individual indicator entry) - does NOT save to `indicator_history`
-2. **DepartmentDataEntry** (bulk entry) - correctly saves to `indicator_history`
+The dashboard shows no recent activity even though data exists, and the `indicator_history` table is empty despite having historical data entries.
 
-This means historical data tracking only works when using the bulk entry page.
+## Root Cause Analysis
+
+| Issue | Finding |
+|-------|---------|
+| No recent activity | Activity logs exist (from Jan 28) but may not be displaying correctly |
+| Empty indicator_history | The fix was just applied; no new entries since the fix |
+| Team lead data entry | Code is correct but needs testing |
+
+---
 
 ## Solution Overview
-Update `DataEntryDialog.tsx` to also insert records into `indicator_history`, making both entry paths consistent.
+
+### Step 1: Force Data Refresh on Dashboard
+
+Add a trigger to invalidate the query cache and force a fresh data fetch when the dashboard loads. This ensures stale cached data doesn't prevent display.
+
+**File**: `src/components/ActivityTimelineWidget.tsx`
+
+**Change**: Add immediate fetch on mount and ensure loading states are handled correctly.
 
 ---
 
-## Step 1: Update DataEntryDialog to Insert History Records
+### Step 2: Backfill Existing Activity Logs to indicator_history
 
-Modify the `handleSave` function to also create a history record when saving values.
+Since old data entries created `activity_logs` but not `indicator_history` records, we can create a one-time backfill to populate historical data.
 
-**Current behavior:**
-- Updates `indicators.current_value` ✅
-- Logs to `activity_logs` ✅  
-- Inserts to `indicator_history` ❌
-
-**New behavior:**
-- Updates `indicators.current_value` ✅
-- Logs to `activity_logs` ✅
-- Inserts to `indicator_history` ✅ (NEW)
+**Approach**: Create a SQL migration that populates `indicator_history` from `activity_logs` where:
+- `entity_type = 'indicator'`
+- `action = 'update'`
+- `new_value` contains `current_value`
 
 ---
 
-## Step 2: Add Period Selection (Optional Enhancement)
+### Step 3: Verify and Enhance the History Insert in DepartmentDataEntry
 
-The `DepartmentDataEntry` page has a period selector (YYYY-MM format). Consider adding a similar period selector to `DataEntryDialog` so history records have proper period values.
+Ensure the bulk entry page correctly saves history records and add better error handling.
+
+**File**: `src/pages/DepartmentDataEntry.tsx`
+
+**Current code at lines 302-317**:
+```typescript
+const { error: historyError } = await supabase
+  .from('indicator_history')
+  .insert({
+    indicator_id: update.id,
+    value: newValue,
+    period,
+    evidence_url: evidenceUrl,
+    no_evidence_reason: update.evidenceReason || null,
+    created_by: user!.id
+  });
+```
+
+**Enhancement**: Add toast notification for history insertion success/failure.
+
+---
+
+### Step 4: Add RLS Policy for UPDATE on indicator_history
+
+Currently, users can INSERT but cannot UPDATE the history table. For the `IndicatorHistoryDialog` edit functionality to work, we need to allow updates.
+
+**SQL Migration**:
+```sql
+CREATE POLICY "Users can update their own history entries"
+  ON indicator_history FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = created_by);
+```
 
 ---
 
 ## Technical Details
 
-### File to Modify: `src/components/DataEntryDialog.tsx`
+### Migration: Backfill indicator_history from activity_logs
 
-**Add after the `indicators` update (around line 60):**
-
-```typescript
-// Create history record
-const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
-
-const { error: historyError } = await supabase
-  .from('indicator_history')
-  .insert({
-    indicator_id: indicator.id,
-    value: value,
-    period: currentPeriod,
-    created_by: user.id
-  });
-
-if (historyError) {
-  console.error('History insert error:', historyError);
-  // Don't fail the whole operation, just log the error
-}
+```sql
+INSERT INTO indicator_history (indicator_id, value, period, created_at, created_by)
+SELECT 
+  al.entity_id::uuid as indicator_id,
+  (al.new_value->>'current_value')::numeric as value,
+  COALESCE(al.metadata->>'period', to_char(al.created_at, 'YYYY-MM')) as period,
+  al.created_at,
+  al.user_id as created_by
+FROM activity_logs al
+WHERE al.entity_type = 'indicator'
+  AND al.action = 'update'
+  AND al.new_value->>'current_value' IS NOT NULL
+  AND al.entity_id IS NOT NULL
+ON CONFLICT DO NOTHING;
 ```
+
+### Component Changes
+
+**ActivityTimelineWidget.tsx**:
+- Add `refetch()` call on mount if logs are empty
+- Improve empty state messaging
+
+**DepartmentDataEntry.tsx**:
+- Add console logging for history insert success
+- Show user feedback for history save status
 
 ---
 
 ## Implementation Order
-1. Modify `DataEntryDialog.tsx` to add history insertion
-2. Test the flow by entering a value through the dialog
-3. Verify the record appears in `indicator_history`
-4. Confirm admin can see the entry in activity timeline
+
+1. Create migration to add UPDATE policy on `indicator_history`
+2. Create migration to backfill history from existing activity logs
+3. Update `ActivityTimelineWidget` to force fresh data fetch
+4. Test the end-to-end flow
 
 ---
 
-## Expected Outcome
+## Expected Outcomes
+
 After implementation:
-- Both data entry methods will create history records
-- Admins will have complete audit trails
-- Historical trending data will be captured regardless of entry method
+- Dashboard will show recent activity correctly
+- `indicator_history` will have historical data from past entries
+- Team leads can enter data and it saves to both tables
+- Admin can see all historical data and edits
+- Users can edit their own history entries
+
