@@ -116,8 +116,9 @@ export default function AdminDepartmentStatus() {
                 is_read: false
             }));
 
+            // @ts-ignore - notifications table not in generated types yet
             const { error: notifError } = await supabase
-                .from('notifications')
+                .from('notifications' as any)
                 .insert(notifications);
 
             if (notifError) throw notifError;
