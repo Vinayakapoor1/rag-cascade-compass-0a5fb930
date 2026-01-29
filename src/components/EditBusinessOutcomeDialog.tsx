@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 interface EditBusinessOutcomeDialogProps {
@@ -21,6 +22,7 @@ export function EditBusinessOutcomeDialog({
   onOpenChange,
   onSuccess
 }: EditBusinessOutcomeDialogProps) {
+  const { user } = useAuth();
   const [value, setValue] = useState(currentValue || '');
   const [saving, setSaving] = useState(false);
 
@@ -41,12 +43,16 @@ export function EditBusinessOutcomeDialog({
 
       // Log activity
       await supabase.from('activity_logs').insert({
+        user_id: user?.id,
         action: 'update',
         entity_type: 'org_objective',
         entity_id: orgObjectiveId,
         entity_name: 'Business Outcome',
-        old_value: currentValue,
-        new_value: value || null
+        old_value: { value: currentValue },
+        new_value: { value: value || null },
+        metadata: {
+          user_email: user?.email
+        }
       });
 
       toast.success('Business outcome updated');

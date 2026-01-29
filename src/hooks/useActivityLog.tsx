@@ -28,7 +28,10 @@ export function useActivityLog() {
         entity_name: params.entityName,
         old_value: params.oldValue,
         new_value: params.newValue,
-        metadata: params.metadata
+        metadata: {
+          ...params.metadata,
+          user_email: user.email
+        }
       });
     } catch (error) {
       console.error('Failed to log activity:', error);

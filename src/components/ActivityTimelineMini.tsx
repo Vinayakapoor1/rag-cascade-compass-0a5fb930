@@ -18,6 +18,8 @@ interface ActivityLog {
     new_value: any;
     metadata: any;
     user_email?: string;
+    profile_name?: string;
+    profile_email?: string;
 }
 
 interface ActivityTimelineMiniProps {
@@ -34,6 +36,7 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
 
     const fetchRecentLogs = async () => {
         try {
+            // Fetch logs with profile info via user_id
             const { data, error } = await supabase
                 .from('activity_logs')
                 .select('*')
@@ -42,11 +45,32 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
 
             if (error) throw error;
 
-            // Use metadata.user_email if available
-            const logsWithEmail = (data || []).map(log => ({
-                ...log,
-                user_email: (log.metadata as Record<string, any>)?.user_email || null
-            }));
+            // Fetch profiles for user_ids that exist
+            const userIds = [...new Set((data || []).map(log => log.user_id).filter(Boolean))];
+            let profilesMap: Record<string, { full_name: string | null; email: string | null }> = {};
+            
+            if (userIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('user_id, full_name, email')
+                    .in('user_id', userIds);
+                
+                profilesMap = (profiles || []).reduce((acc, p) => {
+                    acc[p.user_id] = { full_name: p.full_name, email: p.email };
+                    return acc;
+                }, {} as Record<string, { full_name: string | null; email: string | null }>);
+            }
+
+            // Merge profile info into logs
+            const logsWithEmail = (data || []).map(log => {
+                const profile = log.user_id ? profilesMap[log.user_id] : null;
+                return {
+                    ...log,
+                    user_email: (log.metadata as Record<string, any>)?.user_email || profile?.email || null,
+                    profile_name: profile?.full_name || null,
+                    profile_email: profile?.email || null
+                };
+            });
 
             setLogs(logsWithEmail);
         } catch (error) {
@@ -122,10 +146,10 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
                                 </p>
                             )}
 
-                            {/* User Email */}
-                            {log.user_email && (
+                            {/* User Info */}
+                            {(log.profile_name || log.user_email) && (
                                 <p className="text-[9px] text-muted-foreground/70 italic">
-                                    Updated by {log.user_email}
+                                    Updated by {log.profile_name || log.user_email}
                                 </p>
                             )}
 
