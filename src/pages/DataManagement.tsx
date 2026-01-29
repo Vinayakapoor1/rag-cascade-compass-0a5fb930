@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, FolderTree, Settings, Users, LogOut, Home } from 'lucide-react';
+import { Loader2, AlertCircle, FolderTree, Settings, Users, LogOut, Home, Database } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { DepartmentUploader } from '@/components/admin/DepartmentUploader';
@@ -17,6 +17,7 @@ import { TeamAccessTab } from '@/components/admin/TeamAccessTab';
 import { FormulasTab } from '@/components/admin/FormulasTab';
 import { SnapshotsTab } from '@/components/admin/SnapshotsTab';
 import { AdminDashboardCard } from '@/components/admin/AdminDashboardCard';
+import { AdminDataControls } from '@/components/admin/AdminDataControls';
 import { RAGLegend } from '@/components/RAGLegend';
 
 export default function DataManagement() {
@@ -206,6 +207,12 @@ export default function DataManagement() {
               <Settings className="h-4 w-4" />
               Configuration
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="data-controls" className="gap-2 px-4 py-2.5">
+                <Database className="h-4 w-4" />
+                Data Controls
+              </TabsTrigger>
+            )}
             <TabsTrigger value="admin" className="gap-2 px-4 py-2.5">
               <Users className="h-4 w-4" />
               Team & Uploads
@@ -236,6 +243,13 @@ export default function DataManagement() {
               </TabsContent>
             </Tabs>
           </TabsContent>
+
+          {/* Data Controls Tab (Admin Only) */}
+          {isAdmin && (
+            <TabsContent value="data-controls" className="space-y-4">
+              <AdminDataControls />
+            </TabsContent>
+          )}
 
           <TabsContent value="admin" className="space-y-4">
             <Tabs defaultValue="upload">
