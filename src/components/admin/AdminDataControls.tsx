@@ -438,45 +438,45 @@ export function AdminDataControls() {
                             Reset Department
                         </AlertDialogAction>
                     </AlertDialogFooter>
+                </AlertDialogContent>
             </AlertDialog>
-        </AlertDialog>
 
-            {/* Reset All Data Dialog */ }
-    <AlertDialog open={resetAllDialogOpen} onOpenChange={setResetAllDialogOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                    <AlertTriangle className="h-5 w-5" />
-                    Reset ALL Data?
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                    <div className="space-y-2">
-                        <p className="font-semibold">This will:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                            <li>Reset ALL indicators across ALL departments</li>
-                            <li>Delete ALL indicator history</li>
-                            <li>Set all RAG statuses to amber</li>
-                        </ul>
-                        <p className="font-semibold text-destructive mt-4">
-                            This action is IRREVERSIBLE. Are you absolutely sure?
-                        </p>
-                    </div>
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                    onClick={() => {
-                        resetAllData();
-                        setResetAllDialogOpen(false);
-                    }}
-                    className="bg-destructive hover:bg-destructive/90"
-                >
-                    Yes, Reset Everything
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
-        </div >
+            {/* Reset All Data Dialog */}
+            <AlertDialog open={resetAllDialogOpen} onOpenChange={setResetAllDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="h-5 w-5" />
+                            Reset ALL Data?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <div className="space-y-2">
+                                <p className="font-semibold">This will:</p>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>Reset ALL indicators across ALL departments</li>
+                                    <li>Delete ALL indicator history</li>
+                                    <li>Set all RAG statuses to amber</li>
+                                </ul>
+                                <p className="font-semibold text-destructive mt-4">
+                                    This action is IRREVERSIBLE. Are you absolutely sure?
+                                </p>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                resetAllData();
+                                setResetAllDialogOpen(false);
+                            }}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Yes, Reset Everything
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
     );
 }
