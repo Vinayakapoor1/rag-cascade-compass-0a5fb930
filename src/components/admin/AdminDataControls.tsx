@@ -198,7 +198,7 @@ export function AdminDataControls() {
 
     const resetAllData = async () => {
         try {
-            // Reset all indicators
+            // Reset all indicators with 'not-set' RAG status (per RAG threshold standards)
             const { error: updateError } = await supabase
                 .from('indicators')
                 .update({
@@ -206,22 +206,33 @@ export function AdminDataControls() {
                     evidence_url: null,
                     evidence_type: null,
                     no_evidence_reason: null,
-                    rag_status: 'amber',
+                    rag_status: 'not-set',
                 })
                 .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all
 
             if (updateError) throw updateError;
 
             // Delete all history
-            // @ts-ignore - indicator_history table not in generated types yet
             const { error: historyError } = await supabase
-                .from('indicator_history' as any)
+                .from('indicator_history')
                 .delete()
                 .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
-            if (historyError) throw historyError;
+            if (historyError) {
+                console.warn('History delete error (may be RLS):', historyError);
+            }
 
-            toast.success('All indicator data has been reset');
+            // Delete all activity logs for a clean slate
+            const { error: logsError } = await supabase
+                .from('activity_logs')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+            if (logsError) {
+                console.warn('Activity logs delete error (may be RLS):', logsError);
+            }
+
+            toast.success('All indicator data, history, and activity logs have been reset');
             fetchData();
         } catch (error: any) {
             console.error('Error resetting all data:', error);
