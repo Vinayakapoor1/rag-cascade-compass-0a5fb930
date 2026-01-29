@@ -1,210 +1,102 @@
 
-# Add Team Leader Guide Card to Data Entry Page + KPI Formula Info Buttons
 
-## Overview
+# Fix Info Button Tooltips Not Showing
 
-This plan addresses two requests:
-1. **Move/add the Team Leader Data Entry Guide card** to the department data entry page (`/department/:departmentId/data-entry`)
-2. **Add formula info buttons** (ℹ️) next to each KPI that display the calculation formula when clicked
+## Problem Analysis
+
+The info buttons (ℹ️) for KPI formulas are not showing anything because:
+
+| Issue | Cause | Impact |
+|-------|-------|--------|
+| **Long hover delay** | Radix UI `TooltipProvider` defaults to 700ms delay | Users hover briefly and move away before tooltip appears |
+| **User expectation mismatch** | Users may be clicking the button expecting a popup | Tooltips only work on hover, not click |
+
+The formula data IS being fetched correctly (confirmed in network requests showing formula text like "Key Acocunts with CSAT score ≥ 90% / Total key accounts assessed * 100").
 
 ---
 
-## Current State Analysis
+## Solution
 
-### Team Leader Guide Card
-- Currently exists in `src/pages/Index.tsx` (lines 181-203)
-- Shows for department heads who are not admins
-- User wants it on the **data entry page** instead/also
+### Option 1: Quick Fix - Reduce Tooltip Delay
 
-### KPI Formulas
-- The `indicators` table has a `formula` column containing calculation formulas
-- Example formulas from database:
-  - "Builds with no automated step skipped / Total builds generated × 100"
-  - "(Net New ARR − Churned ARR) / Starting ARR × 100"
-- Currently **not fetched** in `DepartmentDataEntry.tsx` (line 176 only selects `id, name, current_value, target_value, unit, frequency, evidence_url`)
-- Need to add `formula` to the interface and query
+Update the `TooltipProvider` to show tooltips immediately (0ms delay):
+
+```typescript
+// Line 603 in DepartmentDataEntry.tsx
+<TooltipProvider delayDuration={0}>
+```
+
+This makes the tooltip appear instantly on hover instead of waiting 700ms.
+
+### Option 2: Add Click-to-Show Alternative (Enhanced UX)
+
+For mobile users and those who expect click behavior, we can add `open` state management:
+
+```typescript
+// The Tooltip component can be controlled
+<Tooltip open={openFormulaId === ind.id} onOpenChange={(open) => setOpenFormulaId(open ? ind.id : null)}>
+    <TooltipTrigger asChild>
+        <button onClick={() => setOpenFormulaId(openFormulaId === ind.id ? null : ind.id)}>
+            <Info className="h-4 w-4" />
+        </button>
+    </TooltipTrigger>
+    ...
+</Tooltip>
+```
 
 ---
 
 ## Implementation Plan
 
-### Step 1: Add `formula` to Indicator Interface and Query
+I recommend **Option 1** (quick fix) as the primary solution, with a small enhancement for better visibility:
 
-**File**: `src/pages/DepartmentDataEntry.tsx`
+### Step 1: Set Immediate Tooltip Delay
 
-Update the Indicator interface (line 21-35):
+**File**: `src/pages/DepartmentDataEntry.tsx` (line 603)
+
+Change:
 ```typescript
-interface Indicator {
-    id: string;
-    name: string;
-    current_value: number | null;
-    target_value: number | null;
-    unit: string | null;
-    frequency: string | null;
-    evidence_url: string | null;
-    formula: string | null;  // ADD THIS
-    kr_id: string;
-    kr_name: string;
-    fo_id: string;
-    fo_name: string;
-    previous_value?: number | null;
-    previous_period?: string | null;
-}
+<TooltipProvider>
 ```
 
-Update the database query (line 174-178):
+To:
 ```typescript
-const { data: inds } = await supabase
-    .from('indicators')
-    .select('id, name, current_value, target_value, unit, frequency, evidence_url, formula')  // ADD formula
-    .eq('key_result_id', kr.id)
-    .order('name');
+<TooltipProvider delayDuration={0}>
 ```
 
-### Step 2: Add Info Icon Import
+### Step 2: Visual Enhancement for Info Button
 
-**File**: `src/pages/DepartmentDataEntry.tsx`
-
-Add `Info` to the lucide-react imports (line 13-17):
-```typescript
-import {
-    Save, Loader2, ChevronDown, ChevronRight, Paperclip,
-    TrendingUp, Target, Calendar, Filter, CheckCircle2, AlertCircle,
-    History, Upload, Link as LinkIcon, Info, ClipboardCheck  // ADD Info, ClipboardCheck
-} from 'lucide-react';
-```
-
-### Step 3: Add Tooltip Import
-
-**File**: `src/pages/DepartmentDataEntry.tsx`
-
-Add tooltip component import:
-```typescript
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-```
-
-### Step 4: Add Team Leader Guide Card to Data Entry Page
-
-**File**: `src/pages/DepartmentDataEntry.tsx`
-
-Add guide card after the header section (around line 611), before the Stats Card:
+Make the info button more obviously interactive:
 
 ```typescript
-{/* Team Leader Data Entry Guide */}
-<Card className="border-primary/30 bg-primary/5">
-    <CardContent className="p-4">
-        <div className="flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-primary/10">
-                <ClipboardCheck className="h-6 w-6 text-primary" />
-            </div>
-            <div className="flex-1">
-                <h3 className="font-semibold text-base mb-2">Team Leader Data Entry Guide</h3>
-                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                    <li>Select the reporting period using the date picker</li>
-                    <li>Enter current values for each KPI (click the ℹ️ icon to see the formula)</li>
-                    <li>Attach evidence (file upload or link) OR provide a reason if unavailable</li>
-                    <li>Click individual Save buttons or "Save All Changes" when done</li>
-                </ol>
-            </div>
-        </div>
-    </CardContent>
-</Card>
-```
-
-### Step 5: Add Info Button to Each KPI Row
-
-**File**: `src/pages/DepartmentDataEntry.tsx`
-
-Update the grid column headers (line 742) to add a column for the info icon:
-```typescript
-<div className="grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 ...">
-    <div className="text-center">ℹ️</div>  {/* NEW COLUMN */}
-    <div>Indicator</div>
-    ...
-</div>
-```
-
-Update each indicator row (line 775) to add the info button with tooltip:
-```typescript
-<div
-    key={ind.id}
-    className={cn(
-        "grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center ...",
-        ...
-    )}
+<button
+    type="button"
+    className="p-1 rounded-full hover:bg-primary/10 transition-colors group"
+    onClick={(e) => e.stopPropagation()}
 >
-    {/* Formula Info Button */}
-    <div className="flex justify-center">
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button
-                    type="button"
-                    className="p-1 rounded-full hover:bg-muted transition-colors"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <Info className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                </button>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-xs">
-                <div className="space-y-1">
-                    <p className="font-medium text-xs">Calculation Formula</p>
-                    <p className="text-xs">{ind.formula || 'No formula defined'}</p>
-                </div>
-            </TooltipContent>
-        </Tooltip>
-    </div>
-    
-    {/* Rest of the indicator row... */}
-    <div>
-        <p className="text-sm font-medium">{ind.name}</p>
-        ...
-    </div>
-    ...
-</div>
+    <Info className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
+</button>
 ```
+
+This makes the button:
+- Have a subtle primary-colored background on hover
+- Start with a more visible primary tint (instead of muted-foreground)
+- Transition smoothly for better feedback
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/pages/DepartmentDataEntry.tsx` | Add formula to interface & query, add guide card, add info button column with tooltips |
+| File | Change |
+|------|--------|
+| `src/pages/DepartmentDataEntry.tsx` | Add `delayDuration={0}` to TooltipProvider, enhance info button styling |
 
 ---
 
-## Visual Preview
-
-### Guide Card (at top of page)
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ 📋 Team Leader Data Entry Guide                                     │
-│                                                                     │
-│ 1. Select the reporting period using the date picker                │
-│ 2. Enter current values for each KPI (click ℹ️ to see formula)      │
-│ 3. Attach evidence (file/link) OR provide a reason if unavailable  │
-│ 4. Click Save when done                                            │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### KPI Row with Info Button
-```text
-┌────┬────────────────────────┬────────┬────────┬─────────┬────────┐
-│ ℹ️ │ Indicator              │ Target │ Prev   │ Current │ ...    │
-├────┼────────────────────────┼────────┼────────┼─────────┼────────┤
-│ ⓘ  │ Build Automation Rate  │ 95%    │ 87     │ [____]  │ ...    │
-│    │                        │        │        │         │        │
-│    └── Hover reveals: "Calculation Formula:                      │
-│        Builds with no automated step skipped /                   │
-│        Total builds generated × 100"                             │
-└────┴────────────────────────┴────────┴────────┴─────────┴────────┘
-```
-
----
-
-## Expected Outcomes
+## Expected Result
 
 After implementation:
-1. Team leaders will see a clear instruction guide at the top of the data entry page
-2. Each KPI will have an info (ℹ️) button that shows the calculation formula on hover
-3. The formula helps team leaders understand exactly what data they need to input
+1. Hovering over the ℹ️ icon will **immediately** show the formula tooltip
+2. The formula text (e.g., "Key Accounts with CSAT score >= 90% / Total key accounts assessed * 100") will display in a styled popup
+3. The button will be more visually prominent indicating it's interactive
+
