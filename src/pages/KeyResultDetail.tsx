@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { useOrgObjectiveById } from '@/hooks/useOrgObjectives';
 import { DrilldownBreadcrumb } from '@/components/DrilldownBreadcrumb';
@@ -6,13 +7,32 @@ import { IndicatorCard } from '@/components/IndicatorCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { getRAGMutedBg, getOrgObjectiveColorClasses } from '@/lib/ragUtils';
 import { cn } from '@/lib/utils';
-import { Target, User, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Target, User, TrendingUp, TrendingDown, Activity, RotateCcw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function KeyResultDetail() {
   const { orgObjectiveId, krId } = useParams<{ orgObjectiveId: string; krId: string }>();
   const { data: objective, isLoading } = useOrgObjectiveById(orgObjectiveId || '');
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const queryClient = useQueryClient();
+  const { user, isAdmin } = useAuth();
 
   if (isLoading) {
     return (
@@ -48,6 +68,51 @@ export default function KeyResultDetail() {
   const isOnTrack = progress >= 100 || keyResult.status === 'green';
   const orgColorClasses = getOrgObjectiveColorClasses(objective.color);
 
+  const handleResetKR = async () => {
+    if (!keyResult?.indicators?.length) {
+      toast.error('No indicators to reset');
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const indicatorIds = keyResult.indicators.map(ind => ind.id);
+
+      // Reset all indicators for this KR
+      const { error } = await supabase
+        .from('indicators')
+        .update({
+          current_value: null,
+          evidence_url: null,
+          evidence_type: null,
+          no_evidence_reason: null,
+          rag_status: 'amber',
+        })
+        .in('id', indicatorIds);
+
+      if (error) throw error;
+
+      // Delete history for these indicators
+      const { error: historyError } = await supabase
+        .from('indicator_history')
+        .delete()
+        .in('indicator_id', indicatorIds);
+
+      if (historyError) {
+        console.warn('History delete error:', historyError);
+      }
+
+      toast.success('Key Result data reset successfully');
+      queryClient.invalidateQueries({ queryKey: ['org-objectives'] });
+      setResetDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error resetting KR:', error);
+      toast.error(error.message || 'Failed to reset Key Result');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Breadcrumb */}
@@ -79,8 +144,47 @@ export default function KeyResultDetail() {
             Owner: {keyResult.owner || 'Not assigned'}
           </p>
         </div>
-        <RAGBadge status={keyResult.status} size="lg" showLabel pulse />
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive border-destructive/50 hover:bg-destructive/10"
+              onClick={() => setResetDialogOpen(true)}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset KR
+            </Button>
+          )}
+          <RAGBadge status={keyResult.status} size="lg" showLabel pulse />
+        </div>
       </div>
+
+      {/* Reset KR Dialog */}
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Key Result Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-2">
+                <p>This will reset all indicators for:</p>
+                <p className="font-medium text-foreground">{keyResult.name}</p>
+                <p className="mt-2">All values, evidence, and history for these indicators will be deleted. This action cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetKR}
+              disabled={resetting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {resetting ? 'Resetting...' : 'Reset Key Result'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Progress Card */}
       <Card className={cn('border-l-4', orgColorClasses.border)}>
