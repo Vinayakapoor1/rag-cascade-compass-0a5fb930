@@ -158,8 +158,20 @@ export function IndicatorHistoryDialog({
         }
     };
 
-    const handleDownloadEvidence = async (url: string) => {
-        window.open(url, '_blank');
+    const getEvidenceUrl = (url: string | null): string | null => {
+        if (!url) return null;
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url;
+        }
+        const { data } = supabase.storage.from('evidence-files').getPublicUrl(url);
+        return data.publicUrl;
+    };
+
+    const handleDownloadEvidence = (url: string) => {
+        const publicUrl = getEvidenceUrl(url);
+        if (publicUrl) {
+            window.open(publicUrl, '_blank');
+        }
     };
 
     return (
@@ -170,7 +182,7 @@ export function IndicatorHistoryDialog({
                         <History className="h-5 w-5" />
                         Data Entry History
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription asChild>
                         <div className="space-y-1 mt-2">
                             <p className="font-medium text-foreground">{indicatorName}</p>
                             {krName && <p className="text-xs">Key Result: {krName}</p>}
