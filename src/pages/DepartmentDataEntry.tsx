@@ -600,7 +600,7 @@ export default function DepartmentDataEntry() {
     }
 
     return (
-        <TooltipProvider>
+        <TooltipProvider delayDuration={0}>
         <div className="container mx-auto p-6 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -807,10 +807,10 @@ export default function DepartmentDataEntry() {
                                                                         <TooltipTrigger asChild>
                                                                             <button
                                                                                 type="button"
-                                                                                className="p-1 rounded-full hover:bg-muted transition-colors"
+                                                                                className="p-1 rounded-full hover:bg-primary/10 transition-colors group"
                                                                                 onClick={(e) => e.stopPropagation()}
                                                                             >
-                                                                                <Info className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                                                <Info className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
                                                                             </button>
                                                                         </TooltipTrigger>
                                                                         <TooltipContent side="right" className="max-w-xs">
