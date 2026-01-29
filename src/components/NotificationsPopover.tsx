@@ -120,7 +120,7 @@ export function NotificationsPopover() {
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
+                    <Bell className="h-5 w-5 text-foreground" />
                     {unreadCount > 0 && (
                         <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
                     )}

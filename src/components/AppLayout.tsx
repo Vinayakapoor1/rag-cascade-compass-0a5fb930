@@ -71,8 +71,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                     {/* Department Head: Enter Data Button */}
                     {isDepartmentHead && !isAdmin && (
                       <Link to="/data">
-                        <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20">
-                          <Settings className="h-4 w-4 sm:mr-2" />
+                        <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
+                          <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
                           <span className="hidden sm:inline">Enter Data</span>
                         </Button>
                       </Link>
@@ -81,8 +81,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                     {/* Admin: Unified Dashboard Button */}
                     {isAdmin && (
                       <Link to="/admin">
-                        <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 bg-primary/10 hover:bg-primary/20">
-                          <Settings className="h-4 w-4 sm:mr-2" />
+                        <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 bg-primary/10 hover:bg-primary/20 text-foreground">
+                          <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
                           <span className="hidden sm:inline">Admin Dashboard</span>
                         </Button>
                       </Link>
@@ -95,7 +95,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                         size="sm"
                         className="hover:bg-muted/50 transition-colors px-2"
                       >
-                        <LogOut className="h-4 w-4" />
+                        <LogOut className="h-4 w-4 text-foreground" />
                       </Button>
 
                       {/* Dropdown Menu */}
