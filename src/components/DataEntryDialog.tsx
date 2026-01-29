@@ -61,6 +61,22 @@ export function DataEntryDialog({ open, onOpenChange, indicator }: DataEntryDial
 
       if (error) throw error;
 
+      // Create history record for audit trail
+      const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const { error: historyError } = await supabase
+        .from('indicator_history')
+        .insert({
+          indicator_id: indicator.id,
+          value: value,
+          period: currentPeriod,
+          created_by: user.id
+        });
+
+      if (historyError) {
+        console.error('History insert error:', historyError);
+        // Don't fail the whole operation, just log the error
+      }
+
       await logActivity({
         action: 'update',
         entityType: 'indicator',
