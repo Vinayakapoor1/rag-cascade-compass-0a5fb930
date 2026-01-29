@@ -36,19 +36,16 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
         try {
             const { data, error } = await supabase
                 .from('activity_logs')
-                .select(`
-                    *,
-                    users:user_id(email)
-                `)
+                .select('*')
                 .order('created_at', { ascending: false })
                 .limit(limit);
 
             if (error) throw error;
 
-            // Map user email to logs
+            // Use metadata.user_email if available
             const logsWithEmail = (data || []).map(log => ({
                 ...log,
-                user_email: log.users?.email
+                user_email: log.metadata?.user_email || null
             }));
 
             setLogs(logsWithEmail);
