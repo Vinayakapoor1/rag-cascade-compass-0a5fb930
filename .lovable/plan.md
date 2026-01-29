@@ -1,130 +1,145 @@
 
-# Fix Light Mode Button Visibility Issues
+# Fix "Unknown User" Display in Activity Logs
 
-## Problem Analysis
+## Problem Summary
 
-Based on the screenshot and code review, there are visibility issues with certain buttons and interactive elements in light mode when hovering:
+When you edited the Business Outcome, the activity log shows "Unknown User" even though you were signed in. This is because:
 
-| Element | Issue | Root Cause |
-|---------|-------|------------|
-| Ghost buttons (e.g., "Clear Filter") | May become hard to read on hover | The ghost variant uses `hover:bg-accent hover:text-accent-foreground` which was recently changed |
-| Outline buttons with custom classes | Inconsistent hover states | Some use `hover-glow` without explicit text color preservation |
-| Button text disappearing | Text becomes same color as background | The accent change may have affected text contrast |
+| Issue | Root Cause |
+|-------|------------|
+| **No user_id saved** | `EditBusinessOutcomeDialog` doesn't include `user_id` when logging activity |
+| **No user_email in metadata** | The component doesn't store your email in the log metadata |
+| **Display fallback says "Unknown User"** | When no user info is found, the timeline shows this placeholder |
 
 ---
 
 ## Solution Overview
 
-### Step 1: Refine Light Mode Accent Colors
+### Step 1: Fix EditBusinessOutcomeDialog
+The `EditBusinessOutcomeDialog` component inserts activity logs directly without using the proper hook. We need to update it to:
+1. Get the current user from `useAuth`
+2. Include `user_id` in the log
+3. Include `user_email` in the metadata (like other components do)
 
-Update the CSS variables in `src/index.css` to ensure proper contrast for hover states in light mode:
-
-```css
-/* Light mode - ensure accent provides good contrast */
---accent: 0 0% 93%;  /* Slightly darker background */
---accent-foreground: 0 0% 10%;  /* Dark text for readability */
-```
-
-### Step 2: Add Explicit Hover Styles to Ghost Buttons
-
-Update the button component or specific instances to ensure text remains visible on hover:
-
-**File**: `src/components/ui/button.tsx`
-
-Change the ghost variant to include more explicit light mode contrast:
-```typescript
-ghost: "hover:bg-accent hover:text-accent-foreground",
-// Change to:
-ghost: "hover:bg-muted hover:text-foreground",
-```
-
-This ensures:
-- Light mode: Uses the subtle muted background with dark foreground text
-- Dark mode: Still works correctly with the existing muted color scheme
-
-### Step 3: Update Outline Button Hover States
-
-For outline buttons that currently use only `hover:bg-accent`, add explicit text color:
-
-**File**: `src/components/ui/button.tsx`
+**File**: `src/components/EditBusinessOutcomeDialog.tsx`
 
 ```typescript
-outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-// Change to:
-outline: "border border-input bg-background hover:bg-muted hover:text-foreground",
+// Add import
+import { useAuth } from '@/hooks/useAuth';
+
+// Inside the component
+const { user } = useAuth();
+
+// Update the insert call
+await supabase.from('activity_logs').insert({
+  user_id: user?.id,  // Add user_id
+  action: 'update',
+  entity_type: 'org_objective',
+  entity_id: orgObjectiveId,
+  entity_name: 'Business Outcome',
+  old_value: currentValue,
+  new_value: value || null,
+  metadata: {
+    user_email: user?.email  // Add user email to metadata
+  }
+});
+```
+
+### Step 2: Update useActivityLog Hook
+The `useActivityLog` hook includes `user_id` but doesn't include `user_email` in metadata. We should update it to automatically include the email:
+
+**File**: `src/hooks/useActivityLog.tsx`
+
+```typescript
+const logActivity = async (params: LogActivityParams) => {
+  if (!user) return;
+
+  try {
+    await supabase.from('activity_logs').insert({
+      user_id: user.id,
+      action: params.action,
+      entity_type: params.entityType,
+      entity_id: params.entityId,
+      entity_name: params.entityName,
+      old_value: params.oldValue,
+      new_value: params.newValue,
+      metadata: {
+        ...params.metadata,
+        user_email: user.email  // Always include user email
+      }
+    });
+  } catch (error) {
+    console.error('Failed to log activity:', error);
+  }
+};
+```
+
+### Step 3: Improve Activity Timeline Display
+Update the timeline components to show user info from multiple fallback sources:
+1. First try `metadata.user_email`
+2. Then try joining with `profiles` table using `user_id`
+3. Fall back to truncated `user_id` if nothing else
+
+**File**: `src/components/ActivityTimelineMini.tsx`
+- Query profiles table to get user names
+- Display user name/email even when not in metadata
+
+**File**: `src/components/ActivityTimelineWidget.tsx`
+- Same improvements
+
+### Step 4: Fix Existing Log Entry (One-Time Cleanup)
+Update the existing log entry that has no user_id to include the correct information:
+
+```sql
+UPDATE activity_logs 
+SET user_id = 'e14f5073-c078-4405-9821-8811aa565e40',
+    metadata = jsonb_build_object('user_email', 'vinayak.kapoor@infosecventures.com')
+WHERE entity_name = 'Business Outcome' 
+  AND user_id IS NULL;
 ```
 
 ---
 
 ## Technical Details
 
-### CSS Variable Changes
+### Files to Modify
 
-**File**: `src/index.css`
+| File | Change |
+|------|--------|
+| `src/components/EditBusinessOutcomeDialog.tsx` | Add `useAuth`, include `user_id` and `user_email` in activity log |
+| `src/hooks/useActivityLog.tsx` | Auto-include `user_email` in metadata for all logged activities |
+| `src/components/ActivityTimelineMini.tsx` | Fetch user profiles to display names, improve fallback handling |
+| `src/components/ActivityTimelineWidget.tsx` | Same improvements as ActivityTimelineMini |
 
-In the `:root` (light mode) section, update:
-```css
-/* Before */
---accent: 0 0% 95%;
---accent-foreground: 0 0% 8%;
+### Query Enhancement for Displaying User Names
 
-/* After - using muted for better consistency */
-/* Keep accent for other uses, but buttons will now use muted */
-```
-
-### Button Component Changes
-
-**File**: `src/components/ui/button.tsx`
+Instead of just fetching activity logs, join with profiles to get user names:
 
 ```typescript
-const buttonVariants = cva(
-  "...",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-muted hover:text-foreground",  // Changed
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-muted hover:text-foreground",  // Changed
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      // ... rest unchanged
-    },
-  },
-);
+const { data, error } = await supabase
+  .from('activity_logs')
+  .select(`
+    *,
+    profiles!activity_logs_user_id_fkey (
+      full_name,
+      email
+    )
+  `)
+  .order('created_at', { ascending: false })
+  .limit(limit);
 ```
 
----
-
-## Why This Works
-
-1. **`muted` is designed for subtle backgrounds**: It's specifically styled for both light and dark modes with proper contrast
-2. **`foreground` ensures readable text**: Using `text-foreground` instead of `text-accent-foreground` guarantees the text stays the standard readable color
-3. **Consistent across themes**: The muted color variables are already properly set for both light and dark modes
+Then display:
+- `log.profiles?.full_name` (preferred)
+- `log.metadata?.user_email` (fallback)
+- "Unknown User" only if nothing is available
 
 ---
 
-## Visual Comparison
+## Expected Outcomes
 
-| State | Before | After |
-|-------|--------|-------|
-| Ghost button (light mode, hover) | Light gray bg, possibly invisible text | Light gray bg, dark text (visible) |
-| Outline button (light mode, hover) | Similar issue | Proper contrast maintained |
-| Ghost button (dark mode, hover) | Works correctly | Still works correctly |
-
----
-
-## Files to Modify
-
-1. **`src/components/ui/button.tsx`**: Update ghost and outline variant hover classes
-2. **`src/index.css`** (optional): Ensure accent variables have proper contrast values
-
----
-
-## Implementation Notes
-
-- This is a minimal change that fixes the visibility issue
-- No changes to component logic, only styling classes
-- Backwards compatible with existing button usage
-- Works correctly in both light and dark modes
+After implementation:
+- All new activity logs will include the user's email in metadata
+- Activity timelines will show the user's name or email
+- Existing orphaned log entries will be fixed
+- "Unknown User" will only appear if truly no user info exists
