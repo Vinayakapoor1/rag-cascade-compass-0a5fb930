@@ -37,9 +37,9 @@ interface IndicatorData {
     id: string;
     name: string;
     current_value: number | null;
-    evidence_file: string | null;
     evidence_url: string | null;
-    evidence_reason: string | null;
+    evidence_type: string | null;
+    no_evidence_reason: string | null;
     rag_status: string;
     updated_at: string;
     key_result_name: string;
@@ -77,48 +77,54 @@ export function AdminDataControls() {
                 .order('name');
             setDepartments(deptData || []);
 
-            // Fetch indicators with related data
+            // Fetch indicators with related data using simpler joins
             const { data, error } = await supabase
                 .from('indicators')
                 .select(`
                     id,
                     name,
                     current_value,
-                    evidence_file,
                     evidence_url,
-                    evidence_reason,
+                    evidence_type,
+                    no_evidence_reason,
                     rag_status,
                     updated_at,
-                    key_results!inner(
+                    key_results (
                         name,
-                        functional_objectives!inner(
+                        functional_objectives (
                             department_id,
-                            departments!inner(name)
+                            departments (name)
                         )
                     )
                 `)
                 .order('updated_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase error:', error);
+                throw error;
+            }
+
+            console.log('Fetched indicators:', data);
 
             const formattedData: IndicatorData[] = (data || []).map((ind: any) => ({
                 id: ind.id,
                 name: ind.name,
                 current_value: ind.current_value,
-                evidence_file: ind.evidence_file,
                 evidence_url: ind.evidence_url,
-                evidence_reason: ind.evidence_reason,
+                evidence_type: ind.evidence_type,
+                no_evidence_reason: ind.no_evidence_reason,
                 rag_status: ind.rag_status,
                 updated_at: ind.updated_at,
-                key_result_name: ind.key_results.name,
-                department_name: ind.key_results.functional_objectives.departments.name,
-                department_id: ind.key_results.functional_objectives.department_id,
+                key_result_name: ind.key_results?.name || 'Unknown',
+                department_name: ind.key_results?.functional_objectives?.departments?.name || 'Unknown',
+                department_id: ind.key_results?.functional_objectives?.department_id || '',
             }));
 
+            console.log('Formatted data:', formattedData);
             setIndicators(formattedData);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching data:', error);
-            toast.error('Failed to load indicator data');
+            toast.error(`Failed to load indicator data: ${error.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
@@ -143,9 +149,17 @@ export function AdminDataControls() {
 
     const deleteIndicatorData = async (indicatorId: string) => {
         try {
-            const { error } = await supabase.rpc('delete_indicator_data', {
-                p_indicator_id: indicatorId
-            });
+            // Manually reset the indicator since the RPC function may not exist yet
+            const { error } = await supabase
+                .from('indicators')
+                .update({
+                    current_value: null,
+                    evidence_url: null,
+                    evidence_type: null,
+                    no_evidence_reason: null,
+                    rag_status: 'amber',
+                })
+                .eq('id', indicatorId);
 
             if (error) throw error;
 
@@ -185,9 +199,9 @@ export function AdminDataControls() {
                 .from('indicators')
                 .update({
                     current_value: null,
-                    evidence_file: null,
                     evidence_url: null,
-                    evidence_reason: null,
+                    evidence_type: null,
+                    no_evidence_reason: null,
                     rag_status: 'amber',
                 })
                 .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all
@@ -220,7 +234,7 @@ export function AdminDataControls() {
     };
 
     const hasData = (ind: IndicatorData) => {
-        return ind.current_value !== null || ind.evidence_file || ind.evidence_url || ind.evidence_reason;
+        return ind.current_value !== null || ind.evidence_url || ind.no_evidence_reason;
     };
 
     const indicatorsWithData = filteredIndicators.filter(hasData);
@@ -341,19 +355,19 @@ export function AdminDataControls() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex gap-1">
-                                                    {ind.evidence_file && (
+                                                    {ind.evidence_url && ind.evidence_type === 'file' && (
                                                         <Badge variant="outline" className="text-xs">
                                                             <FileText className="h-3 w-3 mr-1" />
                                                             File
                                                         </Badge>
                                                     )}
-                                                    {ind.evidence_url && (
+                                                    {ind.evidence_url && ind.evidence_type === 'link' && (
                                                         <Badge variant="outline" className="text-xs">
                                                             <LinkIcon className="h-3 w-3 mr-1" />
                                                             URL
                                                         </Badge>
                                                     )}
-                                                    {ind.evidence_reason && (
+                                                    {ind.no_evidence_reason && (
                                                         <Badge variant="outline" className="text-xs">
                                                             Reason
                                                         </Badge>
