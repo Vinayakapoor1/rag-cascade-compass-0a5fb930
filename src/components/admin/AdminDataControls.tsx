@@ -56,14 +56,22 @@ interface KeyResult {
     department_name: string;
 }
 
-// Helper to get evidence URL - handles both full URLs and storage paths
-function getEvidenceUrl(url: string | null): string | null {
-    if (!url) return null;
+// Helper to open evidence URL - handles both full URLs and storage paths (private bucket needs signed URLs)
+async function openEvidenceUrl(url: string | null): Promise<void> {
+    if (!url) return;
+    // If it's already a full URL, open directly
     if (url.startsWith('http://') || url.startsWith('https://')) {
-        return url;
+        window.open(url, '_blank');
+        return;
     }
-    const { data } = supabase.storage.from('evidence-files').getPublicUrl(url);
-    return data.publicUrl;
+    // For storage paths in private bucket, create a signed URL
+    const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
+    if (error) {
+        console.error('Error creating signed URL:', error);
+        toast.error('Could not access evidence file');
+        return;
+    }
+    window.open(data.signedUrl, '_blank');
 }
 
 export function AdminDataControls() {
@@ -477,10 +485,9 @@ export function AdminDataControls() {
                                             <TableCell>
                                                 <div className="flex gap-1">
                                                     {ind.evidence_url && (
-                                                        <a
-                                                            href={getEvidenceUrl(ind.evidence_url) || '#'}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openEvidenceUrl(ind.evidence_url)}
                                                             className="inline-flex"
                                                         >
                                                             <Badge variant="outline" className="text-xs cursor-pointer hover:bg-primary/10">
@@ -496,7 +503,7 @@ export function AdminDataControls() {
                                                                     </>
                                                                 )}
                                                             </Badge>
-                                                        </a>
+                                                        </button>
                                                     )}
                                                     {ind.no_evidence_reason && (
                                                         <Badge 
