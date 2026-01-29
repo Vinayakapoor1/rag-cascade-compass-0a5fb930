@@ -20,6 +20,8 @@ interface ActivityLog {
     entity_type: string;
     entity_id: string;
     entity_name: string;
+    old_value: any;
+    new_value: any;
     metadata: any;
     user_email?: string;
     profile_name?: string;
@@ -92,6 +94,16 @@ export function ActivityTimelineWidget() {
             case 'department': return <Briefcase className="h-3.5 w-3.5" />;
             default: return <FileText className="h-3.5 w-3.5" />;
         }
+    };
+
+    const getDisplayValue = (value: any): string => {
+        if (!value) return 'Empty';
+        // Handle indicator values
+        if (value.current_value !== undefined) return String(value.current_value);
+        // Handle org_objective/business outcome values
+        if (value.value !== undefined) return value.value || 'Empty';
+        // Handle other structures
+        return JSON.stringify(value);
     };
 
     const getActionColor = (action: string) => {
@@ -215,8 +227,21 @@ export function ActivityTimelineWidget() {
                                                                     log.metadata.new_rag_status === 'red' && "bg-red-500/10 text-red-700 border-red-500/20",
                                                                     log.metadata.new_rag_status === 'gray' && "bg-gray-500/10 text-gray-700 border-gray-500/20"
                                                                 )}>
-                                                                    {log.metadata.new_rag_status}
-                                                                </Badge>
+                                                                {log.metadata.new_rag_status}
+                                                            </Badge>
+                                                        </div>
+                                                    )}
+
+                                                        {/* Value Change - for any update with old/new values */}
+                                                        {log.action === 'update' && (log.old_value || log.new_value) && (
+                                                            <div className="flex items-center gap-1 text-xs">
+                                                                <span className="font-mono text-muted-foreground">
+                                                                    {getDisplayValue(log.old_value)}
+                                                                </span>
+                                                                <span className="text-muted-foreground">→</span>
+                                                                <span className="font-mono text-primary font-medium">
+                                                                    {getDisplayValue(log.new_value)}
+                                                                </span>
                                                             </div>
                                                         )}
                                                     </div>
