@@ -17,6 +17,7 @@ import { TeamAccessTab } from '@/components/admin/TeamAccessTab';
 import { FormulasTab } from '@/components/admin/FormulasTab';
 import { SnapshotsTab } from '@/components/admin/SnapshotsTab';
 import { AdminDashboardCard } from '@/components/admin/AdminDashboardCard';
+import { RAGLegend } from '@/components/RAGLegend';
 
 export default function DataManagement() {
   const navigate = useNavigate();
@@ -24,11 +25,39 @@ export default function DataManagement() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeMainTab, setActiveMainTab] = useState('okr');
 
+  // Department head state - always declare hooks at top level
+  const [departments, setDepartments] = useState<Array<{ department_id: string; departments: { id: string; name: string } }>>([]);
+  const [deptLoading, setDeptLoading] = useState(true);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
     }
   }, [user, authLoading, navigate]);
+
+  // Fetch departments for department heads
+  useEffect(() => {
+    async function fetchDepartments() {
+      if (!user || !isDepartmentHead || isAdmin) {
+        setDeptLoading(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('department_access')
+        .select('department_id, departments(id, name)')
+        .eq('user_id', user.id);
+
+      if (data && data.length === 1) {
+        // Auto-redirect to bulk entry for single department
+        navigate(`/department/${data[0].department_id}/data-entry`, { replace: true });
+      } else if (data) {
+        setDepartments(data);
+        setDeptLoading(false);
+      }
+    }
+    fetchDepartments();
+  }, [user, isDepartmentHead, isAdmin, navigate]);
 
   const handleImportComplete = () => {
     setRefreshKey((k) => k + 1);
@@ -68,28 +97,7 @@ export default function DataManagement() {
 
   // Department heads are redirected to bulk entry view
   if (isDepartmentHead && !isAdmin) {
-    const [departments, setDepartments] = useState<Array<{ department_id: string; departments: { id: string; name: string } }>>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-      async function fetchDepartments() {
-        const { data } = await supabase
-          .from('department_access')
-          .select('department_id, departments(id, name)')
-          .eq('user_id', user.id);
-
-        if (data && data.length === 1) {
-          // Auto-redirect to bulk entry for single department
-          navigate(`/department/${data[0].department_id}/data-entry`, { replace: true });
-        } else if (data) {
-          setDepartments(data);
-          setLoading(false);
-        }
-      }
-      fetchDepartments();
-    }, [user.id, navigate]);
-
-    if (loading) {
+    if (deptLoading) {
       return (
         <AppLayout>
           <div className="flex items-center justify-center min-h-[400px]">
