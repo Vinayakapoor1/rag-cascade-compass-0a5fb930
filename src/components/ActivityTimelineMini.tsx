@@ -17,6 +17,7 @@ interface ActivityLog {
     old_value: any;
     new_value: any;
     metadata: any;
+    user_email?: string;
 }
 
 interface ActivityTimelineMiniProps {
@@ -35,12 +36,22 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
         try {
             const { data, error } = await supabase
                 .from('activity_logs')
-                .select('*')
+                .select(`
+                    *,
+                    users:user_id(email)
+                `)
                 .order('created_at', { ascending: false })
                 .limit(limit);
 
             if (error) throw error;
-            setLogs(data || []);
+
+            // Map user email to logs
+            const logsWithEmail = (data || []).map(log => ({
+                ...log,
+                user_email: log.users?.email
+            }));
+
+            setLogs(logsWithEmail);
         } catch (error) {
             console.error('Error fetching activity logs:', error);
         } finally {
@@ -107,10 +118,17 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
                                 {log.entity_name || 'Unnamed Entity'}
                             </p>
 
-                            {/* KR Name */}
+                            {/* KR Name - no truncation */}
                             {log.metadata?.kr_name && (
-                                <p className="text-[10px] text-muted-foreground truncate">
+                                <p className="text-[10px] text-muted-foreground leading-tight">
                                     KR: {log.metadata.kr_name}
+                                </p>
+                            )}
+
+                            {/* User Email */}
+                            {log.user_email && (
+                                <p className="text-[9px] text-muted-foreground/70 italic">
+                                    Updated by {log.user_email}
                                 </p>
                             )}
 

@@ -128,10 +128,10 @@ export function NotificationsPopover() {
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="end">
                 <Tabs defaultValue="activity" className="w-full">
-                    <div className="flex items-center justify-between p-4 border-b">
-                        <TabsList className="h-8">
-                            <TabsTrigger value="notifications" className="text-xs">
-                                <Bell className="h-3 w-3 mr-1" />
+                    <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+                        <TabsList className="h-9 bg-background border">
+                            <TabsTrigger value="notifications" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                                <Bell className="h-3.5 w-3.5" />
                                 Notifications
                                 {unreadCount > 0 && (
                                     <Badge variant="destructive" className="ml-1 h-4 w-4 p-0 text-[9px] flex items-center justify-center">
@@ -139,8 +139,8 @@ export function NotificationsPopover() {
                                     </Badge>
                                 )}
                             </TabsTrigger>
-                            <TabsTrigger value="activity" className="text-xs">
-                                <Activity className="h-3 w-3 mr-1" />
+                            <TabsTrigger value="activity" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                                <Activity className="h-3.5 w-3.5" />
                                 Activity
                             </TabsTrigger>
                         </TabsList>
