@@ -51,6 +51,18 @@ function getRAGStatus(current: number | null, target: number | null): 'green' | 
     return 'red';
 }
 
+// Helper to get evidence URL - handles both full URLs and storage paths
+function getEvidenceUrl(url: string | null): string | null {
+    if (!url) return null;
+    // If it's already a full URL, return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+    // If it's a storage path, get the public URL
+    const { data } = supabase.storage.from('evidence-files').getPublicUrl(url);
+    return data.publicUrl;
+}
+
 function RAGBadge({ status, size = 'sm' }: { status: 'green' | 'amber' | 'red' | 'gray'; size?: 'sm' | 'xs' }) {
     const styles = {
         green: 'bg-rag-green text-rag-green-foreground',
@@ -284,7 +296,7 @@ export default function DepartmentDataEntry() {
                     const filePath = `evidence/${indicator.id}/${period}/${fileName}`;
 
                     const { error: uploadError } = await supabase.storage
-                        .from('evidence')
+                        .from('evidence-files')
                         .upload(filePath, update.evidenceFile);
 
                     if (uploadError) {
@@ -293,9 +305,9 @@ export default function DepartmentDataEntry() {
                         continue; // Skip this indicator if upload fails
                     } else {
                         const { data } = supabase.storage
-                            .from('evidence')
+                            .from('evidence-files')
                             .getPublicUrl(filePath);
-                        evidenceUrl = data.publicUrl;
+                        evidenceUrl = filePath; // Store the path, not the public URL (bucket is private)
                     }
                 }
 
@@ -319,21 +331,22 @@ export default function DepartmentDataEntry() {
                     console.log('History record saved for:', indicator.name, 'value:', newValue, 'period:', period);
                 }
 
-                // Update indicator current_value
+                // Calculate RAG status change
+                const oldRAGStatus = getRAGStatus(indicator.current_value, indicator.target_value);
+                const newRAGStatus = getRAGStatus(newValue, indicator.target_value);
+
+                // Update indicator current_value AND rag_status
                 const { error } = await supabase
                     .from('indicators')
                     .update({
                         current_value: newValue,
                         evidence_url: evidenceUrl,
                         no_evidence_reason: update.evidenceReason || null,
+                        rag_status: newRAGStatus,
                     })
                     .eq('id', update.id);
 
                 if (error) throw error;
-
-                // Calculate RAG status change
-                const oldRAGStatus = getRAGStatus(indicator.current_value, indicator.target_value);
-                const newRAGStatus = getRAGStatus(newValue, indicator.target_value);
 
                 // Log activity
                 await logActivity({
@@ -650,7 +663,12 @@ export default function DepartmentDataEntry() {
                                                                 </div>
                                                                 <div className="flex justify-center">
                                                                     {hasEvidence ? (
-                                                                        <a href={updates[ind.id]?.evidenceUrl || ind.evidence_url} target="_blank" rel="noopener noreferrer">
+                                                                        <a 
+                                                                            href={getEvidenceUrl(updates[ind.id]?.evidenceUrl || ind.evidence_url) || '#'} 
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
                                                                             <Paperclip className="h-4 w-4 text-primary cursor-pointer" />
                                                                         </a>
                                                                     ) : (

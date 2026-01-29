@@ -91,13 +91,33 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
     };
 
     const getDisplayValue = (value: any): string => {
-        if (!value) return 'Empty';
-        // Handle indicator values
-        if (value.current_value !== undefined) return String(value.current_value);
-        // Handle org_objective/business outcome values
-        if (value.value !== undefined) return value.value || 'Empty';
-        // Handle other structures
-        return JSON.stringify(value);
+        if (value === null || value === undefined) return 'Empty';
+        
+        // Handle primitive values directly
+        if (typeof value === 'string') return value || 'Empty';
+        if (typeof value === 'number') return String(value);
+        
+        // Handle indicator values (has current_value)
+        if ('current_value' in value) {
+            return value.current_value !== null ? String(value.current_value) : 'Empty';
+        }
+        
+        // Handle business outcome values (has value property)
+        if ('value' in value) {
+            return value.value || 'Empty';
+        }
+        
+        // For any other object with a single key, return that value
+        const keys = Object.keys(value);
+        if (keys.length === 1) {
+            const singleValue = value[keys[0]];
+            if (typeof singleValue === 'string' || typeof singleValue === 'number') {
+                return String(singleValue);
+            }
+        }
+        
+        // Last resort: avoid ugly JSON
+        return 'Updated';
     };
 
     const getRAGColor = (status: string) => {
