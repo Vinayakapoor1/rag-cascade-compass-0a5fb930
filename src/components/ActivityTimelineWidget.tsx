@@ -21,6 +21,8 @@ interface ActivityLog {
     entity_id: string;
     entity_name: string;
     metadata: any;
+    user_email?: string;
+    profile_name?: string;
 }
 
 export function ActivityTimelineWidget() {
@@ -47,7 +49,34 @@ export function ActivityTimelineWidget() {
                 .limit(15);
 
             if (error) throw error;
-            setLogs(data || []);
+
+            // Fetch profiles for user_ids
+            const userIds = [...new Set((data || []).map(log => log.user_id).filter(Boolean))];
+            let profilesMap: Record<string, { full_name: string | null; email: string | null }> = {};
+            
+            if (userIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('user_id, full_name, email')
+                    .in('user_id', userIds);
+                
+                profilesMap = (profiles || []).reduce((acc, p) => {
+                    acc[p.user_id] = { full_name: p.full_name, email: p.email };
+                    return acc;
+                }, {} as Record<string, { full_name: string | null; email: string | null }>);
+            }
+
+            // Merge profile info
+            const logsWithUser = (data || []).map(log => {
+                const profile = log.user_id ? profilesMap[log.user_id] : null;
+                return {
+                    ...log,
+                    user_email: (log.metadata as Record<string, any>)?.user_email || profile?.email || null,
+                    profile_name: profile?.full_name || null
+                };
+            });
+
+            setLogs(logsWithUser);
         } catch (error) {
             console.error('Error fetching activity logs:', error);
         } finally {
