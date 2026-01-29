@@ -28,10 +28,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Trash2, AlertTriangle, FileText, Link as LinkIcon, Filter } from 'lucide-react';
+import { Trash2, AlertTriangle, FileText, Link as LinkIcon, Filter, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
 
 interface IndicatorData {
     id: string;
@@ -59,6 +60,13 @@ export function AdminDataControls() {
     const [bulkResetDialogOpen, setBulkResetDialogOpen] = useState(false);
     const [resetAllDialogOpen, setResetAllDialogOpen] = useState(false);
     const [selectedIndicator, setSelectedIndicator] = useState<string | null>(null);
+    const [historyDialog, setHistoryDialog] = useState<{
+        open: boolean;
+        indicatorId: string;
+        indicatorName: string;
+        targetValue: number | null;
+        unit: string | null;
+    }>({ open: false, indicatorId: '', indicatorName: '', targetValue: null, unit: null });
 
     useEffect(() => {
         fetchData();
@@ -401,16 +409,35 @@ export function AdminDataControls() {
                                                 {formatDistanceToNow(new Date(ind.updated_at), { addSuffix: true })}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setSelectedIndicator(ind.id);
-                                                        setDeleteDialogOpen(true);
-                                                    }}
-                                                >
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8"
+                                                        title="View History"
+                                                        onClick={() => setHistoryDialog({
+                                                            open: true,
+                                                            indicatorId: ind.id,
+                                                            indicatorName: ind.name,
+                                                            targetValue: ind.target_value,
+                                                            unit: null
+                                                        })}
+                                                    >
+                                                        <History className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8"
+                                                        title="Delete Data"
+                                                        onClick={() => {
+                                                            setSelectedIndicator(ind.id);
+                                                            setDeleteDialogOpen(true);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -509,6 +536,16 @@ export function AdminDataControls() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Indicator History Dialog */}
+            <IndicatorHistoryDialog
+                open={historyDialog.open}
+                onOpenChange={(open) => setHistoryDialog({ ...historyDialog, open })}
+                indicatorId={historyDialog.indicatorId}
+                indicatorName={historyDialog.indicatorName}
+                targetValue={historyDialog.targetValue}
+                unit={historyDialog.unit}
+            />
         </div>
     );
 }
