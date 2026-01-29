@@ -37,6 +37,7 @@ interface IndicatorData {
     id: string;
     name: string;
     current_value: number | null;
+    target_value: number | null;
     evidence_url: string | null;
     evidence_type: string | null;
     no_evidence_reason: string | null;
@@ -84,6 +85,7 @@ export function AdminDataControls() {
                     id,
                     name,
                     current_value,
+                    target_value,
                     evidence_url,
                     evidence_type,
                     no_evidence_reason,
@@ -110,10 +112,11 @@ export function AdminDataControls() {
                 id: ind.id,
                 name: ind.name,
                 current_value: ind.current_value,
+                target_value: ind.target_value,
                 evidence_url: ind.evidence_url,
                 evidence_type: ind.evidence_type,
                 no_evidence_reason: ind.no_evidence_reason,
-                rag_status: ind.rag_status,
+                rag_status: ind.rag_status || 'amber',
                 updated_at: ind.updated_at,
                 key_result_name: ind.key_results?.name || 'Unknown',
                 department_name: ind.key_results?.functional_objectives?.departments?.name || 'Unknown',
@@ -149,7 +152,7 @@ export function AdminDataControls() {
 
     const deleteIndicatorData = async (indicatorId: string) => {
         try {
-            // Manually reset the indicator since the RPC function may not exist yet
+            // Manually reset the indicator
             const { error } = await supabase
                 .from('indicators')
                 .update({
@@ -237,7 +240,9 @@ export function AdminDataControls() {
         return ind.current_value !== null || ind.evidence_url || ind.no_evidence_reason;
     };
 
-    const indicatorsWithData = filteredIndicators.filter(hasData);
+    // Show all indicators, not just ones with data
+    const indicatorsWithData = filteredIndicators;
+    const indicatorsCount = filteredIndicators.filter(hasData).length;
 
     return (
         <div className="space-y-6">
@@ -308,7 +313,7 @@ export function AdminDataControls() {
                         </div>
                         <div>
                             <span className="text-muted-foreground">With Data:</span>
-                            <span className="ml-2 font-medium">{indicatorsWithData.length}</span>
+                            <span className="ml-2 font-medium">{indicatorsCount}</span>
                         </div>
                     </div>
 
@@ -320,7 +325,7 @@ export function AdminDataControls() {
                                     <TableHead>Department</TableHead>
                                     <TableHead>Key Result</TableHead>
                                     <TableHead>Indicator</TableHead>
-                                    <TableHead>Value</TableHead>
+                                    <TableHead>Current Value</TableHead>
                                     <TableHead>Evidence</TableHead>
                                     <TableHead>RAG</TableHead>
                                     <TableHead>Updated</TableHead>
@@ -368,7 +373,7 @@ export function AdminDataControls() {
                                                         </Badge>
                                                     )}
                                                     {ind.no_evidence_reason && (
-                                                        <Badge variant="outline" className="text-xs">
+                                                        <Badge variant="outline" className="text-xs text-muted-foreground">
                                                             Reason
                                                         </Badge>
                                                     )}
