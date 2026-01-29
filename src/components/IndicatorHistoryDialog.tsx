@@ -158,20 +158,23 @@ export function IndicatorHistoryDialog({
         }
     };
 
-    const getEvidenceUrl = (url: string | null): string | null => {
-        if (!url) return null;
+    const handleDownloadEvidence = async (url: string) => {
+        if (!url) return;
+        
+        // If it's already a full URL (external link), open directly
         if (url.startsWith('http://') || url.startsWith('https://')) {
-            return url;
+            window.open(url, '_blank');
+            return;
         }
-        const { data } = supabase.storage.from('evidence-files').getPublicUrl(url);
-        return data.publicUrl;
-    };
-
-    const handleDownloadEvidence = (url: string) => {
-        const publicUrl = getEvidenceUrl(url);
-        if (publicUrl) {
-            window.open(publicUrl, '_blank');
+        
+        // For storage paths, create a signed URL
+        const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
+        if (error) {
+            console.error('Error creating signed URL:', error);
+            toast.error('Could not access evidence file');
+            return;
         }
+        window.open(data.signedUrl, '_blank');
     };
 
     return (

@@ -51,16 +51,22 @@ function getRAGStatus(current: number | null, target: number | null): 'green' | 
     return 'red';
 }
 
-// Helper to get evidence URL - handles both full URLs and storage paths
-function getEvidenceUrl(url: string | null): string | null {
-    if (!url) return null;
-    // If it's already a full URL, return as-is
+// Helper to open evidence URL - handles both full URLs and storage paths (private bucket needs signed URLs)
+async function openEvidenceUrl(url: string | null): Promise<void> {
+    if (!url) return;
+    // If it's already a full URL, open directly
     if (url.startsWith('http://') || url.startsWith('https://')) {
-        return url;
+        window.open(url, '_blank');
+        return;
     }
-    // If it's a storage path, get the public URL
-    const { data } = supabase.storage.from('evidence-files').getPublicUrl(url);
-    return data.publicUrl;
+    // For storage paths in private bucket, create a signed URL
+    const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
+    if (error) {
+        console.error('Error creating signed URL:', error);
+        toast.error('Could not access evidence file');
+        return;
+    }
+    window.open(data.signedUrl, '_blank');
 }
 
 function RAGBadge({ status, size = 'sm' }: { status: 'green' | 'amber' | 'red' | 'gray'; size?: 'sm' | 'xs' }) {
@@ -781,14 +787,16 @@ export default function DepartmentDataEntry() {
                                                                 </div>
                                                                 <div className="flex justify-center">
                                                                     {hasEvidence ? (
-                                                                        <a 
-                                                                            href={getEvidenceUrl(updates[ind.id]?.evidenceUrl || ind.evidence_url) || '#'} 
-                                                                            target="_blank" 
-                                                                            rel="noopener noreferrer"
-                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        <button 
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                openEvidenceUrl(updates[ind.id]?.evidenceUrl || ind.evidence_url);
+                                                                            }}
+                                                                            className="hover:opacity-70"
                                                                         >
                                                                             <Paperclip className="h-4 w-4 text-primary cursor-pointer" />
-                                                                        </a>
+                                                                        </button>
                                                                     ) : (
                                                                         <Paperclip className="h-4 w-4 text-muted-foreground/30" />
                                                                     )}
