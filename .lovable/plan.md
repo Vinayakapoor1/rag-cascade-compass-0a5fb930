@@ -1,187 +1,166 @@
 
+# Add Team Leader Guide Card to Data Entry Page + KPI Formula Info Buttons
 
-# Fix Links Not Working and Add Team Leader Instructions
+## Overview
 
-## Problem Summary
-
-Based on thorough investigation, there are **3 main issues** to address:
-
-| # | Issue | Root Cause | Impact |
-|---|-------|------------|--------|
-| 1 | Links not opening | URLs entered without protocol (e.g., `google.com` instead of `https://google.com`) are treated as storage paths, causing errors | High |
-| 2 | Links not evident/visible | The Link column exists, but there's no visual indicator showing existing links; only the File column has a paperclip | Medium |
-| 3 | No team leader instructions | Team leaders have no guidance on how to enter data from the main dashboard | Medium |
+This plan addresses two requests:
+1. **Move/add the Team Leader Data Entry Guide card** to the department data entry page (`/department/:departmentId/data-entry`)
+2. **Add formula info buttons** (ℹ️) next to each KPI that display the calculation formula when clicked
 
 ---
 
-## Detailed Analysis
+## Current State Analysis
 
-### Issue 1: Links Not Opening
+### Team Leader Guide Card
+- Currently exists in `src/pages/Index.tsx` (lines 181-203)
+- Shows for department heads who are not admins
+- User wants it on the **data entry page** instead/also
 
-**Current Database State:**
-```
-indicators.evidence_url = "google.com"  (missing https://)
-indicator_history.evidence_url = "gogle.com" | "evidence/uuid/file.xlsx"
-```
-
-**Problem in `openEvidenceUrl` function:**
-```typescript
-if (url.startsWith('http://') || url.startsWith('https://')) {
-    window.open(url, '_blank');  // This is skipped for "google.com"
-    return;
-}
-// Falls through to create signed URL for storage
-const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
-// ERROR: Tries to find "google.com" as a file in storage bucket!
-```
-
-**Solution**: 
-1. Auto-prefix URLs with `https://` when saving if no protocol provided
-2. Fix the `openEvidenceUrl` function to detect non-storage paths and add protocol
-
-### Issue 2: Links Not Evident
-
-**Current UI:**
-- File column has a paperclip icon that shows when a file is uploaded
-- Link column is just an input field
-- No visual indicator showing an existing link has been saved
-
-**Solution**: Add a link icon in the grid that lights up when a URL exists (similar to the paperclip for files)
-
-### Issue 3: Team Leader Instructions Missing
-
-**Current State:**
-- Team leaders see the "Enter Data" button in the header (AppLayout.tsx line 72-78)
-- But there's no explanation of what to do on the main dashboard
-- They need to know: click departments, enter values, attach evidence, and save
-
-**Solution**: Add an instruction card on the main dashboard for logged-in department heads
+### KPI Formulas
+- The `indicators` table has a `formula` column containing calculation formulas
+- Example formulas from database:
+  - "Builds with no automated step skipped / Total builds generated × 100"
+  - "(Net New ARR − Churned ARR) / Starting ARR × 100"
+- Currently **not fetched** in `DepartmentDataEntry.tsx` (line 176 only selects `id, name, current_value, target_value, unit, frequency, evidence_url`)
+- Need to add `formula` to the interface and query
 
 ---
 
 ## Implementation Plan
 
-### Step 1: Fix URL Protocol Handling
+### Step 1: Add `formula` to Indicator Interface and Query
 
 **File**: `src/pages/DepartmentDataEntry.tsx`
 
-Add URL normalization when saving:
+Update the Indicator interface (line 21-35):
 ```typescript
-// Around line 296-298
-if (update.evidenceUrl?.trim()) {
-    let url = update.evidenceUrl.trim();
-    // Auto-add https:// if URL looks like a domain but has no protocol
-    if (url && !url.startsWith('http://') && !url.startsWith('https://') && !url.includes('/')) {
-        // Looks like a domain (e.g., google.com, www.example.org)
-        if (url.includes('.')) {
-            url = 'https://' + url;
-        }
-    }
-    evidenceUrl = url;
+interface Indicator {
+    id: string;
+    name: string;
+    current_value: number | null;
+    target_value: number | null;
+    unit: string | null;
+    frequency: string | null;
+    evidence_url: string | null;
+    formula: string | null;  // ADD THIS
+    kr_id: string;
+    kr_name: string;
+    fo_id: string;
+    fo_name: string;
+    previous_value?: number | null;
+    previous_period?: string | null;
 }
 ```
 
-### Step 2: Fix `openEvidenceUrl` Function (All Files)
-
-**Files**: 
-- `src/pages/DepartmentDataEntry.tsx`
-- `src/components/admin/AdminDataControls.tsx`
-- `src/components/IndicatorHistoryDialog.tsx`
-
-Update the helper function to better detect URLs vs storage paths:
+Update the database query (line 174-178):
 ```typescript
-async function openEvidenceUrl(url: string | null): Promise<void> {
-    if (!url) return;
-    
-    // If it's already a full URL, open directly
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-        window.open(url, '_blank');
-        return;
-    }
-    
-    // Check if this looks like a domain (has dots, no slashes at start)
-    // Storage paths look like: evidence/uuid/file.pdf
-    // Domains look like: google.com, www.example.org
-    const isLikelyDomain = url.includes('.') && !url.startsWith('evidence/') && !url.includes('/');
-    
-    if (isLikelyDomain) {
-        // Treat as external URL, add protocol
-        window.open('https://' + url, '_blank');
-        return;
-    }
-    
-    // For storage paths, create a signed URL
-    const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
-    if (error) {
-        console.error('Error creating signed URL:', error);
-        toast.error('Could not access evidence file');
-        return;
-    }
-    window.open(data.signedUrl, '_blank');
-}
+const { data: inds } = await supabase
+    .from('indicators')
+    .select('id, name, current_value, target_value, unit, frequency, evidence_url, formula')  // ADD formula
+    .eq('key_result_id', kr.id)
+    .order('name');
 ```
 
-### Step 3: Add Link Indicator Column
+### Step 2: Add Info Icon Import
 
 **File**: `src/pages/DepartmentDataEntry.tsx`
 
-Add a new column between File and Link for showing existing link status:
+Add `Info` to the lucide-react imports (line 13-17):
 ```typescript
-// Update grid to show link icon when URL exists
-<div className="flex justify-center">
-    {(updates[ind.id]?.evidenceUrl?.trim() || (ind.evidence_url && ind.evidence_url.startsWith('http'))) ? (
-        <button 
-            type="button"
-            onClick={(e) => {
-                e.stopPropagation();
-                openEvidenceUrl(updates[ind.id]?.evidenceUrl || ind.evidence_url);
-            }}
-            className="hover:opacity-70"
-        >
-            <LinkIcon className="h-4 w-4 text-primary cursor-pointer" />
-        </button>
-    ) : (
-        <LinkIcon className="h-4 w-4 text-muted-foreground/30" />
-    )}
+import {
+    Save, Loader2, ChevronDown, ChevronRight, Paperclip,
+    TrendingUp, Target, Calendar, Filter, CheckCircle2, AlertCircle,
+    History, Upload, Link as LinkIcon, Info, ClipboardCheck  // ADD Info, ClipboardCheck
+} from 'lucide-react';
+```
+
+### Step 3: Add Tooltip Import
+
+**File**: `src/pages/DepartmentDataEntry.tsx`
+
+Add tooltip component import:
+```typescript
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+```
+
+### Step 4: Add Team Leader Guide Card to Data Entry Page
+
+**File**: `src/pages/DepartmentDataEntry.tsx`
+
+Add guide card after the header section (around line 611), before the Stats Card:
+
+```typescript
+{/* Team Leader Data Entry Guide */}
+<Card className="border-primary/30 bg-primary/5">
+    <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+            <div className="p-3 rounded-xl bg-primary/10">
+                <ClipboardCheck className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+                <h3 className="font-semibold text-base mb-2">Team Leader Data Entry Guide</h3>
+                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Select the reporting period using the date picker</li>
+                    <li>Enter current values for each KPI (click the ℹ️ icon to see the formula)</li>
+                    <li>Attach evidence (file upload or link) OR provide a reason if unavailable</li>
+                    <li>Click individual Save buttons or "Save All Changes" when done</li>
+                </ol>
+            </div>
+        </div>
+    </CardContent>
+</Card>
+```
+
+### Step 5: Add Info Button to Each KPI Row
+
+**File**: `src/pages/DepartmentDataEntry.tsx`
+
+Update the grid column headers (line 742) to add a column for the info icon:
+```typescript
+<div className="grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 ...">
+    <div className="text-center">ℹ️</div>  {/* NEW COLUMN */}
+    <div>Indicator</div>
+    ...
 </div>
 ```
 
-### Step 4: Add Team Leader Instructions on Main Dashboard
-
-**File**: `src/pages/Index.tsx`
-
-Add an instruction card for department heads after the login check:
+Update each indicator row (line 775) to add the info button with tooltip:
 ```typescript
-{/* Team Leader Instructions - Only for department heads */}
-{user && isDepartmentHead && !isAdmin && (
-    <div className="card-premium p-6 border-primary/20">
-        <div className="flex items-start gap-5 relative z-10">
-            <div className="p-4 rounded-2xl bg-primary/10 animate-float">
-                <ClipboardCheck className="h-7 w-7 text-primary" />
-            </div>
-            <div className="flex-1">
-                <p className="font-semibold text-lg mb-2">Team Leader Data Entry Guide</p>
-                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                    <li>Click on your department below to expand it</li>
-                    <li>Navigate to the indicators you need to update</li>
-                    <li>Enter current values, attach evidence files or add links</li>
-                    <li>If no evidence available, provide a reason</li>
-                    <li>Click Save to submit your data</li>
-                </ol>
-            </div>
-            <Button asChild className="hover-glow shadow-lg shadow-primary/30">
-                <Link to="/data">Go to Data Entry</Link>
-            </Button>
-        </div>
+<div
+    key={ind.id}
+    className={cn(
+        "grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center ...",
+        ...
+    )}
+>
+    {/* Formula Info Button */}
+    <div className="flex justify-center">
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    className="p-1 rounded-full hover:bg-muted transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Info className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs">
+                <div className="space-y-1">
+                    <p className="font-medium text-xs">Calculation Formula</p>
+                    <p className="text-xs">{ind.formula || 'No formula defined'}</p>
+                </div>
+            </TooltipContent>
+        </Tooltip>
     </div>
-)}
-```
-
-Also need to add the import and hook usage:
-```typescript
-import { ClipboardCheck } from 'lucide-react';
-// And add isDepartmentHead to the useAuth destructure
-const { user, isAdmin, isDepartmentHead, loading: authLoading } = useAuth();
+    
+    {/* Rest of the indicator row... */}
+    <div>
+        <p className="text-sm font-medium">{ind.name}</p>
+        ...
+    </div>
+    ...
+</div>
 ```
 
 ---
@@ -190,32 +169,42 @@ const { user, isAdmin, isDepartmentHead, loading: authLoading } = useAuth();
 
 | File | Changes |
 |------|---------|
-| `src/pages/DepartmentDataEntry.tsx` | Fix URL normalization, update `openEvidenceUrl`, add Link icon column |
-| `src/components/admin/AdminDataControls.tsx` | Update `openEvidenceUrl` to handle domains |
-| `src/components/IndicatorHistoryDialog.tsx` | Update `handleDownloadEvidence` to handle domains |
-| `src/pages/Index.tsx` | Add team leader instructions card |
+| `src/pages/DepartmentDataEntry.tsx` | Add formula to interface & query, add guide card, add info button column with tooltips |
 
 ---
 
-## Technical Notes
+## Visual Preview
 
-### URL vs Storage Path Detection
-- Storage paths always start with `evidence/` and contain slashes
-- External URLs start with `http://` or `https://`
-- Domains without protocol have dots but no slashes (e.g., `google.com`)
+### Guide Card (at top of page)
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ 📋 Team Leader Data Entry Guide                                     │
+│                                                                     │
+│ 1. Select the reporting period using the date picker                │
+│ 2. Enter current values for each KPI (click ℹ️ to see formula)      │
+│ 3. Attach evidence (file/link) OR provide a reason if unavailable  │
+│ 4. Click Save when done                                            │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-### Storage Bucket
-The `evidence-files` bucket is **private** (`public: false`), so:
-- File access requires signed URLs (working correctly)
-- External links should NOT go through storage at all
+### KPI Row with Info Button
+```text
+┌────┬────────────────────────┬────────┬────────┬─────────┬────────┐
+│ ℹ️ │ Indicator              │ Target │ Prev   │ Current │ ...    │
+├────┼────────────────────────┼────────┼────────┼─────────┼────────┤
+│ ⓘ  │ Build Automation Rate  │ 95%    │ 87     │ [____]  │ ...    │
+│    │                        │        │        │         │        │
+│    └── Hover reveals: "Calculation Formula:                      │
+│        Builds with no automated step skipped /                   │
+│        Total builds generated × 100"                             │
+└────┴────────────────────────┴────────┴────────┴─────────┴────────┘
+```
 
 ---
 
 ## Expected Outcomes
 
 After implementation:
-1. URLs entered as `google.com` will be auto-prefixed with `https://` when saved
-2. Existing URLs without protocol will still open correctly (fallback detection)
-3. Link column will show a clickable link icon when a URL exists
-4. Team leaders will see clear instructions on the main dashboard for data entry
-
+1. Team leaders will see a clear instruction guide at the top of the data entry page
+2. Each KPI will have an info (ℹ️) button that shows the calculation formula on hover
+3. The formula helps team leaders understand exactly what data they need to input
