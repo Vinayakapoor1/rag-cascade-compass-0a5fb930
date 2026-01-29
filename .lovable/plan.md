@@ -1,128 +1,110 @@
 
 
-# Plan: Fix Dashboard Data Display and Verify Data Entry Flow
+# Plan: Fix Reset Data Issues - Activity Logs, History, and RAG Status
 
 ## Problem Summary
-The dashboard shows no recent activity even though data exists, and the `indicator_history` table is empty despite having historical data entries.
-
-## Root Cause Analysis
 
 | Issue | Finding |
 |-------|---------|
-| No recent activity | Activity logs exist (from Jan 28) but may not be displaying correctly |
-| Empty indicator_history | The fix was just applied; no new entries since the fix |
-| Team lead data entry | Code is correct but needs testing |
+| **Recent Activity Still Showing** | Reset only clears `indicator_history`, NOT `activity_logs` (2 logs remain) |
+| **indicator_history Not Cleared** | History has 2 records that should have been deleted but weren't |
+| **RAG Status = Amber After Reset** | Reset explicitly sets `rag_status: 'amber'` instead of `'not-set'` |
+
+---
+
+## Root Cause Analysis
+
+### Issue 1: Activity Logs Not Cleared
+The `resetAllData()` function in `AdminDataControls.tsx` (line 199-230) does:
+- Resets indicators table
+- Deletes `indicator_history`
+- **Does NOT delete `activity_logs`**
+
+Activity logs are meant as an audit trail, but if you want a "clean slate", they should also be cleared.
+
+### Issue 2: indicator_history Still Has Records
+The delete operation uses `@ts-ignore` workaround:
+```typescript
+const { error: historyError } = await supabase
+  .from('indicator_history' as any)
+  .delete()
+  .neq('id', '00000000-0000-0000-0000-000000000000');
+```
+This may be failing silently due to RLS policy - users can INSERT and UPDATE their own records, but there's **no DELETE policy** on `indicator_history`.
+
+### Issue 3: RAG Status Shows Amber, Not "Not Set"
+Line 209 of `resetAllData()` explicitly sets:
+```typescript
+rag_status: 'amber',
+```
+Per your RAG threshold standards, reset data should show `'not-set'` (meaning "No data entered").
 
 ---
 
 ## Solution Overview
 
-### Step 1: Force Data Refresh on Dashboard
-
-Add a trigger to invalidate the query cache and force a fresh data fetch when the dashboard loads. This ensures stale cached data doesn't prevent display.
-
-**File**: `src/components/ActivityTimelineWidget.tsx`
-
-**Change**: Add immediate fetch on mount and ensure loading states are handled correctly.
-
----
-
-### Step 2: Backfill Existing Activity Logs to indicator_history
-
-Since old data entries created `activity_logs` but not `indicator_history` records, we can create a one-time backfill to populate historical data.
-
-**Approach**: Create a SQL migration that populates `indicator_history` from `activity_logs` where:
-- `entity_type = 'indicator'`
-- `action = 'update'`
-- `new_value` contains `current_value`
-
----
-
-### Step 3: Verify and Enhance the History Insert in DepartmentDataEntry
-
-Ensure the bulk entry page correctly saves history records and add better error handling.
-
-**File**: `src/pages/DepartmentDataEntry.tsx`
-
-**Current code at lines 302-317**:
-```typescript
-const { error: historyError } = await supabase
-  .from('indicator_history')
-  .insert({
-    indicator_id: update.id,
-    value: newValue,
-    period,
-    evidence_url: evidenceUrl,
-    no_evidence_reason: update.evidenceReason || null,
-    created_by: user!.id
-  });
-```
-
-**Enhancement**: Add toast notification for history insertion success/failure.
-
----
-
-### Step 4: Add RLS Policy for UPDATE on indicator_history
-
-Currently, users can INSERT but cannot UPDATE the history table. For the `IndicatorHistoryDialog` edit functionality to work, we need to allow updates.
-
-**SQL Migration**:
+### Step 1: Add DELETE RLS Policy for indicator_history
+Create migration to allow authenticated users to delete their own history records:
 ```sql
-CREATE POLICY "Users can update their own history entries"
-  ON indicator_history FOR UPDATE
+CREATE POLICY "Users can delete their own history entries"
+  ON indicator_history FOR DELETE
   TO authenticated
   USING (auth.uid() = created_by);
 ```
 
----
-
-## Technical Details
-
-### Migration: Backfill indicator_history from activity_logs
-
-```sql
-INSERT INTO indicator_history (indicator_id, value, period, created_at, created_by)
-SELECT 
-  al.entity_id::uuid as indicator_id,
-  (al.new_value->>'current_value')::numeric as value,
-  COALESCE(al.metadata->>'period', to_char(al.created_at, 'YYYY-MM')) as period,
-  al.created_at,
-  al.user_id as created_by
-FROM activity_logs al
-WHERE al.entity_type = 'indicator'
-  AND al.action = 'update'
-  AND al.new_value->>'current_value' IS NOT NULL
-  AND al.entity_id IS NOT NULL
-ON CONFLICT DO NOTHING;
+### Step 2: Fix RAG Status on Reset
+Change the reset operation to use `'not-set'` instead of `'amber'`:
+```typescript
+rag_status: 'not-set',  // Changed from 'amber'
 ```
 
-### Component Changes
+### Step 3: Add Activity Logs Clearing (Optional)
+Add option to also clear activity logs during reset:
+```typescript
+const { error: logsError } = await supabase
+  .from('activity_logs')
+  .delete()
+  .neq('id', '00000000-0000-0000-0000-000000000000');
+```
 
-**ActivityTimelineWidget.tsx**:
-- Add `refetch()` call on mount if logs are empty
-- Improve empty state messaging
+### Step 4: Run One-Time Cleanup
+Execute SQL to clear remaining orphaned records:
+```sql
+DELETE FROM activity_logs WHERE true;
+DELETE FROM indicator_history WHERE true;
+UPDATE indicators SET rag_status = 'not-set' WHERE current_value IS NULL;
+```
 
-**DepartmentDataEntry.tsx**:
-- Add console logging for history insert success
-- Show user feedback for history save status
+---
+
+## Team Leader Data Entry Logs Location
+
+When team leaders enter data:
+1. **Activity Timeline Widget** (Dashboard) - Shows last 15 entries
+2. **Admin Dashboard** - Full activity timeline with all entries
+3. **indicator_history Table** - Historical values per indicator per period
+
+All entries are saved to:
+- `activity_logs` table (for audit trail / recent activity widget)
+- `indicator_history` table (for historical trending data)
 
 ---
 
 ## Implementation Order
 
-1. Create migration to add UPDATE policy on `indicator_history`
-2. Create migration to backfill history from existing activity logs
-3. Update `ActivityTimelineWidget` to force fresh data fetch
-4. Test the end-to-end flow
+1. Create migration to add DELETE policy on `indicator_history`
+2. Run cleanup migration to clear orphaned records
+3. Update `AdminDataControls.tsx` to set `rag_status: 'not-set'` on reset
+4. Update `AdminDataControls.tsx` to also clear `activity_logs` during reset
+5. Test the reset flow end-to-end
 
 ---
 
 ## Expected Outcomes
 
 After implementation:
-- Dashboard will show recent activity correctly
-- `indicator_history` will have historical data from past entries
-- Team leads can enter data and it saves to both tables
-- Admin can see all historical data and edits
-- Users can edit their own history entries
+- Reset will clear ALL related data (indicators, history, activity logs)
+- RAG status will show "Not Set" (gray) after reset
+- Team lead entries will appear in Recent Activity widget
+- Historical data will be properly tracked in indicator_history
 
