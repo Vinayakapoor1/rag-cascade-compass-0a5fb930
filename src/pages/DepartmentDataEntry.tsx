@@ -573,16 +573,16 @@ export default function DepartmentDataEntry() {
 
                                         {expandedKRs.has(krId) && (
                                             <div className="p-4">
-                                                <div className="grid grid-cols-[2fr,0.8fr,0.8fr,1.2fr,0.8fr,0.6fr,0.6fr,1.2fr,1.5fr,0.6fr,0.6fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
+                                                <div className="grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
                                                     <div>Indicator</div>
                                                     <div className="text-center">Target</div>
                                                     <div className="text-center">Previous</div>
                                                     <div className="text-center">Current</div>
                                                     <div className="text-center">Progress</div>
                                                     <div className="text-center">RAG</div>
-                                                    <div className="text-center">Evidence</div>
+                                                    <div className="text-center">File</div>
                                                     <div className="text-center">Link</div>
-                                                    <div className="text-center">Reason (if no evidence)</div>
+                                                    <div className="text-center">Reason</div>
                                                     <div className="text-center">History</div>
                                                     <div className="text-center">Upload</div>
                                                 </div>
@@ -604,7 +604,7 @@ export default function DepartmentDataEntry() {
                                                             <div
                                                                 key={ind.id}
                                                                 className={cn(
-                                                                    "grid grid-cols-[2fr,0.8fr,0.8fr,1.2fr,0.8fr,0.6fr,0.6fr,1.2fr,1.5fr,0.6fr,0.6fr] gap-2 items-center p-2 rounded-lg border",
+                                                                    "grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
                                                                     hasChanged && "ring-2 ring-primary/30 bg-primary/5",
                                                                     isInvalid && "ring-2 ring-red-500/50 bg-red-50/50"
                                                                 )}
