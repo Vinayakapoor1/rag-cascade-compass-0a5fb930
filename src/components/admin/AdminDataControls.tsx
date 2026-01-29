@@ -45,21 +45,41 @@ interface IndicatorData {
     rag_status: string;
     updated_at: string;
     key_result_name: string;
+    key_result_id: string;
     department_name: string;
     department_id: string;
+}
+
+interface KeyResult {
+    id: string;
+    name: string;
+    department_name: string;
+}
+
+// Helper to get evidence URL - handles both full URLs and storage paths
+function getEvidenceUrl(url: string | null): string | null {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+    const { data } = supabase.storage.from('evidence-files').getPublicUrl(url);
+    return data.publicUrl;
 }
 
 export function AdminDataControls() {
     const [indicators, setIndicators] = useState<IndicatorData[]>([]);
     const [filteredIndicators, setFilteredIndicators] = useState<IndicatorData[]>([]);
     const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+    const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
     const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [bulkResetDialogOpen, setBulkResetDialogOpen] = useState(false);
     const [resetAllDialogOpen, setResetAllDialogOpen] = useState(false);
+    const [resetKRDialogOpen, setResetKRDialogOpen] = useState(false);
     const [selectedIndicator, setSelectedIndicator] = useState<string | null>(null);
+    const [selectedKR, setSelectedKR] = useState<KeyResult | null>(null);
     const [historyDialog, setHistoryDialog] = useState<{
         open: boolean;
         indicatorId: string;
@@ -100,6 +120,7 @@ export function AdminDataControls() {
                     rag_status,
                     updated_at,
                     key_results (
+                        id,
                         name,
                         functional_objectives (
                             department_id,
@@ -127,12 +148,26 @@ export function AdminDataControls() {
                 rag_status: ind.rag_status || 'amber',
                 updated_at: ind.updated_at,
                 key_result_name: ind.key_results?.name || 'Unknown',
+                key_result_id: ind.key_results?.id || '',
                 department_name: ind.key_results?.functional_objectives?.departments?.name || 'Unknown',
                 department_id: ind.key_results?.functional_objectives?.department_id || '',
             }));
 
             console.log('Formatted data:', formattedData);
             setIndicators(formattedData);
+
+            // Extract unique key results
+            const uniqueKRs = new Map<string, KeyResult>();
+            formattedData.forEach(ind => {
+                if (ind.key_result_id && !uniqueKRs.has(ind.key_result_id)) {
+                    uniqueKRs.set(ind.key_result_id, {
+                        id: ind.key_result_id,
+                        name: ind.key_result_name,
+                        department_name: ind.department_name
+                    });
+                }
+            });
+            setKeyResults(Array.from(uniqueKRs.values()));
         } catch (error: any) {
             console.error('Error fetching data:', error);
             toast.error(`Failed to load indicator data: ${error.message || 'Unknown error'}`);
@@ -201,6 +236,46 @@ export function AdminDataControls() {
         } catch (error: any) {
             console.error('Error bulk resetting:', error);
             toast.error(error.message || 'Failed to reset indicators');
+        }
+    };
+
+    const resetKeyResult = async (krId: string) => {
+        try {
+            // Reset all indicators for this KR
+            const { error } = await supabase
+                .from('indicators')
+                .update({
+                    current_value: null,
+                    evidence_url: null,
+                    evidence_type: null,
+                    no_evidence_reason: null,
+                    rag_status: 'amber',
+                })
+                .eq('key_result_id', krId);
+
+            if (error) throw error;
+
+            // Delete history for these indicators
+            const indicatorIds = indicators
+                .filter(ind => ind.key_result_id === krId)
+                .map(ind => ind.id);
+
+            if (indicatorIds.length > 0) {
+                const { error: historyError } = await supabase
+                    .from('indicator_history')
+                    .delete()
+                    .in('indicator_id', indicatorIds);
+
+                if (historyError) {
+                    console.warn('History delete error:', historyError);
+                }
+            }
+
+            toast.success(`Reset all indicators for Key Result successfully`);
+            fetchData();
+        } catch (error: any) {
+            console.error('Error resetting KR:', error);
+            toast.error(error.message || 'Failed to reset Key Result');
         }
     };
 
@@ -370,7 +445,27 @@ export function AdminDataControls() {
                                     indicatorsWithData.map((ind) => (
                                         <TableRow key={ind.id}>
                                             <TableCell className="font-medium">{ind.department_name}</TableCell>
-                                            <TableCell className="text-sm">{ind.key_result_name}</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">{ind.key_result_name}</span>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        title="Reset this Key Result"
+                                                        onClick={() => {
+                                                            setSelectedKR({
+                                                                id: ind.key_result_id,
+                                                                name: ind.key_result_name,
+                                                                department_name: ind.department_name
+                                                            });
+                                                            setResetKRDialogOpen(true);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
                                             <TableCell className="text-sm">{ind.name}</TableCell>
                                             <TableCell>
                                                 {ind.current_value !== null ? (
@@ -381,20 +476,34 @@ export function AdminDataControls() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex gap-1">
-                                                    {ind.evidence_url && ind.evidence_type === 'file' && (
-                                                        <Badge variant="outline" className="text-xs">
-                                                            <FileText className="h-3 w-3 mr-1" />
-                                                            File
-                                                        </Badge>
-                                                    )}
-                                                    {ind.evidence_url && ind.evidence_type === 'link' && (
-                                                        <Badge variant="outline" className="text-xs">
-                                                            <LinkIcon className="h-3 w-3 mr-1" />
-                                                            URL
-                                                        </Badge>
+                                                    {ind.evidence_url && (
+                                                        <a
+                                                            href={getEvidenceUrl(ind.evidence_url) || '#'}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex"
+                                                        >
+                                                            <Badge variant="outline" className="text-xs cursor-pointer hover:bg-primary/10">
+                                                                {ind.evidence_type === 'file' ? (
+                                                                    <>
+                                                                        <FileText className="h-3 w-3 mr-1" />
+                                                                        File
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <LinkIcon className="h-3 w-3 mr-1" />
+                                                                        Link
+                                                                    </>
+                                                                )}
+                                                            </Badge>
+                                                        </a>
                                                     )}
                                                     {ind.no_evidence_reason && (
-                                                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                                                        <Badge 
+                                                            variant="outline" 
+                                                            className="text-xs text-muted-foreground cursor-help"
+                                                            title={ind.no_evidence_reason}
+                                                        >
                                                             Reason
                                                         </Badge>
                                                     )}
@@ -532,6 +641,38 @@ export function AdminDataControls() {
                             className="bg-destructive hover:bg-destructive/90"
                         >
                             Yes, Reset Everything
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Reset Key Result Dialog */}
+            <AlertDialog open={resetKRDialogOpen} onOpenChange={setResetKRDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Reset Key Result Data?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <div className="space-y-2">
+                                <p>This will reset all indicators for:</p>
+                                <p className="font-medium text-foreground">{selectedKR?.name}</p>
+                                <p className="text-xs">Department: {selectedKR?.department_name}</p>
+                                <p className="mt-2">All values, evidence, and history for these indicators will be deleted. This action cannot be undone.</p>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (selectedKR) {
+                                    resetKeyResult(selectedKR.id);
+                                }
+                                setResetKRDialogOpen(false);
+                                setSelectedKR(null);
+                            }}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Reset Key Result
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

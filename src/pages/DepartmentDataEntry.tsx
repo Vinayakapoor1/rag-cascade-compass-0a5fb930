@@ -382,6 +382,123 @@ export default function DepartmentDataEntry() {
         }
     };
 
+    const handleSaveSingle = async (indicatorId: string) => {
+        const update = updates[indicatorId];
+        if (!update || !update.hasChanged || !update.value) {
+            toast.info('No changes to save');
+            return;
+        }
+
+        // Validate evidence
+        if (!update.evidenceFile && !update.evidenceUrl?.trim() && !update.evidenceReason?.trim()) {
+            const indicator = indicators.find(i => i.id === indicatorId);
+            toast.error(`Evidence (file/link) or reason required for: ${indicator?.name}`);
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const indicator = indicators.find(i => i.id === indicatorId);
+            if (!indicator) return;
+
+            const newValue = parseFloat(update.value);
+            if (isNaN(newValue)) return;
+
+            let evidenceUrl = indicator.evidence_url;
+
+            // Use evidence URL if provided
+            if (update.evidenceUrl?.trim()) {
+                evidenceUrl = update.evidenceUrl.trim();
+            }
+            // Otherwise upload evidence file if provided
+            else if (update.evidenceFile) {
+                const fileName = `${Date.now()}_${update.evidenceFile.name}`;
+                const filePath = `evidence/${indicator.id}/${period}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('evidence-files')
+                    .upload(filePath, update.evidenceFile);
+
+                if (uploadError) {
+                    console.error('Upload error:', uploadError);
+                    toast.error(`Failed to upload evidence for ${indicator.name}`);
+                    return;
+                } else {
+                    evidenceUrl = filePath;
+                }
+            }
+
+            // Create history record
+            const { error: historyError } = await supabase
+                .from('indicator_history')
+                .insert({
+                    indicator_id: indicatorId,
+                    value: newValue,
+                    period,
+                    evidence_url: evidenceUrl,
+                    no_evidence_reason: update.evidenceReason || null,
+                    created_by: user!.id
+                });
+
+            if (historyError) {
+                console.error('History insert failed:', historyError);
+            }
+
+            // Calculate RAG status change
+            const oldRAGStatus = getRAGStatus(indicator.current_value, indicator.target_value);
+            const newRAGStatus = getRAGStatus(newValue, indicator.target_value);
+
+            // Update indicator
+            const { error } = await supabase
+                .from('indicators')
+                .update({
+                    current_value: newValue,
+                    evidence_url: evidenceUrl,
+                    no_evidence_reason: update.evidenceReason || null,
+                    rag_status: newRAGStatus,
+                })
+                .eq('id', indicatorId);
+
+            if (error) throw error;
+
+            // Log activity
+            await logActivity({
+                action: 'update',
+                entityType: 'indicator',
+                entityId: indicatorId,
+                entityName: indicator.name,
+                oldValue: { current_value: indicator.current_value },
+                newValue: { current_value: newValue },
+                metadata: {
+                    department_id: departmentId,
+                    period,
+                    user_email: user!.email,
+                    has_evidence: !!evidenceUrl,
+                    kr_name: indicator.kr_name,
+                    fo_name: indicator.fo_name,
+                    old_rag_status: oldRAGStatus,
+                    new_rag_status: newRAGStatus,
+                    target_value: indicator.target_value,
+                    unit: indicator.unit
+                }
+            });
+
+            toast.success(`Saved ${indicator.name}`);
+            // Clear this update
+            setUpdates(prev => {
+                const next = { ...prev };
+                delete next[indicatorId];
+                return next;
+            });
+            fetchData();
+        } catch (error) {
+            console.error('Error saving:', error);
+            toast.error('Failed to save value');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const toggleFO = (foId: string) => {
         setExpandedFOs(prev => {
             const next = new Set(prev);
@@ -589,7 +706,7 @@ export default function DepartmentDataEntry() {
 
                                         {expandedKRs.has(krId) && (
                                             <div className="p-4">
-                                                <div className="grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
+                                                <div className="grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
                                                     <div>Indicator</div>
                                                     <div className="text-center">Target</div>
                                                     <div className="text-center">Previous</div>
@@ -601,6 +718,7 @@ export default function DepartmentDataEntry() {
                                                     <div className="text-center">Reason</div>
                                                     <div className="text-center">History</div>
                                                     <div className="text-center">Upload</div>
+                                                    <div className="text-center">Save</div>
                                                 </div>
 
                                                 <div className="space-y-2">
@@ -620,9 +738,9 @@ export default function DepartmentDataEntry() {
                                                             <div
                                                                 key={ind.id}
                                                                 className={cn(
-                                                                    "grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
-                                                                    hasChanged && "ring-2 ring-primary/30 bg-primary/5",
-                                                                    isInvalid && "ring-2 ring-red-500/50 bg-red-50/50"
+                                                                    "grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
+                                                                    hasChanged && "border-primary/50 bg-muted/30",
+                                                                    isInvalid && "border-destructive/50 bg-destructive/5"
                                                                 )}
                                                             >
                                                                 <div>
@@ -683,7 +801,7 @@ export default function DepartmentDataEntry() {
                                                                         placeholder="Evidence link"
                                                                         className={cn(
                                                                             "h-8 text-xs",
-                                                                            isInvalid && "border-red-500 bg-red-50"
+                                                                            isInvalid && "border-destructive"
                                                                         )}
                                                                     />
                                                                 </div>
@@ -694,9 +812,9 @@ export default function DepartmentDataEntry() {
                                                                             onChange={(e) => handleReasonChange(ind.id, e.target.value)}
                                                                             placeholder="Why no evidence?"
                                                                             className={cn(
-                                                                                "w-full h-16 px-2 py-1 text-xs border rounded resize-none",
+                                                                                "w-full h-16 px-2 py-1 text-xs border rounded resize-none bg-background",
                                                                                 "focus:outline-none focus:ring-2 focus:ring-primary/50",
-                                                                                isInvalid && "border-red-500 bg-red-50"
+                                                                                isInvalid && "border-destructive"
                                                                             )}
                                                                             maxLength={500}
                                                                         />
@@ -735,6 +853,20 @@ export default function DepartmentDataEntry() {
                                                                             onChange={(e) => handleFileChange(ind.id, e.target.files?.[0] || null)}
                                                                         />
                                                                     </label>
+                                                                </div>
+                                                                <div className="flex justify-center">
+                                                                    {hasChanged && (
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-primary hover:text-primary"
+                                                                            title="Save this entry"
+                                                                            onClick={() => handleSaveSingle(ind.id)}
+                                                                            disabled={saving || isInvalid || !currentValue}
+                                                                        >
+                                                                            <Save className="h-4 w-4" />
+                                                                        </Button>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         );
