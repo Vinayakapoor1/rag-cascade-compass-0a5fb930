@@ -41,7 +41,7 @@ const App = () => (
               {/* Main app routes with layout */}
               <Route path="/" element={<AppLayout><Portfolio /></AppLayout>} />
               <Route path="/portfolio" element={<AppLayout><Portfolio /></AppLayout>} />
-              <Route path="/data" element={<AppLayout><DataManagement /></AppLayout>} />
+              <Route path="/data" element={<DataManagement />} />
               <Route path="/org-objective/:orgObjectiveId" element={<AppLayout><OrgObjectiveDetail /></AppLayout>} />
               <Route path="/department/:departmentId" element={<AppLayout><DepartmentDetail /></AppLayout>} />
               <Route path="/department/:departmentId/data-entry" element={<AppLayout><DepartmentDataEntry /></AppLayout>} />
