@@ -29,6 +29,8 @@ export function ActivityTimelineWidget() {
     const [isExpanded, setIsExpanded] = useState(true);
 
     useEffect(() => {
+        // Force fresh fetch on mount - bypass any stale cache
+        setLoading(true);
         fetchRecentLogs();
 
         // Auto-refresh every 30 seconds

@@ -313,7 +313,10 @@ export default function DepartmentDataEntry() {
                     });
 
                 if (historyError) {
-                    console.error('History error:', historyError);
+                    console.error('History insert failed:', historyError);
+                    toast.error(`Failed to save history for ${indicator.name}`);
+                } else {
+                    console.log('History record saved for:', indicator.name, 'value:', newValue, 'period:', period);
                 }
 
                 // Update indicator current_value
