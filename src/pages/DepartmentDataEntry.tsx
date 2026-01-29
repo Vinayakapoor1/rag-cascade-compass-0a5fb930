@@ -13,10 +13,11 @@ import { useActivityLog } from '@/hooks/useActivityLog';
 import {
     Save, Loader2, ChevronDown, ChevronRight, Paperclip,
     TrendingUp, Target, Calendar, Filter, CheckCircle2, AlertCircle,
-    History, Upload, Link as LinkIcon
+    History, Upload, Link as LinkIcon, Info, ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 interface Indicator {
     id: string;
@@ -26,6 +27,7 @@ interface Indicator {
     unit: string | null;
     frequency: string | null;
     evidence_url: string | null;
+    formula: string | null;
     kr_id: string;
     kr_name: string;
     fo_id: string;
@@ -173,7 +175,7 @@ export default function DepartmentDataEntry() {
                 for (const kr of krs || []) {
                     const { data: inds } = await supabase
                         .from('indicators')
-                        .select('id, name, current_value, target_value, unit, frequency, evidence_url')
+                        .select('id, name, current_value, target_value, unit, frequency, evidence_url, formula')
                         .eq('key_result_id', kr.id)
                         .order('name');
 
@@ -598,6 +600,7 @@ export default function DepartmentDataEntry() {
     }
 
     return (
+        <TooltipProvider>
         <div className="container mx-auto p-6 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -609,6 +612,26 @@ export default function DepartmentDataEntry() {
                     Back to Department
                 </Button>
             </div>
+
+            {/* Team Leader Data Entry Guide */}
+            <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-xl bg-primary/10">
+                            <ClipboardCheck className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-base mb-2">Team Leader Data Entry Guide</h3>
+                            <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                                <li>Select the reporting period using the date picker</li>
+                                <li>Enter current values for each KPI (click the <Info className="h-3 w-3 inline" /> icon to see the formula)</li>
+                                <li>Attach evidence (file upload or link) OR provide a reason if unavailable</li>
+                                <li>Click individual Save buttons or "Save All Changes" when done</li>
+                            </ol>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Stats Card */}
             <Card>
@@ -739,7 +762,8 @@ export default function DepartmentDataEntry() {
 
                                         {expandedKRs.has(krId) && (
                                             <div className="p-4">
-                                                <div className="grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
+                                                <div className="grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
+                                                    <div className="text-center">ℹ️</div>
                                                     <div>Indicator</div>
                                                     <div className="text-center">Target</div>
                                                     <div className="text-center">Previous</div>
@@ -772,11 +796,31 @@ export default function DepartmentDataEntry() {
                                                             <div
                                                                 key={ind.id}
                                                                 className={cn(
-                                                                    "grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
+                                                                    "grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
                                                                     hasChanged && "border-primary/50 bg-muted/30",
                                                                     isInvalid && "border-destructive/50 bg-destructive/5"
                                                                 )}
                                                             >
+                                                                {/* Formula Info Button */}
+                                                                <div className="flex justify-center">
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="p-1 rounded-full hover:bg-muted transition-colors"
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                            >
+                                                                                <Info className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                                            </button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent side="right" className="max-w-xs">
+                                                                            <div className="space-y-1">
+                                                                                <p className="font-medium text-xs">Calculation Formula</p>
+                                                                                <p className="text-xs">{ind.formula || 'No formula defined'}</p>
+                                                                            </div>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </div>
                                                                 <div>
                                                                     <p className="text-sm font-medium">{ind.name}</p>
                                                                     {ind.frequency && (
@@ -972,5 +1016,6 @@ export default function DepartmentDataEntry() {
                 unit={historyDialog.unit}
             />
         </div>
+        </TooltipProvider>
     );
 }
