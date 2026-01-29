@@ -45,7 +45,7 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
             // Use metadata.user_email if available
             const logsWithEmail = (data || []).map(log => ({
                 ...log,
-                user_email: log.metadata?.user_email || null
+                user_email: (log.metadata as Record<string, any>)?.user_email || null
             }));
 
             setLogs(logsWithEmail);

@@ -594,6 +594,50 @@ export type Database = {
           },
         ]
       }
+      indicator_history: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          evidence_url: string | null
+          id: string
+          indicator_id: string | null
+          no_evidence_reason: string | null
+          notes: string | null
+          period: string
+          value: number
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          evidence_url?: string | null
+          id?: string
+          indicator_id?: string | null
+          no_evidence_reason?: string | null
+          notes?: string | null
+          period: string
+          value: number
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          evidence_url?: string | null
+          id?: string
+          indicator_id?: string | null
+          no_evidence_reason?: string | null
+          notes?: string | null
+          period?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicator_history_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       indicator_snapshots: {
         Row: {
           calculated_at: string
@@ -679,6 +723,8 @@ export type Database = {
           is_active: boolean | null
           key_result_id: string | null
           name: string
+          no_evidence_reason: string | null
+          rag_status: string | null
           target_value: number | null
           tier: string
           unit: string | null
@@ -698,6 +744,8 @@ export type Database = {
           is_active?: boolean | null
           key_result_id?: string | null
           name: string
+          no_evidence_reason?: string | null
+          rag_status?: string | null
           target_value?: number | null
           tier?: string
           unit?: string | null
@@ -717,6 +765,8 @@ export type Database = {
           is_active?: boolean | null
           key_result_id?: string | null
           name?: string
+          no_evidence_reason?: string | null
+          rag_status?: string | null
           target_value?: number | null
           tier?: string
           unit?: string | null
@@ -802,6 +852,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          link: string | null
+          message: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       org_objectives: {
         Row: {
@@ -1043,6 +1123,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bulk_reset_indicators: {
+        Args: { p_department_id: string }
+        Returns: number
+      }
       has_department_access: {
         Args: { _dept_id: string; _user_id: string }
         Returns: boolean

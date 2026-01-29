@@ -163,8 +163,8 @@ export default function DepartmentDataEntry() {
                             kr_name: kr.name,
                             fo_id: fo.id,
                             fo_name: fo.name,
-                            previous_value: historyData?.value || null,
-                            previous_period: historyData?.period || null,
+                            previous_value: (historyData as any)?.value || null,
+                            previous_period: (historyData as any)?.period || null,
                         });
                     }
                 }

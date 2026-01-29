@@ -181,7 +181,8 @@ export function AdminDataControls() {
         }
 
         try {
-            const { data, error } = await supabase.rpc('bulk_reset_indicators', {
+            // @ts-ignore - bulk_reset_indicators function not in generated types yet
+            const { data, error } = await supabase.rpc('bulk_reset_indicators' as any, {
                 p_department_id: selectedDepartment
             });
 
@@ -212,8 +213,9 @@ export function AdminDataControls() {
             if (updateError) throw updateError;
 
             // Delete all history
+            // @ts-ignore - indicator_history table not in generated types yet
             const { error: historyError } = await supabase
-                .from('indicator_history')
+                .from('indicator_history' as any)
                 .delete()
                 .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
