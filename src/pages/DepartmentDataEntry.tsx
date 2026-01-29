@@ -13,7 +13,7 @@ import { useActivityLog } from '@/hooks/useActivityLog';
 import {
     Save, Loader2, ChevronDown, ChevronRight, Paperclip,
     TrendingUp, Target, Calendar, Filter, CheckCircle2, AlertCircle,
-    History, Upload
+    History, Upload, Link as LinkIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
@@ -51,14 +51,27 @@ function getRAGStatus(current: number | null, target: number | null): 'green' | 
     return 'red';
 }
 
-// Helper to open evidence URL - handles both full URLs and storage paths (private bucket needs signed URLs)
+// Helper to open evidence URL - handles full URLs, domains without protocol, and storage paths
 async function openEvidenceUrl(url: string | null): Promise<void> {
     if (!url) return;
+    
     // If it's already a full URL, open directly
     if (url.startsWith('http://') || url.startsWith('https://')) {
         window.open(url, '_blank');
         return;
     }
+    
+    // Check if this looks like a domain (has dots, no slashes at start)
+    // Storage paths look like: evidence/uuid/file.pdf
+    // Domains look like: google.com, www.example.org
+    const isLikelyDomain = url.includes('.') && !url.startsWith('evidence/') && !url.includes('/');
+    
+    if (isLikelyDomain) {
+        // Treat as external URL, add protocol
+        window.open('https://' + url, '_blank');
+        return;
+    }
+    
     // For storage paths in private bucket, create a signed URL
     const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
     if (error) {
@@ -292,9 +305,16 @@ export default function DepartmentDataEntry() {
 
                 let evidenceUrl = indicator.evidence_url;
 
-                // Use evidence URL if provided
+                // Use evidence URL if provided - auto-prefix https:// if needed
                 if (update.evidenceUrl?.trim()) {
-                    evidenceUrl = update.evidenceUrl.trim();
+                    let url = update.evidenceUrl.trim();
+                    // Auto-add https:// if URL looks like a domain but has no protocol
+                    if (!url.startsWith('http://') && !url.startsWith('https://') && !url.includes('/')) {
+                        if (url.includes('.')) {
+                            url = 'https://' + url;
+                        }
+                    }
+                    evidenceUrl = url;
                 }
                 // Otherwise upload evidence file if provided
                 else if (update.evidenceFile) {
@@ -412,9 +432,16 @@ export default function DepartmentDataEntry() {
 
             let evidenceUrl = indicator.evidence_url;
 
-            // Use evidence URL if provided
+            // Use evidence URL if provided - auto-prefix https:// if needed
             if (update.evidenceUrl?.trim()) {
-                evidenceUrl = update.evidenceUrl.trim();
+                let url = update.evidenceUrl.trim();
+                // Auto-add https:// if URL looks like a domain but has no protocol
+                if (!url.startsWith('http://') && !url.startsWith('https://') && !url.includes('/')) {
+                    if (url.includes('.')) {
+                        url = 'https://' + url;
+                    }
+                }
+                evidenceUrl = url;
             }
             // Otherwise upload evidence file if provided
             else if (update.evidenceFile) {
@@ -712,7 +739,7 @@ export default function DepartmentDataEntry() {
 
                                         {expandedKRs.has(krId) && (
                                             <div className="p-4">
-                                                <div className="grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
+                                                <div className="grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
                                                     <div>Indicator</div>
                                                     <div className="text-center">Target</div>
                                                     <div className="text-center">Previous</div>
@@ -720,6 +747,7 @@ export default function DepartmentDataEntry() {
                                                     <div className="text-center">Progress</div>
                                                     <div className="text-center">RAG</div>
                                                     <div className="text-center">File</div>
+                                                    <div className="text-center">🔗</div>
                                                     <div className="text-center">Link</div>
                                                     <div className="text-center">Reason</div>
                                                     <div className="text-center">History</div>
@@ -744,7 +772,7 @@ export default function DepartmentDataEntry() {
                                                             <div
                                                                 key={ind.id}
                                                                 className={cn(
-                                                                    "grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
+                                                                    "grid grid-cols-[2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
                                                                     hasChanged && "border-primary/50 bg-muted/30",
                                                                     isInvalid && "border-destructive/50 bg-destructive/5"
                                                                 )}
@@ -785,15 +813,21 @@ export default function DepartmentDataEntry() {
                                                                 <div className="flex justify-center">
                                                                     <RAGBadge status={ragStatus} />
                                                                 </div>
+                                                                {/* File column - shows paperclip for uploaded files */}
                                                                 <div className="flex justify-center">
-                                                                    {hasEvidence ? (
+                                                                    {updates[ind.id]?.evidenceFile ? (
+                                                                        <span title="File pending upload">
+                                                                            <Paperclip className="h-4 w-4 text-green-500" />
+                                                                        </span>
+                                                                    ) : (ind.evidence_url && ind.evidence_url.startsWith('evidence/')) ? (
                                                                         <button 
                                                                             type="button"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                openEvidenceUrl(updates[ind.id]?.evidenceUrl || ind.evidence_url);
+                                                                                openEvidenceUrl(ind.evidence_url);
                                                                             }}
                                                                             className="hover:opacity-70"
+                                                                            title="View uploaded file"
                                                                         >
                                                                             <Paperclip className="h-4 w-4 text-primary cursor-pointer" />
                                                                         </button>
@@ -801,6 +835,32 @@ export default function DepartmentDataEntry() {
                                                                         <Paperclip className="h-4 w-4 text-muted-foreground/30" />
                                                                     )}
                                                                 </div>
+                                                                {/* Link icon column - shows clickable link when URL exists */}
+                                                                <div className="flex justify-center">
+                                                                    {(() => {
+                                                                        const urlValue = updates[ind.id]?.evidenceUrl?.trim() || '';
+                                                                        const existingUrl = ind.evidence_url;
+                                                                        const hasExternalLink = urlValue || (existingUrl && (existingUrl.startsWith('http') || (!existingUrl.startsWith('evidence/') && existingUrl.includes('.'))));
+                                                                        
+                                                                        if (hasExternalLink) {
+                                                                            return (
+                                                                                <button 
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        openEvidenceUrl(urlValue || existingUrl);
+                                                                                    }}
+                                                                                    className="hover:opacity-70"
+                                                                                    title="Open link"
+                                                                                >
+                                                                                    <LinkIcon className="h-4 w-4 text-primary cursor-pointer" />
+                                                                                </button>
+                                                                            );
+                                                                        }
+                                                                        return <LinkIcon className="h-4 w-4 text-muted-foreground/30" />;
+                                                                    })()}
+                                                                </div>
+                                                                {/* Link input column */}
                                                                 <div>
                                                                     <Input
                                                                         type="url"

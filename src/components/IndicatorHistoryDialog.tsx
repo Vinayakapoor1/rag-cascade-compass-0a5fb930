@@ -167,6 +167,17 @@ export function IndicatorHistoryDialog({
             return;
         }
         
+        // Check if this looks like a domain (has dots, no slashes at start)
+        // Storage paths look like: evidence/uuid/file.pdf
+        // Domains look like: google.com, www.example.org
+        const isLikelyDomain = url.includes('.') && !url.startsWith('evidence/') && !url.includes('/');
+        
+        if (isLikelyDomain) {
+            // Treat as external URL, add protocol
+            window.open('https://' + url, '_blank');
+            return;
+        }
+        
         // For storage paths, create a signed URL
         const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
         if (error) {

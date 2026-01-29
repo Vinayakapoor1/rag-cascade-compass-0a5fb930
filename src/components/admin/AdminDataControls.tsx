@@ -56,14 +56,27 @@ interface KeyResult {
     department_name: string;
 }
 
-// Helper to open evidence URL - handles both full URLs and storage paths (private bucket needs signed URLs)
+// Helper to open evidence URL - handles full URLs, domains without protocol, and storage paths
 async function openEvidenceUrl(url: string | null): Promise<void> {
     if (!url) return;
+    
     // If it's already a full URL, open directly
     if (url.startsWith('http://') || url.startsWith('https://')) {
         window.open(url, '_blank');
         return;
     }
+    
+    // Check if this looks like a domain (has dots, no slashes at start)
+    // Storage paths look like: evidence/uuid/file.pdf
+    // Domains look like: google.com, www.example.org
+    const isLikelyDomain = url.includes('.') && !url.startsWith('evidence/') && !url.includes('/');
+    
+    if (isLikelyDomain) {
+        // Treat as external URL, add protocol
+        window.open('https://' + url, '_blank');
+        return;
+    }
+    
     // For storage paths in private bucket, create a signed URL
     const { data, error } = await supabase.storage.from('evidence-files').createSignedUrl(url, 3600);
     if (error) {

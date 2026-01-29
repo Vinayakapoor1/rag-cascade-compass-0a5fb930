@@ -13,12 +13,12 @@ import { RAGBadge } from '@/components/RAGBadge';
 import { getRAGMutedBg, getRAGBorderColor } from '@/lib/ragUtils';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, LogIn, Settings, Building2, Target, TrendingUp, RefreshCw, Layers } from 'lucide-react';
+import { LayoutDashboard, LogIn, Settings, Building2, Target, TrendingUp, RefreshCw, Layers, ClipboardCheck } from 'lucide-react';
 import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 
 const Index = () => {
   const { data: orgObjectives, isLoading, error, refetch } = useOrgObjectives();
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, loading: authLoading } = useAuth();
 
   // Calculate totals
   const totalOrgObjectives = orgObjectives?.length ?? 0;
@@ -173,6 +173,30 @@ const Index = () => {
               </div>
               <Button asChild className="hover-glow shadow-lg shadow-primary/30">
                 <Link to="/auth">Sign In</Link>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Team Leader Instructions - Only for department heads (not admins) */}
+        {user && isDepartmentHead && !isAdmin && (
+          <div className="card-premium p-6 border-primary/20">
+            <div className="flex items-start gap-5 relative z-10">
+              <div className="p-4 rounded-2xl bg-primary/10 animate-float">
+                <ClipboardCheck className="h-7 w-7 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-lg mb-2">Team Leader Data Entry Guide</p>
+                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                  <li>Click on your department below to expand it</li>
+                  <li>Navigate to the indicators you need to update</li>
+                  <li>Enter current values, attach evidence files or add links</li>
+                  <li>If no evidence available, provide a reason</li>
+                  <li>Click Save to submit your data</li>
+                </ol>
+              </div>
+              <Button asChild className="hover-glow shadow-lg shadow-primary/30">
+                <Link to="/data">Go to Data Entry</Link>
               </Button>
             </div>
           </div>
