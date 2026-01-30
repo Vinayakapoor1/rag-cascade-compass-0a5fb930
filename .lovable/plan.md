@@ -1,103 +1,127 @@
 
 
-# Update Visual Template in DepartmentUploader Component
+# Fix Delete Button for Team Leader History Entries
 
-## Summary
+## Problem
 
-Update the visual template preview in `DepartmentUploader.tsx` to show the 9-column format with Security & Technology sample data. This change will appear under **Team & Uploads → OKR Upload** on the Manage Data page (`/data`).
+The delete button in the indicator history dialog does not work for team leaders because the Row-Level Security (RLS) policy on the `indicator_history` table only allows **admins** to delete entries.
 
-## Current State (What You See Now)
-
-Location: `/data` → Team & Uploads tab → OKR Upload sub-tab
-
-```text
-8-Column Template:
-| Dept | Owner | Org Objective | Func. Obj | Key Result | Indicator | Formula | Target |
-|------|-------|---------------|-----------|------------|-----------|---------|--------|
-| CS   | Tanvi | Max CS        | Adoption  | +25% usage | Adoption Rate | (a/b)*100 | 80 |
+Current policy:
+```sql
+-- Only admins can delete
+Policy: "Admins can delete indicator_history"
+Command: DELETE
+Using Expression: is_admin(auth.uid())
 ```
 
-## New State (After Update)
+Team leaders have the `department_head` role, not `admin`, so they are blocked by this policy.
 
-```text
-9-Column Template:
-| Dept | Owner | Org Objective | Func. Obj | Formula | Key Result | Formula (BODMAS) | KPI | Formula |
-|------|-------|---------------|-----------|---------|------------|------------------|-----|---------|
-| S&T  | Rishiraj | Op. Excellence | Partner Enablement | (KR1 % + KR2 %) / 2 | Partner Pre-Sales... | MIN((Actual/Target)×100,100) | Pre-Sales Readiness % | (Ready/Total)×100 |
+---
+
+## Solution
+
+Update the RLS policy to allow users to delete their own history entries (entries they created). This follows the same pattern as the UPDATE policy.
+
+---
+
+## Database Changes
+
+### Migration: Update RLS Policy for `indicator_history`
+
+```sql
+-- Drop the existing admin-only delete policy
+DROP POLICY IF EXISTS "Admins can delete indicator_history" ON indicator_history;
+
+-- Create new policy that allows:
+-- 1. Admins to delete any entry
+-- 2. Users to delete their own entries (entries they created)
+CREATE POLICY "Users can delete own history entries"
+ON indicator_history
+FOR DELETE
+USING (
+  auth.uid() = created_by 
+  OR is_admin(auth.uid())
+);
 ```
 
 ---
 
-## File to Modify
+## Code Changes (Optional Enhancement)
 
-| File | Location |
-|------|----------|
-| `src/components/admin/DepartmentUploader.tsx` | Lines 430-458 |
+### File: `src/components/IndicatorHistoryDialog.tsx`
 
----
+Add better error handling to show a more descriptive message if deletion fails due to permissions:
 
-## Technical Details
-
-### Changes (Lines 430-458)
-
-**Before:**
-- Label: "8-Column Template"
-- Headers: Dept, Owner, Org Objective, Func. Obj, Key Result, Indicator, Formula, Target
-- Sample: CS, Tanvi, Max CS, Adoption, +25% usage, Adoption Rate, (a/b)*100, 80
-
-**After:**
-- Label: "9-Column Template"
-- Headers: Dept, Owner, Org Objective, Func. Obj, Formula, Key Result, Formula (BODMAS), KPI, Formula
-- Sample: S&T, Rishiraj, Op. Excellence, Partner Enablement, (KR1 % + KR2 %) / 2, Partner Pre-Sales..., MIN((Actual/Target)×100,100), Pre-Sales Readiness %, (Ready/Total)×100
-
-### Updated Code
-
+**Current code (lines 95-123):**
 ```tsx
-<div className="text-xs space-y-3 text-muted-foreground">
-  <p className="font-medium text-foreground">9-Column Template:</p>
-  <div className="bg-background rounded p-2 font-mono overflow-x-auto">
-    <table className="w-full text-left">
-      <thead>
-        <tr className="border-b border-border">
-          <th className="p-1">Dept</th>
-          <th className="p-1">Owner</th>
-          <th className="p-1">Org Objective</th>
-          <th className="p-1">Func. Obj</th>
-          <th className="p-1">Formula</th>
-          <th className="p-1">Key Result</th>
-          <th className="p-1">Formula (BODMAS)</th>
-          <th className="p-1">KPI</th>
-          <th className="p-1">Formula</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td className="p-1">S&T</td>
-          <td className="p-1">Rishiraj</td>
-          <td className="p-1">Op. Excellence</td>
-          <td className="p-1">Partner Enablement</td>
-          <td className="p-1">(KR1 % + KR2 %) / 2</td>
-          <td className="p-1">Partner Pre-Sales...</td>
-          <td className="p-1">MIN((Actual/Target)×100,100)</td>
-          <td className="p-1">Pre-Sales Readiness %</td>
-          <td className="p-1">(Ready/Total)×100</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  <p className="mt-2">
-    <strong>Universal RAG:</strong> 1-50 Red | 51-75 Amber | 76-100 Green
-  </p>
-</div>
+const deleteHistoryEntry = async (entryId: string, period: string) => {
+    try {
+        const { error } = await supabase
+            .from('indicator_history')
+            .delete()
+            .eq('id', entryId);
+
+        if (error) throw error;
+        // ... rest of the function
+    } catch (error) {
+        console.error('Error deleting history:', error);
+        toast.error('Failed to delete entry');
+    }
+};
 ```
+
+**Enhanced code:**
+```tsx
+const deleteHistoryEntry = async (entryId: string, period: string) => {
+    try {
+        const { error, count } = await supabase
+            .from('indicator_history')
+            .delete()
+            .eq('id', entryId)
+            .select();  // Add select to get count
+
+        if (error) throw error;
+        
+        // Check if any rows were actually deleted
+        // (RLS might silently block the operation)
+        
+        await logActivity({
+            action: 'delete',
+            entityType: 'indicator',
+            entityId: indicatorId,
+            entityName: indicatorName,
+            oldValue: { period },
+            metadata: { 
+                deleted_history_entry: true,
+                period 
+            }
+        });
+
+        toast.success('History entry deleted');
+        setDeleteConfirmId(null);
+        fetchHistory();
+    } catch (error) {
+        console.error('Error deleting history:', error);
+        toast.error('Failed to delete entry. You may only delete entries you created.');
+    }
+};
+```
+
+---
+
+## Summary of Changes
+
+| Change | Description |
+|--------|-------------|
+| Database Migration | Update RLS policy to allow users to delete their own entries |
+| Code Enhancement | Improve error message in `IndicatorHistoryDialog.tsx` |
 
 ---
 
 ## Result
 
 After implementation:
-- The visual preview under Team & Uploads → OKR Upload will show the 9-column format
-- Sample data will use Security & Technology (S&T) department with Rishiraj as owner
-- Column headers will match your uploaded template exactly
-- Formula columns will show your actual formula patterns
+- Team leaders can delete history entries **they created**
+- Admins can still delete any entry
+- Clear error messages if deletion fails
 
