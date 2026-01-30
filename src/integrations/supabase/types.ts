@@ -206,10 +206,12 @@ export type Database = {
           contact_person: string | null
           created_at: string
           csm_id: string | null
+          deployment_type: string | null
           email: string | null
           id: string
           industry: string | null
           industry_id: string | null
+          logo_url: string | null
           managed_services: boolean | null
           metadata: Json | null
           name: string
@@ -223,10 +225,12 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           csm_id?: string | null
+          deployment_type?: string | null
           email?: string | null
           id?: string
           industry?: string | null
           industry_id?: string | null
+          logo_url?: string | null
           managed_services?: boolean | null
           metadata?: Json | null
           name: string
@@ -240,10 +244,12 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           csm_id?: string | null
+          deployment_type?: string | null
           email?: string | null
           id?: string
           industry?: string | null
           industry_id?: string | null
+          logo_url?: string | null
           managed_services?: boolean | null
           metadata?: Json | null
           name?: string

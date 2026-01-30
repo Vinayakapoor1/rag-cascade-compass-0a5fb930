@@ -416,7 +416,6 @@ function KRStatBlock({
                 entityName={kr.name}
               />
             </div>
-            <span className="text-xs text-muted-foreground">{kpiCount} KPIs</span>
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
             <RAGBadge status={displayStatus} size="sm" />
@@ -468,22 +467,6 @@ function IndicatorStatBlock({
                   unit: ind.unit
                 }}
               />
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-muted-foreground">
-                {ind.current_value ?? '-'} / {ind.target_value ?? '-'} {ind.unit || ''}
-              </span>
-              <span className="text-xs text-muted-foreground">•</span>
-              <span className="text-xs text-muted-foreground capitalize">{ind.tier}</span>
-              {ind.last_updated_at && (
-                <>
-                  <span className="text-xs text-muted-foreground">•</span>
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5" title={new Date(ind.last_updated_at).toLocaleString()}>
-                    <Clock className="h-3 w-3" />
-                    {formatDistanceToNow(new Date(ind.last_updated_at), { addSuffix: true })}
-                  </span>
-                </>
-              )}
             </div>
           </div>
           <div className="flex flex-col items-end flex-shrink-0">

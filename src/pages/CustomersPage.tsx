@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom';
 import { useCustomersWithImpact } from '@/hooks/useCustomerImpact';
 import { DrilldownBreadcrumb } from '@/components/DrilldownBreadcrumb';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CustomerFormDialog } from '@/components/CustomerFormDialog';
-import { Users, Search, Building2, Activity, ChevronRight, Loader2, Filter, Plus, Edit, Trash2, Tag } from 'lucide-react';
+import { RAGBadge } from '@/components/RAGBadge';
+import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +21,7 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [deploymentFilter, setDeploymentFilter] = useState<string>('all');
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
@@ -53,12 +56,14 @@ export default function CustomersPage() {
     }
   };
 
-  // Get unique tiers and statuses for filters
-  const { tiers, statuses } = useMemo(() => {
-    if (!customers) return { tiers: [], statuses: [] };
+  // Get unique tiers, statuses, and deployment types for filters
+  const { tiers, statuses, deploymentTypes } = useMemo(() => {
+    if (!customers) return { tiers: [], statuses: [], deploymentTypes: [] };
+    const deployments = [...new Set(customers.map(c => c.deploymentType).filter(Boolean))].sort();
     return {
       tiers: [...new Set(customers.map(c => c.tier))].sort(),
       statuses: [...new Set(customers.map(c => c.status))].sort(),
+      deploymentTypes: deployments as string[],
     };
   }, [customers]);
 
@@ -71,17 +76,37 @@ export default function CustomersPage() {
         (c.industry?.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesTier = tierFilter === 'all' || c.tier === tierFilter;
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-      return matchesSearch && matchesTier && matchesStatus;
+      const matchesDeployment = deploymentFilter === 'all' || c.deploymentType === deploymentFilter;
+      return matchesSearch && matchesTier && matchesStatus && matchesDeployment;
     });
-  }, [customers, searchQuery, tierFilter, statusFilter]);
+  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter]);
 
-  // Summary stats
+  // Summary stats - now based on filtered customers
   const stats = useMemo(() => {
-    if (!customers) return { total: 0, linked: 0, totalLinks: 0 };
-    const linked = customers.filter(c => c.linkedIndicatorCount > 0).length;
-    const totalLinks = customers.reduce((sum, c) => sum + c.linkedIndicatorCount, 0);
-    return { total: customers.length, linked, totalLinks };
-  }, [customers]);
+    if (!filteredCustomers) return { total: 0, linked: 0, totalLinks: 0 };
+    const linked = filteredCustomers.filter(c => c.linkedIndicatorCount > 0).length;
+    const totalLinks = filteredCustomers.reduce((sum, c) => sum + c.linkedIndicatorCount, 0);
+    return { total: filteredCustomers.length, linked, totalLinks };
+  }, [filteredCustomers]);
+
+  // Get status badge styling
+  const getStatusBadgeClasses = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return 'bg-rag-green/10 text-rag-green border-rag-green/20';
+      case 'Inactive':
+        return 'bg-red-500/10 text-red-600 border-red-500/20';
+      case 'Prospect':
+        return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
+      default:
+        return '';
+    }
+  };
+
+  // Get initials for avatar fallback
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
 
   if (isLoading) {
     return (
@@ -200,6 +225,19 @@ export default function CustomersPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Deployment Type Filter */}
+        <Select value={deploymentFilter} onValueChange={setDeploymentFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Deployment" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Deployments</SelectItem>
+            {deploymentTypes.map(type => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Customer List */}
@@ -209,7 +247,7 @@ export default function CustomersPage() {
             <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No customers found</h3>
             <p className="text-muted-foreground">
-              {searchQuery || tierFilter !== 'all' || statusFilter !== 'all'
+              {searchQuery || tierFilter !== 'all' || statusFilter !== 'all' || deploymentFilter !== 'all'
                 ? 'Try adjusting your filters.'
                 : 'No customers have been added yet.'}
             </p>
@@ -222,18 +260,33 @@ export default function CustomersPage() {
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <Link to={`/customers/${customer.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
+                      {/* Customer Avatar/Logo */}
+                      <Avatar className="h-10 w-10">
+                        {customer.logoUrl && <AvatarImage src={customer.logoUrl} alt={customer.name} />}
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+                          {getInitials(customer.name)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold">{customer.name}</h3>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="outline">{customer.tier}</Badge>
                           <Badge
-                            variant={customer.status === 'Active' ? 'default' : 'secondary'}
+                            variant="outline"
+                            className={getStatusBadgeClasses(customer.status)}
                           >
                             {customer.status}
                           </Badge>
+                          {customer.deploymentType && (
+                            <Badge variant="outline" className="gap-1">
+                              {customer.deploymentType === 'Cloud' ? (
+                                <Cloud className="h-3 w-3" />
+                              ) : customer.deploymentType === 'On Prem' ? (
+                                <Server className="h-3 w-3" />
+                              ) : null}
+                              {customer.deploymentType}
+                            </Badge>
+                          )}
                           {customer.region && (
                             <span className="text-xs text-muted-foreground">{customer.region}</span>
                           )}
@@ -258,7 +311,12 @@ export default function CustomersPage() {
                         )}
                       </div>
                     </Link>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
+                      {/* RAG Status */}
+                      <div className="flex flex-col items-center">
+                        <RAGBadge status={customer.ragStatus} size="md" />
+                        <span className="text-[10px] text-muted-foreground mt-1">Health</span>
+                      </div>
                       <div className="text-right">
                         <p className={cn(
                           "text-2xl font-bold",
