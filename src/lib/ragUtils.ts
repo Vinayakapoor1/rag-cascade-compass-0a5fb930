@@ -93,6 +93,9 @@ export function getOrgObjectiveColorClasses(color: OrgObjectiveColor | string): 
       return { border: 'border-org-yellow', bg: 'bg-org-yellow-muted', text: 'text-org-yellow' };
     case 'orange':
       return { border: 'border-org-orange', bg: 'bg-org-orange-muted', text: 'text-org-orange' };
+    case 'teal':
+    case 'cyan':
+      return { border: 'border-org-teal', bg: 'bg-org-teal-muted', text: 'text-org-teal' };
     default:
       return { border: 'border-primary', bg: 'bg-primary/10', text: 'text-primary' };
   }
