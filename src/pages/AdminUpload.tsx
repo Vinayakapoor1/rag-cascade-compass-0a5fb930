@@ -487,18 +487,20 @@ export default function AdminUpload() {
               <div className="bg-muted/30 rounded-lg p-4 space-y-2">
                 <h4 className="font-medium text-foreground">9-Column Format:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• <strong>Department</strong> - Team name</li>
-                  <li>• <strong>Owner</strong> - Responsible person</li>
-                  <li>• <strong>Organizational Objective</strong> - Top-level goal</li>
-                  <li>• <strong>Functional Objective + Formula</strong> - Team objective with rollup formula</li>
-                  <li>• <strong>Key Result + Formula</strong> - Measurable outcome with aggregation formula</li>
-                  <li>• <strong>KPI + Formula</strong> - Individual metric with calculation formula</li>
+                  <li>• <strong>Column A:</strong> Department</li>
+                  <li>• <strong>Column B:</strong> Owner</li>
+                  <li>• <strong>Column C:</strong> Organizational Objective</li>
+                  <li>• <strong>Column D:</strong> Functional Objective</li>
+                  <li>• <strong>Column E:</strong> Formula (FO aggregation, e.g., <code>(KR1 % + KR2 %) / 2</code>)</li>
+                  <li>• <strong>Column F:</strong> Key Result</li>
+                  <li>• <strong>Column G:</strong> Formula (BODMAS rule, e.g., <code>MIN((Actual KPI % / Target KPI %) × 100,100)</code>)</li>
+                  <li>• <strong>Column H:</strong> KPI</li>
+                  <li>• <strong>Column I:</strong> Formula (KPI calculation)</li>
                 </ul>
                 <div className="flex gap-2 mt-3 text-xs flex-wrap">
-                  <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">AVG - Average</span>
-                  <span className="px-2 py-1 rounded bg-purple-100 text-purple-700 font-medium">SUM - Total</span>
-                  <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 font-medium">WEIGHTED_AVG</span>
-                  <span className="px-2 py-1 rounded bg-red-100 text-red-700 font-medium">MIN - Worst Case</span>
+                  <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">(KR1 % + KR2 %) / 2</span>
+                  <span className="px-2 py-1 rounded bg-purple-100 text-purple-700 font-medium">MIN((Actual / Target) × 100, 100)</span>
+                  <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 font-medium">BODMAS Expressions</span>
                 </div>
               </div>
 
