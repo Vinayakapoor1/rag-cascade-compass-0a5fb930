@@ -353,7 +353,7 @@
     @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
   }
 
-  /* Decorative Gradient Orb */
+  /* Decorative Gradient Orb - Optimized for performance */
   .gradient-orb {
     @apply absolute rounded-full pointer-events-none;
     background: radial-gradient(circle, 
@@ -361,7 +361,8 @@
       hsla(0, 72%, 50%, 0.04) 50%, 
       transparent 70%
     );
-    filter: blur(60px);
+    filter: blur(40px);
+    will-change: transform;
   }
 
   .dark .gradient-orb {
@@ -370,6 +371,15 @@
       hsla(0, 72%, 50%, 0.08) 50%, 
       transparent 70%
     );
+  }
+
+  /* Dark mode logo adjustment - make dark text visible */
+  .logo-dark-mode-adjust {
+    @apply transition-all duration-300;
+  }
+
+  .dark .logo-dark-mode-adjust {
+    filter: brightness(1.8);
   }
 
   /* Inner Highlight Effect for Cards */
@@ -482,8 +492,19 @@
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
+  will-change: transform;
 }
 
 .animate-glow {
   animation: glow 3s ease-in-out infinite;
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .gradient-orb,
+  .animate-glow,
+  .shimmer {
+    animation: none !important;
+  }
 }

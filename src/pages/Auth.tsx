@@ -67,7 +67,7 @@ export default function Auth() {
           <img 
             src="/images/klarity-logo-full.png" 
             alt="KlaRity by Infosec Ventures" 
-            className="h-20 w-auto"
+            className="h-20 w-auto logo-dark-mode-adjust"
           />
         </div>
 

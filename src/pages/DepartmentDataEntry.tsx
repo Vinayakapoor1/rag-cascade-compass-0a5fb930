@@ -662,7 +662,7 @@ export default function DepartmentDataEntry() {
                                     type="month"
                                     value={period}
                                     onChange={(e) => setPeriod(e.target.value)}
-                                    className="w-40"
+                                    className="w-48"
                                 />
                             </div>
                             <Button
