@@ -33,6 +33,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
+import { useActivityLog } from '@/hooks/useActivityLog';
+import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface IndicatorData {
     id: string;
@@ -88,6 +91,9 @@ async function openEvidenceUrl(url: string | null): Promise<void> {
 }
 
 export function AdminDataControls() {
+    const { user } = useAuth();
+    const { logActivity } = useActivityLog();
+    const queryClient = useQueryClient();
     const [indicators, setIndicators] = useState<IndicatorData[]>([]);
     const [filteredIndicators, setFilteredIndicators] = useState<IndicatorData[]>([]);
     const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
@@ -216,6 +222,10 @@ export function AdminDataControls() {
 
     const deleteIndicatorData = async (indicatorId: string) => {
         try {
+            // Get indicator info before reset
+            const indicator = indicators.find(i => i.id === indicatorId);
+            const oldValue = indicator?.current_value;
+
             // Manually reset the indicator
             const { error } = await supabase
                 .from('indicators')
@@ -229,6 +239,31 @@ export function AdminDataControls() {
                 .eq('id', indicatorId);
 
             if (error) throw error;
+
+            // Delete history for this indicator
+            await supabase
+                .from('indicator_history')
+                .delete()
+                .eq('indicator_id', indicatorId);
+
+            // Log admin activity
+            await logActivity({
+                action: 'delete',
+                entityType: 'indicator',
+                entityId: indicatorId,
+                entityName: indicator?.name || 'Unknown Indicator',
+                oldValue: { current_value: oldValue },
+                metadata: {
+                    is_admin_action: true,
+                    action_type: 'reset_indicator',
+                    department_name: indicator?.department_name,
+                    key_result_name: indicator?.key_result_name,
+                    user_email: user?.email
+                }
+            });
+
+            // Invalidate cache
+            queryClient.invalidateQueries({ queryKey: ['org-objectives'] });
 
             toast.success('Indicator data deleted successfully');
             fetchData();
@@ -245,12 +280,32 @@ export function AdminDataControls() {
         }
 
         try {
+            const dept = departments.find(d => d.id === selectedDepartment);
+            const affectedIndicators = indicators.filter(i => i.department_id === selectedDepartment);
+
             // @ts-ignore - bulk_reset_indicators function not in generated types yet
             const { data, error } = await supabase.rpc('bulk_reset_indicators' as any, {
                 p_department_id: selectedDepartment
             });
 
             if (error) throw error;
+
+            // Log admin activity
+            await logActivity({
+                action: 'delete',
+                entityType: 'department',
+                entityId: selectedDepartment,
+                entityName: dept?.name || 'Unknown Department',
+                metadata: {
+                    is_admin_action: true,
+                    action_type: 'bulk_reset_department',
+                    indicators_reset: data,
+                    user_email: user?.email
+                }
+            });
+
+            // Invalidate cache
+            queryClient.invalidateQueries({ queryKey: ['org-objectives'] });
 
             toast.success(`Reset ${data} indicators successfully`);
             fetchData();
@@ -262,6 +317,9 @@ export function AdminDataControls() {
 
     const resetKeyResult = async (krId: string) => {
         try {
+            const kr = keyResults.find(k => k.id === krId);
+            const affectedIndicators = indicators.filter(ind => ind.key_result_id === krId);
+
             // Reset all indicators for this KR
             const { error } = await supabase
                 .from('indicators')
@@ -277,9 +335,7 @@ export function AdminDataControls() {
             if (error) throw error;
 
             // Delete history for these indicators
-            const indicatorIds = indicators
-                .filter(ind => ind.key_result_id === krId)
-                .map(ind => ind.id);
+            const indicatorIds = affectedIndicators.map(ind => ind.id);
 
             if (indicatorIds.length > 0) {
                 const { error: historyError } = await supabase
@@ -292,6 +348,24 @@ export function AdminDataControls() {
                 }
             }
 
+            // Log admin activity
+            await logActivity({
+                action: 'delete',
+                entityType: 'key_result',
+                entityId: krId,
+                entityName: kr?.name || 'Unknown Key Result',
+                metadata: {
+                    is_admin_action: true,
+                    action_type: 'reset_key_result',
+                    indicators_reset: affectedIndicators.length,
+                    department_name: kr?.department_name,
+                    user_email: user?.email
+                }
+            });
+
+            // Invalidate cache
+            queryClient.invalidateQueries({ queryKey: ['org-objectives'] });
+
             toast.success(`Reset all indicators for Key Result successfully`);
             fetchData();
         } catch (error: any) {
@@ -302,6 +376,8 @@ export function AdminDataControls() {
 
     const resetAllData = async () => {
         try {
+            const totalIndicators = indicators.length;
+
             // Reset all indicators with 'not-set' RAG status (per RAG threshold standards)
             const { error: updateError } = await supabase
                 .from('indicators')
@@ -326,6 +402,19 @@ export function AdminDataControls() {
                 console.warn('History delete error (may be RLS):', historyError);
             }
 
+            // Log admin activity before clearing logs
+            await logActivity({
+                action: 'delete',
+                entityType: 'indicator',
+                entityName: 'All Indicators',
+                metadata: {
+                    is_admin_action: true,
+                    action_type: 'reset_all_data',
+                    indicators_reset: totalIndicators,
+                    user_email: user?.email
+                }
+            });
+
             // Delete all activity logs for a clean slate
             const { error: logsError } = await supabase
                 .from('activity_logs')
@@ -335,6 +424,9 @@ export function AdminDataControls() {
             if (logsError) {
                 console.warn('Activity logs delete error (may be RLS):', logsError);
             }
+
+            // Invalidate cache
+            queryClient.invalidateQueries({ queryKey: ['org-objectives'] });
 
             toast.success('All indicator data, history, and activity logs have been reset');
             fetchData();
