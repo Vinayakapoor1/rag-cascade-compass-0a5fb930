@@ -358,7 +358,7 @@ export default function Portfolio() {
       {/* 3. Organizational Objectives - Small Stat Blocks */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Organizational Objectives</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {filteredObjectives.map(objective => (
               <OrgObjectiveStatBlock
                 key={objective.id}

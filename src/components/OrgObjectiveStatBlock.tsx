@@ -62,7 +62,7 @@ export function OrgObjectiveStatBlock({
               <Target className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-sm leading-tight line-clamp-2">{name}</h3>
+              <h3 className="font-semibold text-xs leading-tight">{name}</h3>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground inline-block mt-1">
                 {classification}
               </span>
