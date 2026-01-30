@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, Briefcase, Layers, LayoutGrid, Calendar, ArrowRight, Trash2 } from 'lucide-react';
+import { FileText, Briefcase, Layers, LayoutGrid, Calendar, ArrowRight, Trash2, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -172,9 +172,29 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
 
                         {/* Content */}
                         <div className="flex-1 min-w-0 space-y-1">
-                            <p className="text-sm font-medium truncate">
-                                {log.entity_name || 'Unnamed Entity'}
-                            </p>
+                            <div className="flex items-center gap-1">
+                                <p className="text-sm font-medium truncate">
+                                    {log.entity_name || 'Unnamed Entity'}
+                                </p>
+                                {/* Admin Badge */}
+                                {log.metadata?.is_admin_action && (
+                                    <Badge 
+                                        variant="outline" 
+                                        className="text-[8px] px-1 py-0 h-3.5 bg-purple-500/10 text-purple-700 border-purple-500/20 uppercase font-medium"
+                                    >
+                                        <Shield className="h-2 w-2 mr-0.5" />
+                                        ADMIN
+                                    </Badge>
+                                )}
+                            </div>
+
+                            {/* Action Type for admin actions */}
+                            {log.metadata?.action_type && (
+                                <p className="text-[10px] text-muted-foreground leading-tight">
+                                    Action: {log.metadata.action_type.replace(/_/g, ' ')}
+                                    {log.metadata?.indicators_reset && ` (${log.metadata.indicators_reset} indicators)`}
+                                </p>
+                            )}
 
                             {/* KR Name - no truncation */}
                             {log.metadata?.kr_name && (
@@ -183,10 +203,16 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
                                 </p>
                             )}
 
-                            {/* User Info */}
+                            {/* User Info - styled differently for admin vs user */}
                             {(log.profile_name || log.user_email) && (
-                                <p className="text-[9px] text-muted-foreground/70 italic">
-                                    Updated by {log.profile_name || log.user_email}
+                                <p className={cn(
+                                    "text-[9px] italic",
+                                    log.metadata?.is_admin_action 
+                                        ? "text-purple-600/70" 
+                                        : "text-muted-foreground/70"
+                                )}>
+                                    {log.metadata?.is_admin_action ? 'By admin: ' : 'Updated by '}
+                                    {log.profile_name || log.user_email}
                                 </p>
                             )}
 
