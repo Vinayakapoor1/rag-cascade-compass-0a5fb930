@@ -1,14 +1,18 @@
 
 
-# Show Full Org Objective Names with Aligned Layout
+# Align CORE and Enabler Classification Badges
 
 ## Problem
 
-The current implementation uses `line-clamp-3` which truncates long objective names like "Operational Excellence & Cybersecurity Resilience". The user wants to see the **full names** while still maintaining alignment of the status badges and progress bars.
+The classification badges ("CORE" / "Enabler") are in the status row below the title section. Since the title section uses `min-h-[56px]` and can grow with longer names, the badges are still at different vertical positions across cards - they're pushed down by varying amounts of title text.
 
 ## Solution
 
-Use CSS Grid with a **minimum height** instead of a fixed height, allowing the title area to expand for longer names while ensuring all cards in the same row have equal heights through the grid's implicit row stretching.
+Restructure the card to use a **two-part flex layout**:
+1. **Top section** (flexible): Title area that can grow
+2. **Bottom section** (fixed): Classification + RAG status + Progress bar - always anchored to the bottom
+
+This ensures the CORE/Enabler badges, RAG status, percentages, and progress bars are all perfectly aligned across all cards regardless of title length.
 
 ---
 
@@ -20,32 +24,49 @@ Use CSS Grid with a **minimum height** instead of a fixed height, allowing the t
 
 ## Technical Changes
 
-### Current Title Section (Lines 59-70)
-```tsx
-{/* Title Section - fixed height for alignment */}
-<div className="flex items-start gap-3 h-[56px]">
-  <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
-    <Target className="h-4 w-4 text-muted-foreground" />
-  </div>
-  <h3 
-    className="font-semibold text-sm leading-tight flex-1 line-clamp-3"
-    title={name}
-  >
-    {name}
-  </h3>
-</div>
+### New Card Structure
+
+```text
+┌─────────────────────────────────┐
+│  [Icon]  Objective Name         │  ← Flexible area (flex-1)
+│          (can grow as needed)   │
+│                                 │
+├─────────────────────────────────┤
+│  [CORE]           [RAG] [85%]   │  ← Fixed at bottom (mt-auto)
+│  ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░           │
+└─────────────────────────────────┘
 ```
 
-### New Title Section
+### Updated Layout Code
+
 ```tsx
-{/* Title Section - minimum height, grows with content */}
-<div className="flex items-start gap-3 min-h-[56px]">
-  <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
-    <Target className="h-4 w-4 text-muted-foreground" />
+<div className="p-4 h-full flex flex-col">
+  {/* Title Section - flexible, grows with content */}
+  <div className="flex items-start gap-3 flex-1">
+    <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
+      <Target className="h-4 w-4 text-muted-foreground" />
+    </div>
+    <h3 className="font-semibold text-sm leading-tight">
+      {name}
+    </h3>
   </div>
-  <h3 className="font-semibold text-sm leading-tight flex-1">
-    {name}
-  </h3>
+  
+  {/* Bottom Section - fixed position, anchored to bottom */}
+  <div className="mt-auto">
+    {/* Status Row */}
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground">
+        {classification}
+      </span>
+      <div className="flex items-center gap-2">
+        <RAGBadge status={displayStatus} size="sm" />
+        <span className="text-base font-bold">{percentage}%</span>
+      </div>
+    </div>
+    
+    {/* Progress Bar */}
+    <Progress ... />
+  </div>
 </div>
 ```
 
@@ -53,53 +74,38 @@ Use CSS Grid with a **minimum height** instead of a fixed height, allowing the t
 
 | Element | Before | After |
 |---------|--------|-------|
-| Title container height | `h-[56px]` (fixed, clips text) | `min-h-[56px]` (minimum, expands as needed) |
-| Line clamping | `line-clamp-3` (truncates) | Removed (shows full text) |
-| Title attribute | `title={name}` (for tooltip) | Removed (not needed) |
+| Title container | `min-h-[56px]` (min height) | `flex-1` (takes available space) |
+| Status row | `mt-2 mb-3` (relative to title) | Inside `mt-auto` wrapper (anchored to bottom) |
+| Progress bar | Separate with `mt-auto` | Inside same bottom wrapper |
 
 ---
 
 ## How Alignment Works
 
-The parent grid in `Portfolio.tsx` uses:
-```tsx
-<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-```
+1. **CSS Grid** (parent): All cards in the row have the same height (tallest card wins)
+2. **h-full**: Each card fills its grid cell completely
+3. **flex-col** + **flex-1**: Title area expands to fill available space
+4. **mt-auto wrapper**: Classification badge + progress bar group sticks to the bottom
 
-CSS Grid automatically stretches all items in the same row to match the tallest item. Combined with `h-full` on the card and `flex flex-col` with `mt-auto` on the progress bar:
-
-1. **Grid row**: All 5 cards in a row get the same height (matching the tallest)
-2. **Card**: Uses `h-full` to fill the grid cell
-3. **Flexbox column**: Content flows top-to-bottom
-4. **Progress bar**: `mt-auto` pushes it to the bottom
-
-This means if "Operational Excellence & Cybersecurity Resilience" wraps to 3 lines, all other cards in that row will also be 3-line height, keeping badges and progress bars aligned.
+This means regardless of how many lines the title takes, the CORE/Enabler badges, RAG status, and progress bars will always be at the exact same vertical position across all cards.
 
 ---
 
 ## Visual Result
 
 ```text
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│ Brand &         │ │ Customer        │ │ Operational     │
-│ Reputation      │ │ Experience &    │ │ Excellence &    │
-│                 │ │ Success         │ │ Cybersecurity   │
-│                 │ │                 │ │ Resilience      │
-├─────────────────┤ ├─────────────────┤ ├─────────────────┤
-│ [CORE] [G][85%] │ │ [CORE] [A][72%] │ │ [ENABLER][R]68% │
-├─────────────────┤ ├─────────────────┤ ├─────────────────┤
-│ ▓▓▓▓▓▓▓▓░░░░░░░ │ │ ▓▓▓▓▓▓▓░░░░░░░░ │ │ ▓▓▓▓▓▓░░░░░░░░░ │
-└─────────────────┘ └─────────────────┘ └─────────────────┘
-      ↑                    ↑                    ↑
-   All cards same height, badges & bars aligned
+Card 1               Card 2               Card 3
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│ Brand &          │ │ Customer         │ │ Operational      │
+│ Reputation       │ │ Experience &     │ │ Excellence &     │
+│                  │ │ Success          │ │ Cybersecurity    │
+│                  │ │                  │ │ Resilience       │
+│                  │ │                  │ │                  │
+├──────────────────┤ ├──────────────────┤ ├──────────────────┤ ← Same line
+│ [CORE]    [G]85% │ │ [CORE]    [A]72% │ │ [Enabler] [R]68% │
+│ ▓▓▓▓▓▓▓░░░░░░░░░ │ │ ▓▓▓▓▓▓░░░░░░░░░░ │ │ ▓▓▓▓▓░░░░░░░░░░░ │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
 ```
 
----
-
-## Benefits
-
-1. **Full names visible**: No truncation, all objective names fully displayed
-2. **Natural alignment**: CSS Grid handles row height synchronization automatically
-3. **Consistent spacing**: Status row and progress bar align perfectly
-4. **Responsive**: Works across all breakpoints (2, 3, or 5 columns)
+All CORE/Enabler badges perfectly aligned horizontally ✓
 
