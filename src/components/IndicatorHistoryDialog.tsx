@@ -94,12 +94,20 @@ export function IndicatorHistoryDialog({
 
     const deleteHistoryEntry = async (entryId: string, period: string) => {
         try {
-            const { error } = await supabase
+            const { error, data } = await supabase
                 .from('indicator_history')
                 .delete()
-                .eq('id', entryId);
+                .eq('id', entryId)
+                .select();
 
             if (error) throw error;
+
+            // Check if any rows were actually deleted (RLS might silently block)
+            if (!data || data.length === 0) {
+                toast.error('You can only delete entries you created.');
+                setDeleteConfirmId(null);
+                return;
+            }
 
             await logActivity({
                 action: 'delete',
@@ -118,7 +126,7 @@ export function IndicatorHistoryDialog({
             fetchHistory();
         } catch (error) {
             console.error('Error deleting history:', error);
-            toast.error('Failed to delete entry');
+            toast.error('Failed to delete entry. You may only delete entries you created.');
         }
     };
 
