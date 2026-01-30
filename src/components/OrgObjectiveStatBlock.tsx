@@ -56,32 +56,35 @@ export function OrgObjectiveStatBlock({
       getGlowClass(displayStatus)
     )}>
       <div className="p-4 h-full flex flex-col">
-        {/* Title Section - minimum height, grows with content */}
-        <div className="flex items-start gap-3 min-h-[56px]">
+        {/* Title Section - flexible, grows with content */}
+        <div className="flex items-start gap-3 flex-1">
           <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
             <Target className="h-4 w-4 text-muted-foreground" />
           </div>
-          <h3 className="font-semibold text-sm leading-tight flex-1">
+          <h3 className="font-semibold text-sm leading-tight">
             {name}
           </h3>
         </div>
         
-        {/* Status Row - fixed position with badge left, RAG + percentage right */}
-        <div className="flex items-center justify-between mt-2 mb-3">
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground">
-            {classification}
-          </span>
-          <div className="flex items-center gap-2">
-            <RAGBadge status={displayStatus} size="sm" />
-            <span className="text-base font-bold">{Math.round(percentage)}%</span>
+        {/* Bottom Section - anchored to bottom for alignment */}
+        <div className="mt-auto">
+          {/* Status Row */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground">
+              {classification}
+            </span>
+            <div className="flex items-center gap-2">
+              <RAGBadge status={displayStatus} size="sm" />
+              <span className="text-base font-bold">{Math.round(percentage)}%</span>
+            </div>
           </div>
+          
+          {/* Progress Bar */}
+          <Progress 
+            value={Math.min(percentage, 100)} 
+            className={`h-1.5 ${getProgressColorClass(displayStatus)}`}
+          />
         </div>
-        
-        {/* Progress Bar - bottom */}
-        <Progress 
-          value={Math.min(percentage, 100)} 
-          className={`h-1.5 mt-auto ${getProgressColorClass(displayStatus)}`}
-        />
       </div>
     </div>
   );
