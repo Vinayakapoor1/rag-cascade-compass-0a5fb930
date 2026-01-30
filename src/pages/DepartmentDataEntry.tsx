@@ -1014,6 +1014,9 @@ export default function DepartmentDataEntry() {
                 krName={historyDialog.krName}
                 targetValue={historyDialog.targetValue}
                 unit={historyDialog.unit}
+                onDataChange={() => {
+                    fetchData();
+                }}
             />
         </div>
         </TooltipProvider>
