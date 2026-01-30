@@ -1,16 +1,106 @@
 
+# Multi-Feature Enhancement Plan
 
-# Display All 5 Org Objective Cards in One Line with Full Text
+## Summary of Changes
 
-## Problem
+This plan addresses the following issues and enhancements:
 
-Currently, the Organizational Objectives section displays cards in a `grid-cols-4` layout on large screens, causing the 5th card to wrap to a second row. Additionally, the objective names are truncated with `line-clamp-2`, cutting off text like "Achieve Operational Excellence - People,..." and "Maximize Customer Success and...".
+1. **Dashboard Org Objective Cards**: No issue found - the 0% cards are displaying correctly with empty progress bars
+2. **Department Detail Cards**: Remove extra text labels from KR and KPI cards
+3. **Customers Page**: Dynamic stats, colored status badges, RAG status, logo support, and deployment type filtering
 
-## Solution
+---
 
-Make two changes:
-1. Update the grid layout to display all 5 cards in a single row on large screens
-2. Remove text truncation so full objective names are visible
+## Part 1: Remove Text Labels from Department Cards
+
+**Files to modify:** `src/pages/DepartmentDetail.tsx`
+
+### Changes to KRStatBlock (Line 419)
+Remove the "X KPIs" text label from Key Result cards:
+- **Current:** Shows `{kpiCount} KPIs`
+- **Updated:** Remove this line entirely
+
+### Changes to IndicatorStatBlock (Lines 472-487)
+Remove the detailed text showing values and tier from KPI cards:
+- **Current:** Shows `{current} / {target} {unit} • {tier} • {timestamp}`
+- **Updated:** Remove this line entirely - the progress bar and percentage already communicate the status
+
+This simplifies the cards to show only:
+- Icon + Name + Info button
+- RAG Badge + Percentage
+- Progress bar
+
+---
+
+## Part 2: Customers Page Enhancements
+
+### 2A. Dynamic Stats Based on Filtering
+
+**File:** `src/pages/CustomersPage.tsx`
+
+**Current behavior:** Summary stats use all customers regardless of filters
+```tsx
+const stats = useMemo(() => {
+    if (!customers) return { ... };
+    // Uses 'customers', not 'filteredCustomers'
+});
+```
+
+**New behavior:** Stats will recalculate based on filtered results:
+- Total Customers: Count of filtered customers
+- Linked to KPIs: Count of filtered customers with KPI links
+- Total KPI Links: Sum of KPI links from filtered customers
+
+### 2B. Active = Green, Inactive = Red Status Badges
+
+**File:** `src/pages/CustomersPage.tsx`
+
+Update the status Badge styling:
+| Status | Color |
+|--------|-------|
+| Active | Green (bg-rag-green/10, text-rag-green) |
+| Inactive | Red (bg-red-500/10, text-red-600) |
+| Prospect | Yellow (bg-yellow-500/10, text-yellow-600) |
+
+### 2C. Add RAG Status for Each Customer
+
+**Approach:** Calculate customer RAG status based on their linked KPI performance
+
+**New hook needed:** Fetch KPI status breakdown for each customer to calculate aggregate RAG
+
+The RAG status will be:
+- Based on their linked indicators' performance
+- Shows "Not Set" if no KPIs linked
+- Displays as a RAG badge on each customer card
+
+### 2D. Customer Logo Support
+
+**Database change:** Add `logo_url` column to `customers` table
+
+**Form change:** Add logo upload field to CustomerFormDialog
+- Upload to Supabase Storage
+- Display as avatar/icon on customer cards
+
+### 2E. Deployment Type Filter (On Prem / Cloud)
+
+**Database change:** Add `deployment_type` column to `customers` table
+- Values: 'On Prem', 'Cloud', 'Hybrid', or null
+
+**UI changes:**
+- Add dropdown filter for deployment type
+- Add field in CustomerFormDialog
+- Display badge on customer cards
+
+---
+
+## Database Migration Required
+
+```sql
+-- Add new columns to customers table
+ALTER TABLE customers 
+ADD COLUMN IF NOT EXISTS logo_url TEXT,
+ADD COLUMN IF NOT EXISTS deployment_type TEXT CHECK (deployment_type IN ('On Prem', 'Cloud', 'Hybrid'));
+```
 
 ---
 
@@ -18,52 +108,67 @@ Make two changes:
 
 | File | Changes |
 |------|---------|
-| `src/pages/Portfolio.tsx` | Change grid to `lg:grid-cols-5` for 5-column layout |
-| `src/components/OrgObjectiveStatBlock.tsx` | Remove `line-clamp-2` so full text is visible |
+| `src/pages/DepartmentDetail.tsx` | Remove text labels from KRStatBlock and IndicatorStatBlock |
+| `src/pages/CustomersPage.tsx` | Dynamic stats, colored badges, RAG status, logo display, deployment filter |
+| `src/components/CustomerFormDialog.tsx` | Add logo upload, deployment type field |
+| `src/hooks/useCustomerImpact.tsx` | Add RAG status calculation per customer |
 
 ---
 
-## Technical Details
+## Technical Implementation Details
 
-### 1. Portfolio.tsx (Line 361)
-
-**Current:**
+### 1. KRStatBlock Simplification
 ```tsx
-<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+// Remove this line (around line 419):
+<span className="text-xs text-muted-foreground">{kpiCount} KPIs</span>
 ```
 
-**Updated:**
+### 2. IndicatorStatBlock Simplification
 ```tsx
-<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+// Remove lines 472-487 (the entire flex container with value/tier/timestamp)
+<div className="flex items-center gap-2 mt-1">
+    <span className="text-xs text-muted-foreground">...</span>
+    ...
+</div>
 ```
 
-Changes:
-- `lg:grid-cols-4` → `lg:grid-cols-5` to fit all 5 cards in one row
-- `gap-4` → `gap-3` to slightly reduce spacing and give cards more room
-
-### 2. OrgObjectiveStatBlock.tsx (Line 65)
-
-**Current:**
+### 3. Dynamic Stats Calculation
 ```tsx
-<h3 className="font-semibold text-sm leading-tight line-clamp-2">{name}</h3>
+// Change from using 'customers' to 'filteredCustomers'
+const stats = useMemo(() => {
+    if (!filteredCustomers) return { total: 0, linked: 0, totalLinks: 0 };
+    const linked = filteredCustomers.filter(c => c.linkedIndicatorCount > 0).length;
+    const totalLinks = filteredCustomers.reduce((sum, c) => sum + c.linkedIndicatorCount, 0);
+    return { total: filteredCustomers.length, linked, totalLinks };
+}, [filteredCustomers]);
 ```
 
-**Updated:**
+### 4. Status Badge Colors
 ```tsx
-<h3 className="font-semibold text-xs leading-tight">{name}</h3>
+<Badge
+    className={cn(
+        customer.status === 'Active' && 'bg-rag-green/10 text-rag-green border-rag-green/20',
+        customer.status === 'Inactive' && 'bg-red-500/10 text-red-600 border-red-500/20',
+        customer.status === 'Prospect' && 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+    )}
+>
+    {customer.status}
+</Badge>
 ```
 
-Changes:
-- Remove `line-clamp-2` to show full text without truncation
-- `text-sm` → `text-xs` to allow longer names to fit within the card width
+### 5. Customer RAG Status
+Add to `useCustomersWithImpact` hook:
+- Fetch all indicator_customer_links with indicator status
+- Calculate average RAG for each customer
+- Return as part of CustomerWithImpact interface
 
 ---
 
-## Result
+## Result After Implementation
 
-After implementation:
-- All 5 Organizational Objectives display in a single row on large screens
-- Full objective names are visible without "..." truncation
-- Cards adjust to smaller gap for better spacing with 5 columns
-- Responsive behavior preserved (2 columns on mobile, 3 on medium screens)
-
+1. **Department cards** will be cleaner with just name, percentage, and progress bar
+2. **Customer stats** will update dynamically as filters are applied
+3. **Status badges** will use meaningful colors (green for active, red for inactive)
+4. **RAG status** will show customer health at a glance
+5. **Logo upload** will allow brand identity on customer cards
+6. **Deployment filter** will enable filtering by On Prem vs Cloud
