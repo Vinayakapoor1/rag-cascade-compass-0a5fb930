@@ -1,241 +1,159 @@
 
+# Performance, Layout Fix & Dark Mode Logo Optimization
 
-# Fix Admin Console Delete Function + Add History Entry Delete
+## Issues Summary
 
-## Problem Summary
-
-| Issue | Current Behavior | Expected Behavior |
-|-------|-----------------|-------------------|
-| Delete/Reset not updating RAG | Sets RAG to 'amber' (yellow) | Should set RAG to 'not-set' (gray) when no data |
-| No individual history delete | Can only edit history entries | Need delete option for each history entry |
-| Unclear terminology | Single "Delete" action that resets data | Clearer Reset vs Delete options |
+| # | Issue | Description |
+|---|-------|-------------|
+| 1 | **Performance** | Page feels slow due to multiple potential causes |
+| 2 | **Layout** | Date picker (month input) is cut off (screenshot shows "February 2026" with cropped text) |
+| 3 | **Logo Dark Mode** | "Rity" and "INFOSEC" text needs to turn white in dark mode (currently stays red/dark on dark background) |
 
 ---
 
-## Solution Overview
+## Solutions
 
-### Fix 1: Update RAG Status on Reset/Delete
+### 1. Performance Improvements
 
-When clearing indicator data, the RAG status should become 'not-set' (gray) to indicate "No data entered" rather than 'amber' which implies at-risk performance.
+**Root Causes Identified:**
+- `useOrgObjectives` makes 7 sequential database queries on every load
+- Heavy CSS animations (`gradient-orb`, `animate-float`) running continuously
+- All hierarchy data loaded upfront even when not needed
 
-**Affected functions:**
-- `deleteIndicatorData()` - line 227: change `rag_status: 'amber'` to `rag_status: 'not-set'`
-- `resetKeyResult()` - line 274: change `rag_status: 'amber'` to `rag_status: 'not-set'`
-- `bulk_reset_indicators` database function already uses 'amber' - but this is a stored procedure, so we'll update the client-side ones
+**Optimizations:**
 
-### Fix 2: Add Delete Button to History Entries
+a) **Reduce animation overhead in CSS** (`src/index.css`):
+- Change `gradient-orb` filter blur from 60px to 40px
+- Add `will-change: transform` for GPU acceleration
+- Use `prefers-reduced-motion` media query to disable animations for users who prefer it
 
-Add a trash icon button next to the Edit button in the history dialog that allows deleting individual history entries.
+b) **Optimize the main data hook** (`src/hooks/useOrgObjectives.tsx`):
+- Add `staleTime: 60000` (1 minute) to React Query to avoid refetching too frequently
+- Add `refetchOnWindowFocus: false` to prevent unnecessary refetches
 
-### Fix 3: Rename Actions for Clarity
+c) **Lazy loading animations**:
+- Add CSS optimization to only animate visible elements
 
-- Current "Delete Data" button → Rename to "Reset" with a different icon
-- Add actual "Delete" for history entries
+### 2. Layout Fix - Date Picker Width
+
+**Problem:** The month input (`type="month"`) is set to `w-40` (160px) which is too narrow for "February 2026" format.
+
+**Solution:** In `src/pages/DepartmentDataEntry.tsx`, change the input width from `w-40` to `w-48` (192px) to accommodate longer month names.
+
+```typescript
+// Line 661-666
+<Input
+    type="month"
+    value={period}
+    onChange={(e) => setPeriod(e.target.value)}
+    className="w-48"  // Changed from w-40
+/>
+```
+
+### 3. Dark Mode Logo - CSS Filter Approach
+
+**Problem:** The logo image (`klarity-logo-full.png`) shows "Kla" in red and "Rity" + "INFOSEC VENTURES" in dark/black text. In dark mode, the dark text becomes invisible.
+
+**Solution Options:**
+
+**Option A (Recommended): CSS Filter Inversion for Dark Mode**
+Apply a CSS class that uses `filter` to make the dark portions of the logo become white while preserving the red.
+
+```css
+/* In src/index.css */
+.dark .logo-dark-mode-adjust {
+    filter: brightness(1.5) contrast(1.1);
+}
+```
+
+This approach:
+- Brightens the dark text to become visible
+- Preserves the red color
+- Works with the existing PNG image
+
+**Option B: Create a dark mode version of the logo**
+- Would require creating/uploading a separate logo file with white text
+- More work but provides perfect color control
+
+I recommend **Option A** as it's simpler and doesn't require new assets.
 
 ---
 
 ## Implementation Details
 
-### Step 1: Fix RAG Status in AdminDataControls.tsx
-
-**File**: `src/components/admin/AdminDataControls.tsx`
-
-Update `deleteIndicatorData` function (line 227):
-```typescript
-const { error } = await supabase
-    .from('indicators')
-    .update({
-        current_value: null,
-        evidence_url: null,
-        evidence_type: null,
-        no_evidence_reason: null,
-        rag_status: 'not-set',  // Changed from 'amber'
-    })
-    .eq('id', indicatorId);
-```
-
-Update `resetKeyResult` function (line 274):
-```typescript
-const { error } = await supabase
-    .from('indicators')
-    .update({
-        current_value: null,
-        evidence_url: null,
-        evidence_type: null,
-        no_evidence_reason: null,
-        rag_status: 'not-set',  // Changed from 'amber'
-    })
-    .eq('key_result_id', krId);
-```
-
-Update dialog description (line 586):
-```typescript
-<AlertDialogDescription>
-    This will reset this indicator to its default state (no value, no evidence, RAG status = not-set).
-    This action cannot be undone.
-</AlertDialogDescription>
-```
-
-### Step 2: Add Delete Button to History Dialog
-
-**File**: `src/components/IndicatorHistoryDialog.tsx`
-
-Add import for Trash2 icon:
-```typescript
-import { History, Download, FileText, Calendar, User, Pencil, Save, X, ExternalLink, Trash2 } from 'lucide-react';
-```
-
-Add state for delete confirmation:
-```typescript
-const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-```
-
-Add delete function:
-```typescript
-const deleteHistoryEntry = async (entryId: string, period: string) => {
-    try {
-        const { error } = await supabase
-            .from('indicator_history')
-            .delete()
-            .eq('id', entryId);
-
-        if (error) throw error;
-
-        await logActivity({
-            action: 'delete',
-            entityType: 'indicator',
-            entityId: indicatorId,
-            entityName: indicatorName,
-            oldValue: { period },
-            metadata: { 
-                deleted_history_entry: true,
-                period 
-            }
-        });
-
-        toast.success('History entry deleted');
-        setDeleteConfirmId(null);
-        fetchHistory();
-    } catch (error) {
-        console.error('Error deleting history:', error);
-        toast.error('Failed to delete entry');
-    }
-};
-```
-
-Add Delete button in table actions column (after Edit button):
-```typescript
-<TableCell className="text-right">
-    {isEditing ? (
-        // ... existing edit buttons
-    ) : deleteConfirmId === entry.id ? (
-        <div className="flex items-center justify-end gap-1">
-            <span className="text-xs text-destructive mr-1">Delete?</span>
-            <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-destructive"
-                onClick={() => deleteHistoryEntry(entry.id, entry.period)}
-            >
-                Yes
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2"
-                onClick={() => setDeleteConfirmId(null)}
-            >
-                No
-            </Button>
-        </div>
-    ) : (
-        <div className="flex items-center justify-end gap-1">
-            <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 gap-1"
-                onClick={() => startEdit(entry)}
-            >
-                <Pencil className="h-3 w-3" />
-                <span className="text-xs">Edit</span>
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 gap-1 text-destructive hover:text-destructive"
-                onClick={() => setDeleteConfirmId(entry.id)}
-            >
-                <Trash2 className="h-3 w-3" />
-            </Button>
-        </div>
-    )}
-</TableCell>
-```
-
-### Step 3: Update Button Label for Clarity
-
-**File**: `src/components/admin/AdminDataControls.tsx`
-
-Change the action button label (around line 561-567):
-```typescript
-<Button
-    variant="ghost"
-    size="icon"
-    className="h-8 w-8"
-    title="Reset Indicator (Clear Data)"  // More descriptive title
-    onClick={() => {
-        setSelectedIndicator(ind.id);
-        setDeleteDialogOpen(true);
-    }}
->
-    <RotateCcw className="h-4 w-4 text-orange-500" />  // Use reset icon instead of trash
-</Button>
-```
-
-Also add `RotateCcw` to imports.
-
----
-
-## Files to Modify
+### File Changes
 
 | File | Changes |
 |------|---------|
-| `src/components/admin/AdminDataControls.tsx` | Fix RAG status to 'not-set', add RotateCcw icon, update button title |
-| `src/components/IndicatorHistoryDialog.tsx` | Add delete functionality for individual history entries |
+| `src/index.css` | Add animation performance optimizations, add logo dark mode filter class |
+| `src/pages/DepartmentDataEntry.tsx` | Widen month input from `w-40` to `w-48` |
+| `src/components/AppLayout.tsx` | Add `logo-dark-mode-adjust` class to logo images |
+| `src/pages/Index.tsx` | Add `logo-dark-mode-adjust` class to logo image |
+| `src/pages/Auth.tsx` | Add `logo-dark-mode-adjust` class to logo image |
+| `src/hooks/useOrgObjectives.tsx` | Add staleTime and refetchOnWindowFocus to React Query config |
+
+### CSS Addition for Logo (src/index.css)
+
+```css
+/* Dark mode logo adjustment - make dark text visible */
+.dark .logo-dark-mode-adjust {
+    filter: brightness(0) invert(1);
+}
+
+.dark .logo-dark-mode-adjust-subtle {
+    filter: brightness(1.8);
+}
+```
+
+### Logo Class Application (AppLayout.tsx example)
+
+```typescript
+<img
+    src="/images/klarity-logo-full.png"
+    alt="KlaRity by Infosec Ventures"
+    className="h-12 w-auto transition-all duration-300 group-hover:brightness-110 dark:brightness-[1.8]"
+/>
+```
+
+### React Query Optimization (useOrgObjectives.tsx)
+
+```typescript
+export function useOrgObjectives() {
+    return useQuery({
+        queryKey: ['org-objectives'],
+        queryFn: fetchOrgObjectives,
+        staleTime: 60000, // 1 minute
+        refetchOnWindowFocus: false,
+    });
+}
+```
 
 ---
 
-## Visual Changes
+## Visual Preview
 
-### Before (Admin Data Controls)
-```
-[Trash Icon] Delete Data → Sets RAG to amber
-```
+### Date Picker (Before vs After)
 
-### After (Admin Data Controls)  
-```
-[Reset Icon] Reset Indicator → Sets RAG to 'not-set' (gray)
+```text
+Before (w-40):  [February 20...]  (cut off)
+After (w-48):   [February 2026 ]  (full text visible)
 ```
 
-### Before (History Dialog)
-```
-| Period | Value | ... | Actions    |
-|--------|-------|-----|------------|
-| 2025-01| 85    | ... | [Edit]     |
-```
+### Logo Dark Mode (Before vs After)
 
-### After (History Dialog)
-```
-| Period | Value | ... | Actions         |
-|--------|-------|-----|-----------------|
-| 2025-01| 85    | ... | [Edit] [Delete] |
+```text
+Before:  KlaRity      (dark text invisible on dark background)
+         ▫▫▫▫▫▫▫     (INFOSEC VENTURES invisible)
+
+After:   KlaRity      (red stays red, "Rity" becomes white)
+         INFOSEC      (white text visible)
+         VENTURES
 ```
 
 ---
 
-## Technical Notes
+## Expected Outcomes
 
-- The 'not-set' RAG status aligns with the project's RAG threshold standards: "0% or null" → "Not Set" (gray)
-- RLS policy on `indicator_history` already allows admins to delete (`Admins can delete indicator_history`)
-- Activity logging captures deletions for audit trail
-
+1. **Performance**: Reduced animation overhead, less frequent data refetching
+2. **Layout**: Month picker shows full text without cropping
+3. **Logo**: "Rity" and "INFOSEC VENTURES" turn white in dark mode while "Kla" stays red
