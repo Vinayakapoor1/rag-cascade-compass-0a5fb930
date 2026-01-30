@@ -56,12 +56,15 @@ export function OrgObjectiveStatBlock({
       getGlowClass(displayStatus)
     )}>
       <div className="p-4 h-full flex flex-col">
-        {/* Title Section - flexible height with minimum */}
-        <div className="flex items-start gap-3 min-h-[48px] flex-1">
+        {/* Title Section - fixed height for alignment */}
+        <div className="flex items-start gap-3 h-[56px]">
           <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
             <Target className="h-4 w-4 text-muted-foreground" />
           </div>
-          <h3 className="font-semibold text-sm leading-snug flex-1">
+          <h3 
+            className="font-semibold text-sm leading-tight flex-1 line-clamp-3"
+            title={name}
+          >
             {name}
           </h3>
         </div>
