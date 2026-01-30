@@ -55,8 +55,8 @@ export function OrgObjectiveStatBlock({
       getBorderColorClass(displayStatus),
       getGlowClass(displayStatus)
     )}>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
+      <div className="p-4 h-full flex flex-col">
+        <div className="flex items-start justify-between gap-2 flex-1">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
               <Target className="h-4 w-4 text-muted-foreground" />
@@ -76,7 +76,7 @@ export function OrgObjectiveStatBlock({
         
         <Progress 
           value={Math.min(percentage, 100)} 
-          className={`h-1.5 ${getProgressColorClass(displayStatus)}`}
+          className={`h-1.5 mt-auto ${getProgressColorClass(displayStatus)}`}
         />
       </div>
     </div>
