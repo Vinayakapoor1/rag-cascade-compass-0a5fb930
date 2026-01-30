@@ -1,122 +1,106 @@
 
-# Fix Dark Mode Logo + Show Full Date in Activity Logs
+# Update OKR Import Template with Your Data
 
-## Issues to Fix
+## Summary
 
-| # | Issue | Root Cause |
-|---|-------|------------|
-| 1 | **Logo not visible in dark mode** | `brightness(1.8)` filter only makes colors brighter, doesn't turn black text to white |
-| 2 | **Activity logs show relative time only** | Uses `formatDistanceToNow()` which shows "2 hours ago" instead of full date |
+Update the downloadable OKR Import Template and Admin UI to match your uploaded file format, replacing the generic sample data with your "Security & Technology" department data.
 
----
+## Changes Overview
 
-## Solution 1: Dark Mode Logo Fix
+### 1. Update Template File (`src/lib/simpleExcelTemplate.ts`)
 
-### The Problem
+**Current sample data** (generic):
+- Customer Success, Product Development, Operations departments
+- Simple formulas: `AVG(KRs)`, `SUM(KPIs)`
 
-The current logo has:
-- **Red text**: "Kla" and "VENTURES" 
-- **Black text**: "Rity", "by", "INFOSEC"
+**New sample data** (from your file):
+- Security & Technology department with Rishiraj Nigam as owner
+- Organizational Objective: "Achieve Operational Excellence - People, Process, Technology"
+- 6 Functional Objectives with their Key Results and KPIs
+- Real formulas: `(KR1 % + KR2 %) / 2` and `MIN((Actual KPI % / Target KPI %) × 100,100)`
 
-In dark mode, the black text disappears against the dark background. The `brightness(1.8)` filter just makes colors lighter but doesn't effectively convert black to white.
+### 2. Update Instructions Sheet
 
-### The Solution
+Align the instructions with the exact column headers from your file:
+- Column E: "Formula" (for FO aggregation)
+- Column G: "Formula (BODMAS rule)" (for KR calculation)
+- Column I: "Formula" (for KPI calculation)
 
-Use `filter: invert(1) brightness(2)` which:
-1. **Inverts** all colors (black → white, red → cyan)
-2. **Increases brightness** to make the inverted colors pop
+### 3. Update Admin UI Preview (`src/pages/AdminUpload.tsx`)
 
-However, this changes red to cyan which may not be ideal. A better approach is to use `filter: brightness(0) invert(1)` which:
-1. Makes everything black first
-2. Then inverts to white
-
-**Result**: The entire logo becomes white, which provides excellent contrast on dark backgrounds while maintaining brand recognition through the shape.
-
-### CSS Change
-
-**File**: `src/index.css`
-
-```css
-/* Dark mode logo adjustment - make dark text visible */
-.logo-dark-mode-adjust {
-    @apply transition-all duration-300;
-}
-
-.dark .logo-dark-mode-adjust {
-    filter: brightness(0) invert(1);
-}
-```
-
-This makes the entire logo white in dark mode, which is a common approach for logos with dark text portions.
+Update the V5 Format tab description to show the 9-column structure matching your template.
 
 ---
 
-## Solution 2: Show Full Date in Activity Logs
+## New Sample Data (from your file)
 
-### Current Behavior
-```text
-Updated 2 hours ago
-```
+| Department | Owner | Org Objective | Functional Objective | FO Formula | Key Result | KR Formula | KPI | KPI Formula |
+|------------|-------|---------------|---------------------|------------|------------|------------|-----|-------------|
+| Security & Technology | Rishiraj Nigam | Achieve Operational Excellence - People, Process, Technology | Enhance Partner Technical Enablement | (KR1 % + KR2 %) / 2 | Partner Pre-Sales Technical Enablement... | MIN((Actual KPI % / Target KPI %) x 100,100) | Partner Pre-Sales Readiness Compliance % | (No. of partner-led pre-sales engagements meeting readiness criteria / Total evaluated engagements) x 100 |
+| ... | ... | ... | Partner Solution Design Compliance | ... | Achieve 90% partner-led solution designs... | ... | Partner Solution Design Compliance % | ... |
+| ... | ... | ... | Ensure On-Time and Quality Technical Delivery | (KR1 % + KR2 %) / 2 | On-Time Secure Delivery... | ... | On-Time & Secure Delivery Rate % | ... |
+| ... | ... | ... | | | Post Delivery Stability... | ... | Post-Go-Live Stability Rate % | ... |
+| ... | ... | ... | Sustain and Scale a Reliable, Resilient Technology Environment | (KR1 % + KR2 %) / 2 | Platform Availability & Performance... | ... | Platform Availability % | ... |
+| ... | ... | ... | | | Recoverability & Capacity Readiness... | ... | Resilience & Capacity Compliance % | ... |
+| ... | ... | ... | Fortify Security of Managed IT Environment | (KR1 % + KR2 %) / 2 | Preventive Control Coverage... | ... | Preventive Security Control Coverage % | ... |
+| ... | ... | ... | | | Detection & Response Effectiveness... | ... | Security Incident SLA Compliance % | ... |
+| ... | ... | ... | Drive Automation and Continuous Optimization in Technical Operations | (KR1 % + KR2 %) / 2 | Automation of Repetitive Operations... | ... | Operational Automation Coverage % | ... |
+| ... | ... | ... | | | Operational Outcome Improvement... | ... | Operational Outcome Improvement % | ... |
 
-### Desired Behavior
-```text
-Jan 30, 2026, 2:45 PM
-```
+---
 
-### Files to Update
+## Files to Modify
 
-Both activity log components need to change from `formatDistanceToNow()` to `format()`:
+| File | Changes |
+|------|---------|
+| `src/lib/simpleExcelTemplate.ts` | Replace sample data with your Security & Technology data; update column headers to match your file |
+| `src/pages/AdminUpload.tsx` | Update V5 Format description to show accurate 9-column structure |
 
-1. **`src/components/ActivityTimelineMini.tsx`** (line 221)
-2. **`src/components/ActivityTimelineWidget.tsx`** (line 271)
+---
 
-### Code Change
+## Technical Details
+
+### Sample Data Structure
 
 ```typescript
-// Import format function from date-fns
-import { format } from 'date-fns';
-
-// Replace:
-{formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
-
-// With:
-{format(new Date(log.created_at), 'MMM d, yyyy, h:mm a')}
+const sampleData: V54OKRRow[] = [
+  // Functional Objective 1: Enhance Partner Technical Enablement
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Enhance Partner Technical Enablement', 
+    foFormula: '(KR1 % + KR2 %) / 2', 
+    keyResult: 'Partner Pre-Sales Technical Enablement - Ensure >=75% partners are technically ready...', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Partner Pre-Sales Readiness Compliance %', 
+    kpiFormula: '(No. of partner-led pre-sales engagements meeting readiness criteria / Total evaluated engagements) × 100' 
+  },
+  // ... 9 more rows covering all 6 Functional Objectives
+];
 ```
 
-**Format explanation**:
-- `MMM` = Short month name (Jan, Feb, Mar)
-- `d` = Day of month (1-31)
-- `yyyy` = Full year (2026)
-- `h:mm` = Hour and minutes (2:45)
-- `a` = AM/PM
+### Column Headers
+
+```typescript
+const headers = [
+  'Department',
+  'Owner', 
+  'Organizational Objective',
+  'Functional Objective',
+  'Formula',                    // FO Formula
+  'Key Result',
+  'Formula (BODMAS rule)',      // KR Formula
+  'KPI',
+  'Formula'                     // KPI Formula
+];
+```
 
 ---
 
-## Implementation Summary
+## Result
 
-| File | Change |
-|------|--------|
-| `src/index.css` | Update dark logo filter from `brightness(1.8)` to `brightness(0) invert(1)` |
-| `src/components/ActivityTimelineMini.tsx` | Change date format from relative to full date |
-| `src/components/ActivityTimelineWidget.tsx` | Change date format from relative to full date |
-
----
-
-## Visual Preview
-
-### Dark Mode Logo (Before vs After)
-
-```text
-Before:  KlaRity              (Rity invisible)
-         by INFOSEC VENTURES  (INFOSEC invisible)
-
-After:   KlaRity              (entire logo white)
-         by INFOSEC VENTURES  (fully visible)
-```
-
-### Activity Log Date (Before vs After)
-
-```text
-Before:  📅 2 hours ago
-After:   📅 Jan 30, 2026, 2:45 PM
-```
+After implementation:
+- Downloading the V5 template will produce an Excel file with your exact data structure
+- The sample data will be relevant to your Security & Technology use case
+- The formulas will reflect your actual calculation patterns
