@@ -86,7 +86,7 @@ export default function KeyResultDetail() {
           evidence_url: null,
           evidence_type: null,
           no_evidence_reason: null,
-          rag_status: 'amber',
+          rag_status: 'not-set',
         })
         .in('id', indicatorIds);
 
