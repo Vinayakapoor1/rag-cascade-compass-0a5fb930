@@ -353,40 +353,73 @@ export interface CustomerWithImpact {
   industry: string | null;
   status: string;
   linkedIndicatorCount: number;
+  ragStatus: RAGStatus;
+  logoUrl: string | null;
+  deploymentType: string | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
-  // Fetch all customers
+  // Fetch all customers including new columns
   const { data: customers, error: custError } = await supabase
     .from('customers')
-    .select('id, name, tier, region, industry, status')
+    .select('id, name, tier, region, industry, status, logo_url, deployment_type')
     .order('name');
   
   if (custError) throw custError;
   if (!customers) return [];
 
-  // Fetch all indicator links
+  // Fetch all indicator links with indicator data for RAG calculation
   const { data: links, error: linksError } = await supabase
     .from('indicator_customer_links')
-    .select('customer_id');
+    .select('customer_id, indicator_id, indicators(current_value, target_value)');
   
   if (linksError) throw linksError;
 
-  // Count links per customer
-  const linkCounts = new Map<string, number>();
+  // Calculate link counts and RAG status per customer
+  const customerData = new Map<string, { count: number; statuses: RAGStatus[] }>();
+  
   (links || []).forEach(link => {
-    linkCounts.set(link.customer_id, (linkCounts.get(link.customer_id) || 0) + 1);
+    if (!customerData.has(link.customer_id)) {
+      customerData.set(link.customer_id, { count: 0, statuses: [] });
+    }
+    const data = customerData.get(link.customer_id)!;
+    data.count++;
+    
+    // Calculate indicator RAG status
+    const indicator = link.indicators as any;
+    if (indicator && indicator.current_value != null && indicator.target_value != null && indicator.target_value > 0) {
+      const progress = (indicator.current_value / indicator.target_value) * 100;
+      data.statuses.push(percentageToRAG(progress));
+    }
   });
 
-  return customers.map(c => ({
-    id: c.id,
-    name: c.name,
-    tier: c.tier,
-    region: c.region,
-    industry: c.industry,
-    status: c.status,
-    linkedIndicatorCount: linkCounts.get(c.id) || 0,
-  }));
+  return customers.map(c => {
+    const data = customerData.get(c.id);
+    const linkedCount = data?.count || 0;
+    
+    // Calculate overall RAG status from linked indicators
+    let ragStatus: RAGStatus = 'not-set';
+    if (data && data.statuses.length > 0) {
+      // Calculate average score: green=100, amber=60, red=30
+      const avgScore = data.statuses.reduce((sum, s) => {
+        return sum + (s === 'green' ? 100 : s === 'amber' ? 60 : s === 'red' ? 30 : 0);
+      }, 0) / data.statuses.length;
+      ragStatus = percentageToRAG(avgScore);
+    }
+
+    return {
+      id: c.id,
+      name: c.name,
+      tier: c.tier,
+      region: c.region,
+      industry: c.industry,
+      status: c.status,
+      linkedIndicatorCount: linkedCount,
+      ragStatus,
+      logoUrl: c.logo_url,
+      deploymentType: c.deployment_type,
+    };
+  });
 }
 
 export function useCustomersWithImpact() {
