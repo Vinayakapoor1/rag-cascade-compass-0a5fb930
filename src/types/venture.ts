@@ -3,7 +3,7 @@
 export type RAGStatus = 'green' | 'amber' | 'red' | 'not-set';
 
 // Identity colors for Org Objectives (separate from RAG)
-export type OrgObjectiveColor = 'green' | 'purple' | 'blue' | 'yellow' | 'orange';
+export type OrgObjectiveColor = 'green' | 'purple' | 'blue' | 'yellow' | 'orange' | 'teal';
 
 // Indicator tier types
 export type IndicatorTier = 'kpi' | 'leading' | 'lagging';

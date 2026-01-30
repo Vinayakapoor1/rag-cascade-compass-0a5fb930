@@ -87,6 +87,8 @@ export default {
           "yellow-muted": "hsl(var(--org-yellow-muted))",
           orange: "hsl(var(--org-orange))",
           "orange-muted": "hsl(var(--org-orange-muted))",
+          teal: "hsl(var(--org-teal))",
+          "teal-muted": "hsl(var(--org-teal-muted))",
         },
         // Indicator Tier Colors
         tier: {

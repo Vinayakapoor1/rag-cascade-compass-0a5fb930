@@ -93,6 +93,7 @@ function getColorLabel(color: OrgObjectiveColor): string {
     blue: 'blue',
     yellow: 'yellow',
     orange: 'orange',
+    teal: 'teal',
   };
   return colorLabels[color];
 }

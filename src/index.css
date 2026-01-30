@@ -35,6 +35,8 @@
     --org-yellow-muted: 45 93% 95%;
     --org-orange: 25 95% 53%;
     --org-orange-muted: 25 95% 95%;
+    --org-teal: 174 72% 40%;
+    --org-teal-muted: 174 72% 95%;
 
     /* Indicator Tier Colors - Priority Order (NOT Performance) */
     --tier-1: 217 91% 60%;        /* Blue - Tier 1: Look first */
@@ -96,6 +98,7 @@
     --org-blue-muted: 210 100% 12%;
     --org-yellow-muted: 45 93% 12%;
     --org-orange-muted: 25 95% 12%;
+    --org-teal-muted: 174 72% 12%;
 
     /* Indicator Tier Colors - Dark Mode */
     --tier-1-muted: 217 91% 12%;
