@@ -706,6 +706,9 @@ export function AdminDataControls() {
                 indicatorName={historyDialog.indicatorName}
                 targetValue={historyDialog.targetValue}
                 unit={historyDialog.unit}
+                onDataChange={() => {
+                    fetchData();
+                }}
             />
         </div>
     );

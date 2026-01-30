@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, Briefcase, Layers, LayoutGrid, Calendar, ArrowRight } from 'lucide-react';
+import { FileText, Briefcase, Layers, LayoutGrid, Calendar, ArrowRight, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -158,9 +158,16 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
             <div className="space-y-2 p-2">
                 {logs.map((log) => (
                     <div key={log.id} className="flex gap-2 items-start p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                        {/* Icon */}
-                        <div className="mt-0.5 p-1.5 rounded-full bg-muted">
-                            {getEntityIcon(log.entity_type)}
+                        {/* Icon - Red for delete actions */}
+                        <div className={cn(
+                            "mt-0.5 p-1.5 rounded-full",
+                            log.action === 'delete' ? "bg-red-500/10" : "bg-muted"
+                        )}>
+                            {log.action === 'delete' ? (
+                                <Trash2 className="h-3 w-3 text-red-600" />
+                            ) : (
+                                getEntityIcon(log.entity_type)
+                            )}
                         </div>
 
                         {/* Content */}
@@ -193,6 +200,28 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
                                     <span className="font-mono text-primary font-medium">
                                         {getDisplayValue(log.new_value)}
                                     </span>
+                                </div>
+                            )}
+
+                            {/* Delete Action - Show in Red */}
+                            {log.action === 'delete' && (
+                                <div className="flex items-center gap-1 text-xs">
+                                    <Badge 
+                                        variant="outline" 
+                                        className="text-[8px] px-1 py-0 h-3.5 bg-red-500/10 text-red-700 border-red-500/20 uppercase font-medium"
+                                    >
+                                        DELETED
+                                    </Badge>
+                                    {log.metadata?.period && (
+                                        <span className="text-muted-foreground">
+                                            Period: {log.metadata.period}
+                                        </span>
+                                    )}
+                                    {log.old_value && (
+                                        <span className="font-mono text-red-600 line-through">
+                                            {getDisplayValue(log.old_value)}
+                                        </span>
+                                    )}
                                 </div>
                             )}
 

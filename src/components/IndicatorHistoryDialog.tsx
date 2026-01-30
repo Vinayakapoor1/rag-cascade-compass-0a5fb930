@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { History, Download, FileText, Calendar, User, Pencil, Save, X, ExternalLink, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-
+import { useQueryClient } from '@tanstack/react-query';
 interface HistoryEntry {
     id: string;
     indicator_id: string;
@@ -33,6 +33,7 @@ interface IndicatorHistoryDialogProps {
     krName?: string;
     targetValue?: number | null;
     unit: string | null;
+    onDataChange?: () => void;
 }
 
 export function IndicatorHistoryDialog({
@@ -42,10 +43,12 @@ export function IndicatorHistoryDialog({
     indicatorName,
     krName,
     targetValue,
-    unit
+    unit,
+    onDataChange
 }: IndicatorHistoryDialogProps) {
     const { user } = useAuth();
     const { logActivity } = useActivityLog();
+    const queryClient = useQueryClient();
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -109,21 +112,49 @@ export function IndicatorHistoryDialog({
                 return;
             }
 
+            const deletedValue = data[0]?.value;
+
+            // Fetch remaining history to determine new current value
+            const { data: remainingHistory } = await supabase
+                .from('indicator_history')
+                .select('value, period')
+                .eq('indicator_id', indicatorId)
+                .order('period', { ascending: false })
+                .limit(1);
+
+            // Update indicator's current_value based on remaining history
+            const newCurrentValue = remainingHistory && remainingHistory.length > 0 
+                ? remainingHistory[0].value 
+                : null;
+
+            await supabase
+                .from('indicators')
+                .update({ current_value: newCurrentValue })
+                .eq('id', indicatorId);
+
             await logActivity({
                 action: 'delete',
                 entityType: 'indicator',
                 entityId: indicatorId,
                 entityName: indicatorName,
-                oldValue: { period },
+                oldValue: { current_value: deletedValue, period },
                 metadata: { 
                     deleted_history_entry: true,
-                    period 
+                    period,
+                    kr_name: krName,
+                    new_indicator_value: newCurrentValue
                 }
             });
+
+            // Invalidate React Query cache for dashboard refresh
+            queryClient.invalidateQueries({ queryKey: ['org-objectives'] });
 
             toast.success('History entry deleted');
             setDeleteConfirmId(null);
             fetchHistory();
+
+            // Notify parent component
+            onDataChange?.();
         } catch (error) {
             console.error('Error deleting history:', error);
             toast.error('Failed to delete entry. You may only delete entries you created.');
