@@ -86,7 +86,7 @@ const Index = () => {
               <img
                 src="/images/klarity-logo.png"
                 alt="KlaRity by Infosec Ventures"
-                className="h-10 w-auto"
+                className="h-10 w-auto logo-dark-mode-adjust"
               />
             </div>
 

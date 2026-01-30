@@ -41,7 +41,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <img
                 src="/images/klarity-logo-full.png"
                 alt="KlaRity by Infosec Ventures"
-                className="h-12 w-auto transition-all duration-300 group-hover:brightness-110"
+                className="h-12 w-auto transition-all duration-300 group-hover:brightness-110 logo-dark-mode-adjust"
               />
             </Link>
 
@@ -146,7 +146,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <img
             src="/images/klarity-logo-full.png"
             alt="KlaRity by Infosec Ventures"
-            className="h-10 w-auto opacity-50 transition-opacity hover:opacity-80"
+            className="h-10 w-auto opacity-50 transition-opacity hover:opacity-80 logo-dark-mode-adjust"
           />
           <p className="text-xs font-medium">© 2026 All rights reserved.</p>
         </div>

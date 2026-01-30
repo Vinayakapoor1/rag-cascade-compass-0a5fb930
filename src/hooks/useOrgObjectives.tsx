@@ -451,6 +451,8 @@ export function useOrgObjectives() {
   return useQuery({
     queryKey: ['org-objectives'],
     queryFn: fetchOrgObjectives,
+    staleTime: 60000, // 1 minute - avoid refetching too frequently
+    refetchOnWindowFocus: false, // Don't refetch on tab focus
   });
 }
 
