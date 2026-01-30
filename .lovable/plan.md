@@ -1,17 +1,21 @@
 
-# Align Classification Badges and Improve Text Layout
+
+# Improve Org Objective Name Alignment and Text Display
 
 ## Problem
 
-Currently, the "CORE" and "Enabler" classification badges are positioned directly below the objective name text. When names have different lengths (some wrap to 2-3 lines, others are shorter), the badges end up at different vertical positions across the 5 cards.
+The Org Objective names in the 5-column grid have varying text lengths:
+- "Brand & Reputation" - Short, single line
+- "Customer Experience & Success" - Medium, wraps to 2 lines  
+- "Sustainable Growth" - Short, single line
+- "Operational Excellence & Cybersecurity Resilience" - Very long, wraps to 3+ lines
+- "Talent Development & Culture" - Medium length
+
+This causes the cards to have different text heights, making the layout look uneven even with the fixed row structure we implemented.
 
 ## Solution
 
-Restructure the card layout into clearly defined rows:
-1. **Row 1**: Icon + Title (with flexible height for text wrapping)
-2. **Row 2**: Classification badge (fixed position, aligned across all cards)
-3. **Row 3**: RAG status + Percentage (aligned to the right)
-4. **Row 4**: Progress bar (already fixed at bottom)
+Apply a **fixed height title area** with CSS that ensures all titles occupy the same vertical space, using line clamping to truncate very long names while showing a tooltip for the full text.
 
 ---
 
@@ -23,73 +27,74 @@ Restructure the card layout into clearly defined rows:
 
 ## Technical Changes
 
-### New Card Structure
-
-```text
-┌─────────────────────────────────┐
-│  [Icon]  Objective Name         │  ← Title section (flexible)
-│          (can wrap)             │
-├─────────────────────────────────┤
-│  [CORE]           [RAG] [85%]   │  ← Status row (fixed position)
-├─────────────────────────────────┤
-│  ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░           │  ← Progress bar (bottom)
-└─────────────────────────────────┘
-```
-
-### Key Layout Changes
-
-1. **Separate title from badge row**: Move the classification badge out of the title div into its own row
-2. **Fixed height title area**: Use `min-h-[48px]` on the title section to ensure consistent spacing
-3. **Badge row alignment**: Create a flex row with badge on left, RAG + percentage on right
-4. **Better text styling**: Slightly larger font with better line height for readability
-
-### Code Structure
-
+### Current Title Section (Lines 59-67)
 ```tsx
-<div className="p-4 h-full flex flex-col">
-  {/* Title Section - flexible height with minimum */}
-  <div className="flex items-start gap-3 min-h-[48px]">
-    <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0">
-      <Target className="h-4 w-4" />
-    </div>
-    <h3 className="font-semibold text-sm leading-snug flex-1">
-      {name}
-    </h3>
+<div className="flex items-start gap-3 min-h-[48px] flex-1">
+  <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
+    <Target className="h-4 w-4 text-muted-foreground" />
   </div>
-  
-  {/* Status Row - fixed position */}
-  <div className="flex items-center justify-between mt-2 mb-3">
-    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80">
-      {classification}
-    </span>
-    <div className="flex items-center gap-2">
-      <RAGBadge status={displayStatus} size="sm" />
-      <span className="text-base font-bold">{percentage}%</span>
-    </div>
-  </div>
-  
-  {/* Progress Bar - bottom */}
-  <Progress className="h-1.5 mt-auto" ... />
+  <h3 className="font-semibold text-sm leading-snug flex-1">
+    {name}
+  </h3>
 </div>
 ```
 
----
+### New Title Section
+```tsx
+<div className="flex items-start gap-3 h-[56px]">
+  <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
+    <Target className="h-4 w-4 text-muted-foreground" />
+  </div>
+  <h3 
+    className="font-semibold text-sm leading-tight flex-1 line-clamp-3"
+    title={name}
+  >
+    {name}
+  </h3>
+</div>
+```
 
-## Visual Improvements
+### Key Changes
 
 | Element | Before | After |
 |---------|--------|-------|
-| Title font | `text-xs` (12px) | `text-sm` (14px) with `leading-snug` |
-| Title area | Variable height | Minimum 48px height |
-| Badge position | Below title (varies) | Fixed row, aligned across cards |
-| Status/Percentage | Top right corner | Middle row, right aligned |
+| Title container height | `min-h-[48px] flex-1` (variable) | `h-[56px]` (fixed) |
+| Line clamping | None | `line-clamp-3` (max 3 lines, then ellipsis) |
+| Title attribute | None | `title={name}` (full name on hover) |
+| Line height | `leading-snug` (1.375) | `leading-tight` (1.25) for more lines |
+
+### Layout Structure with Fixed Heights
+```text
+All cards will have identical structure:
+┌─────────────────────────────────┐
+│  [Icon]  Objective Name...      │  ← Fixed 56px height
+│          (max 3 lines)          │
+├─────────────────────────────────┤
+│  [CORE]           [RAG] [85%]   │  ← Fixed row height
+├─────────────────────────────────┤
+│  ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░           │  ← Progress bar
+└─────────────────────────────────┘
+```
 
 ---
 
-## Result
+## Benefits
 
-After implementation:
-- All "CORE" and "Enabler" badges will be horizontally aligned
-- RAG badges and percentages will be in a consistent row
-- Text will be more readable with improved font size
-- Card layout will look more structured and professional
+1. **Perfect alignment**: All title areas are exactly 56px tall
+2. **Consistent spacing**: Status row and progress bar align across all cards
+3. **Readable text**: 3 lines is enough for most names; very long ones get ellipsis
+4. **Accessibility**: Full name available via tooltip on hover
+5. **Better fit**: `leading-tight` allows more text in the fixed height
+
+---
+
+## Visual Comparison
+
+**Before**: Cards have different heights based on text length, causing misalignment of badges, percentages, and progress bars.
+
+**After**: All cards have identical dimensions with:
+- Title area: Fixed 56px (fits up to 3 lines)
+- Status row: Fixed position
+- Progress bar: Fixed at bottom
+- Very long names truncated with "..." and full text on hover
+
