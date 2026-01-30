@@ -9,7 +9,7 @@ import {
     Activity, Calendar, FileText, Briefcase, Layers,
     LayoutGrid, ChevronRight, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface ActivityLog {
@@ -268,7 +268,7 @@ export function ActivityTimelineWidget() {
                                                 </div>
                                                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap">
                                                     <Calendar className="h-2.5 w-2.5" />
-                                                    {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                                                    {format(new Date(log.created_at), 'MMM d, yyyy, h:mm a')}
                                                 </div>
                                             </div>
                                         </div>

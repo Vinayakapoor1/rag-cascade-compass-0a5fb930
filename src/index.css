@@ -373,13 +373,13 @@
     );
   }
 
-  /* Dark mode logo adjustment - make dark text visible */
+  /* Dark mode logo adjustment - make entire logo white */
   .logo-dark-mode-adjust {
     @apply transition-all duration-300;
   }
 
   .dark .logo-dark-mode-adjust {
-    filter: brightness(1.8);
+    filter: brightness(0) invert(1);
   }
 
   /* Inner Highlight Effect for Cards */
