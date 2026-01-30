@@ -1,21 +1,14 @@
 
 
-# Improve Org Objective Name Alignment and Text Display
+# Show Full Org Objective Names with Aligned Layout
 
 ## Problem
 
-The Org Objective names in the 5-column grid have varying text lengths:
-- "Brand & Reputation" - Short, single line
-- "Customer Experience & Success" - Medium, wraps to 2 lines  
-- "Sustainable Growth" - Short, single line
-- "Operational Excellence & Cybersecurity Resilience" - Very long, wraps to 3+ lines
-- "Talent Development & Culture" - Medium length
-
-This causes the cards to have different text heights, making the layout look uneven even with the fixed row structure we implemented.
+The current implementation uses `line-clamp-3` which truncates long objective names like "Operational Excellence & Cybersecurity Resilience". The user wants to see the **full names** while still maintaining alignment of the status badges and progress bars.
 
 ## Solution
 
-Apply a **fixed height title area** with CSS that ensures all titles occupy the same vertical space, using line clamping to truncate very long names while showing a tooltip for the full text.
+Use CSS Grid with a **minimum height** instead of a fixed height, allowing the title area to expand for longer names while ensuring all cards in the same row have equal heights through the grid's implicit row stretching.
 
 ---
 
@@ -27,20 +20,9 @@ Apply a **fixed height title area** with CSS that ensures all titles occupy the 
 
 ## Technical Changes
 
-### Current Title Section (Lines 59-67)
+### Current Title Section (Lines 59-70)
 ```tsx
-<div className="flex items-start gap-3 min-h-[48px] flex-1">
-  <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
-    <Target className="h-4 w-4 text-muted-foreground" />
-  </div>
-  <h3 className="font-semibold text-sm leading-snug flex-1">
-    {name}
-  </h3>
-</div>
-```
-
-### New Title Section
-```tsx
+{/* Title Section - fixed height for alignment */}
 <div className="flex items-start gap-3 h-[56px]">
   <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
     <Target className="h-4 w-4 text-muted-foreground" />
@@ -54,47 +36,70 @@ Apply a **fixed height title area** with CSS that ensures all titles occupy the 
 </div>
 ```
 
+### New Title Section
+```tsx
+{/* Title Section - minimum height, grows with content */}
+<div className="flex items-start gap-3 min-h-[56px]">
+  <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
+    <Target className="h-4 w-4 text-muted-foreground" />
+  </div>
+  <h3 className="font-semibold text-sm leading-tight flex-1">
+    {name}
+  </h3>
+</div>
+```
+
 ### Key Changes
 
 | Element | Before | After |
 |---------|--------|-------|
-| Title container height | `min-h-[48px] flex-1` (variable) | `h-[56px]` (fixed) |
-| Line clamping | None | `line-clamp-3` (max 3 lines, then ellipsis) |
-| Title attribute | None | `title={name}` (full name on hover) |
-| Line height | `leading-snug` (1.375) | `leading-tight` (1.25) for more lines |
+| Title container height | `h-[56px]` (fixed, clips text) | `min-h-[56px]` (minimum, expands as needed) |
+| Line clamping | `line-clamp-3` (truncates) | Removed (shows full text) |
+| Title attribute | `title={name}` (for tooltip) | Removed (not needed) |
 
-### Layout Structure with Fixed Heights
+---
+
+## How Alignment Works
+
+The parent grid in `Portfolio.tsx` uses:
+```tsx
+<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+```
+
+CSS Grid automatically stretches all items in the same row to match the tallest item. Combined with `h-full` on the card and `flex flex-col` with `mt-auto` on the progress bar:
+
+1. **Grid row**: All 5 cards in a row get the same height (matching the tallest)
+2. **Card**: Uses `h-full` to fill the grid cell
+3. **Flexbox column**: Content flows top-to-bottom
+4. **Progress bar**: `mt-auto` pushes it to the bottom
+
+This means if "Operational Excellence & Cybersecurity Resilience" wraps to 3 lines, all other cards in that row will also be 3-line height, keeping badges and progress bars aligned.
+
+---
+
+## Visual Result
+
 ```text
-All cards will have identical structure:
-┌─────────────────────────────────┐
-│  [Icon]  Objective Name...      │  ← Fixed 56px height
-│          (max 3 lines)          │
-├─────────────────────────────────┤
-│  [CORE]           [RAG] [85%]   │  ← Fixed row height
-├─────────────────────────────────┤
-│  ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░           │  ← Progress bar
-└─────────────────────────────────┘
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ Brand &         │ │ Customer        │ │ Operational     │
+│ Reputation      │ │ Experience &    │ │ Excellence &    │
+│                 │ │ Success         │ │ Cybersecurity   │
+│                 │ │                 │ │ Resilience      │
+├─────────────────┤ ├─────────────────┤ ├─────────────────┤
+│ [CORE] [G][85%] │ │ [CORE] [A][72%] │ │ [ENABLER][R]68% │
+├─────────────────┤ ├─────────────────┤ ├─────────────────┤
+│ ▓▓▓▓▓▓▓▓░░░░░░░ │ │ ▓▓▓▓▓▓▓░░░░░░░░ │ │ ▓▓▓▓▓▓░░░░░░░░░ │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+      ↑                    ↑                    ↑
+   All cards same height, badges & bars aligned
 ```
 
 ---
 
 ## Benefits
 
-1. **Perfect alignment**: All title areas are exactly 56px tall
-2. **Consistent spacing**: Status row and progress bar align across all cards
-3. **Readable text**: 3 lines is enough for most names; very long ones get ellipsis
-4. **Accessibility**: Full name available via tooltip on hover
-5. **Better fit**: `leading-tight` allows more text in the fixed height
-
----
-
-## Visual Comparison
-
-**Before**: Cards have different heights based on text length, causing misalignment of badges, percentages, and progress bars.
-
-**After**: All cards have identical dimensions with:
-- Title area: Fixed 56px (fits up to 3 lines)
-- Status row: Fixed position
-- Progress bar: Fixed at bottom
-- Very long names truncated with "..." and full text on hover
+1. **Full names visible**: No truncation, all objective names fully displayed
+2. **Natural alignment**: CSS Grid handles row height synchronization automatically
+3. **Consistent spacing**: Status row and progress bar align perfectly
+4. **Responsive**: Works across all breakpoints (2, 3, or 5 columns)
 
