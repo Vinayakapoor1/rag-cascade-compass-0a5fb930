@@ -427,7 +427,7 @@ export function DepartmentUploader({ onImportComplete }: { onImportComplete?: ()
         </CardHeader>
         <CardContent>
           <div className="text-xs space-y-3 text-muted-foreground">
-            <p className="font-medium text-foreground">8-Column Template:</p>
+            <p className="font-medium text-foreground">9-Column Template:</p>
             <div className="bg-background rounded p-2 font-mono overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -436,22 +436,24 @@ export function DepartmentUploader({ onImportComplete }: { onImportComplete?: ()
                     <th className="p-1">Owner</th>
                     <th className="p-1">Org Objective</th>
                     <th className="p-1">Func. Obj</th>
-                    <th className="p-1">Key Result</th>
-                    <th className="p-1">Indicator</th>
                     <th className="p-1">Formula</th>
-                    <th className="p-1">Target</th>
+                    <th className="p-1">Key Result</th>
+                    <th className="p-1">Formula (BODMAS)</th>
+                    <th className="p-1">KPI</th>
+                    <th className="p-1">Formula</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="p-1">CS</td>
-                    <td className="p-1">Tanvi</td>
-                    <td className="p-1">Max CS</td>
-                    <td className="p-1">Adoption</td>
-                    <td className="p-1">+25% usage</td>
-                    <td className="p-1">Adoption Rate</td>
-                    <td className="p-1">(a/b)*100</td>
-                    <td className="p-1">80</td>
+                    <td className="p-1">S&T</td>
+                    <td className="p-1">Rishiraj</td>
+                    <td className="p-1">Op. Excellence</td>
+                    <td className="p-1">Partner Enablement</td>
+                    <td className="p-1">(KR1 % + KR2 %) / 2</td>
+                    <td className="p-1">Partner Pre-Sales...</td>
+                    <td className="p-1">MIN((Actual/Target)×100,100)</td>
+                    <td className="p-1">Pre-Sales Readiness %</td>
+                    <td className="p-1">(Ready/Total)×100</td>
                   </tr>
                 </tbody>
               </table>
