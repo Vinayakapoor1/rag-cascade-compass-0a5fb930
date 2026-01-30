@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx-js-style';
 
 // ============= V5.4 OKR IMPORT TEMPLATE =============
-// 10-column format with positional formula detection
+// 9-column format with positional formula detection
 // RAG thresholds are UNIVERSAL: 1-50 Red, 51-75 Amber, 76-100 Green
 
 interface V54OKRRow {
@@ -17,17 +17,125 @@ interface V54OKRRow {
 }
 
 const sampleData: V54OKRRow[] = [
-  // Customer Success samples
-  { department: 'Customer Success', owner: 'Jane Smith', orgObjective: 'Maximize Customer Success and Experience', functionalObjective: 'Drive Product Adoption and Retention', foFormula: 'AVG(KRs)', keyResult: 'Achieve 95% Customer Satisfaction Score', krFormula: 'AVG(KPIs)', kpi: 'Weekly survey response rate', kpiFormula: '(responses / sent) * 100' },
-  { department: 'Customer Success', owner: 'Jane Smith', orgObjective: 'Maximize Customer Success and Experience', functionalObjective: 'Drive Product Adoption and Retention', foFormula: '', keyResult: 'Achieve 95% Customer Satisfaction Score', krFormula: '', kpi: 'Monthly CSAT score', kpiFormula: '(satisfied / total) * 100' },
-  { department: 'Customer Success', owner: 'Jane Smith', orgObjective: 'Maximize Customer Success and Experience', functionalObjective: 'Drive Product Adoption and Retention', foFormula: '', keyResult: 'Reduce Customer Churn to Below 5%', krFormula: 'SUM(KPIs)', kpi: 'Monthly churn rate', kpiFormula: '(churned / total) * 100' },
+  // Functional Objective 1: Enhance Partner Technical Enablement
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Enhance Partner Technical Enablement', 
+    foFormula: '(KR1 % + KR2 %) / 2', 
+    keyResult: 'Partner Pre-Sales Technical Enablement - Ensure >=75% partners are technically ready for pre-sales engagements', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Partner Pre-Sales Readiness Compliance %', 
+    kpiFormula: '(No. of partner-led pre-sales engagements meeting readiness criteria / Total evaluated engagements) × 100' 
+  },
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Enhance Partner Technical Enablement', 
+    foFormula: '', 
+    keyResult: 'Partner Solution Design Compliance - Achieve 90% partner-led solution designs fully compliant with architecture standards', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Partner Solution Design Compliance %', 
+    kpiFormula: '(No. of compliant partner-led solution designs / Total partner-led solution designs) × 100' 
+  },
   
-  // Product Development samples
-  { department: 'Product Development', owner: 'Mike Johnson', orgObjective: 'Drive Market-Leading Innovation', functionalObjective: 'Accelerate Product Releases', foFormula: 'AVG(KRs)', keyResult: 'Launch 3 Major Features This Quarter', krFormula: 'AVG(KPIs)', kpi: 'Features shipped', kpiFormula: 'COUNT(features WHERE status = shipped)' },
-  { department: 'Product Development', owner: 'Mike Johnson', orgObjective: 'Drive Market-Leading Innovation', functionalObjective: 'Accelerate Product Releases', foFormula: '', keyResult: 'Reduce Bug Count by 50%', krFormula: 'AVG(KPIs)', kpi: 'Open bug count', kpiFormula: 'COUNT(bugs WHERE status = open)' },
+  // Functional Objective 2: Ensure On-Time and Quality Technical Delivery
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Ensure On-Time and Quality Technical Delivery', 
+    foFormula: '(KR1 % + KR2 %) / 2', 
+    keyResult: 'On-Time Secure Delivery - Deliver 95% of projects on time with zero critical security defects', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'On-Time & Secure Delivery Rate %', 
+    kpiFormula: '(No. of projects delivered on-time with zero P1/P2 security defects / Total projects delivered) × 100' 
+  },
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Ensure On-Time and Quality Technical Delivery', 
+    foFormula: '', 
+    keyResult: 'Post Delivery Stability - Achieve 90% post-go-live stability with no critical incidents within 30 days', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Post-Go-Live Stability Rate %', 
+    kpiFormula: '(No. of projects with no P1 incidents in 30 days post go-live / Total go-lives) × 100' 
+  },
   
-  // Operations samples
-  { department: 'Operations', owner: 'Sarah Wilson', orgObjective: 'Achieve Operational Excellence', functionalObjective: 'Optimize System Performance', foFormula: 'AVG(KRs)', keyResult: 'Maintain 99.9% System Uptime', krFormula: 'AVG(KPIs)', kpi: 'Monthly uptime percentage', kpiFormula: '(uptime_minutes / total_minutes) * 100' },
+  // Functional Objective 3: Sustain and Scale a Reliable, Resilient Technology Environment
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Sustain and Scale a Reliable, Resilient Technology Environment', 
+    foFormula: '(KR1 % + KR2 %) / 2', 
+    keyResult: 'Platform Availability & Performance - Maintain >=99.9% uptime and SLA compliance across all critical systems', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Platform Availability %', 
+    kpiFormula: '(Total uptime minutes / Total minutes in period) × 100' 
+  },
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Sustain and Scale a Reliable, Resilient Technology Environment', 
+    foFormula: '', 
+    keyResult: 'Recoverability & Capacity Readiness - Achieve 100% DR readiness and capacity headroom across all critical systems', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Resilience & Capacity Compliance %', 
+    kpiFormula: '(No. of systems meeting DR and capacity standards / Total critical systems) × 100' 
+  },
+  
+  // Functional Objective 4: Fortify Security of Managed IT Environment
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Fortify Security of Managed IT Environment', 
+    foFormula: '(KR1 % + KR2 %) / 2', 
+    keyResult: 'Preventive Control Coverage - Ensure 100% coverage of critical security controls (patching, hardening, endpoint protection)', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Preventive Security Control Coverage %', 
+    kpiFormula: '(No. of systems with all critical controls in place / Total managed systems) × 100' 
+  },
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Fortify Security of Managed IT Environment', 
+    foFormula: '', 
+    keyResult: 'Detection & Response Effectiveness - Achieve 95% SLA compliance for security incident detection and response', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Security Incident SLA Compliance %', 
+    kpiFormula: '(No. of security incidents resolved within SLA / Total security incidents) × 100' 
+  },
+  
+  // Functional Objective 5: Drive Automation and Continuous Optimization in Technical Operations
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Drive Automation and Continuous Optimization in Technical Operations', 
+    foFormula: '(KR1 % + KR2 %) / 2', 
+    keyResult: 'Automation of Repetitive Operations - Automate 80% of repetitive operational tasks', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Operational Automation Coverage %', 
+    kpiFormula: '(No. of automated tasks / Total identified repetitive tasks) × 100' 
+  },
+  { 
+    department: 'Security & Technology', 
+    owner: 'Rishiraj Nigam', 
+    orgObjective: 'Achieve Operational Excellence - People, Process, Technology', 
+    functionalObjective: 'Drive Automation and Continuous Optimization in Technical Operations', 
+    foFormula: '', 
+    keyResult: 'Operational Outcome Improvement - Achieve 15% improvement in key operational metrics (MTTR, ticket resolution time)', 
+    krFormula: 'MIN((Actual KPI % / Target KPI %) × 100,100)', 
+    kpi: 'Operational Outcome Improvement %', 
+    kpiFormula: '((Baseline metric - Current metric) / Baseline metric) × 100' 
+  },
 ];
 
 function createInstructionsSheet(): XLSX.WorkSheet {
@@ -40,21 +148,21 @@ function createInstructionsSheet(): XLSX.WorkSheet {
     ['3. Formula columns follow their parent entity (FO Formula after Functional Objective, etc.)'],
     ['4. Upload the file - hierarchy is auto-detected from column positions'],
     [''],
-    ['=== COLUMN STRUCTURE (10 COLUMNS) ==='],
+    ['=== COLUMN STRUCTURE (9 COLUMNS) ==='],
     ['Column A: Department - Department name'],
     ['Column B: Owner - Owner of the department/team'],
     ['Column C: Organizational Objective - High-level strategic objective'],
     ['Column D: Functional Objective - Team-level objective under Department'],
-    ['Column E: FO Formula - Formula for aggregating Key Results (AVG, SUM, WEIGHTED_AVG, MIN, MAX)'],
+    ['Column E: Formula - Formula for aggregating Key Results (e.g., (KR1 % + KR2 %) / 2)'],
     ['Column F: Key Result - Measurable outcome under Functional Objective'],
-    ['Column G: KR Formula (Apply BODMAS rule) - Formula for aggregating KPIs'],
+    ['Column G: Formula (BODMAS rule) - Formula for calculating KR from KPI (e.g., MIN((Actual KPI % / Target KPI %) × 100,100))'],
     ['Column H: KPI - Key Performance Indicator'],
-    ['Column I: KPI Formula - How the KPI value is calculated'],
-    ['Column J: (Reserved for future use)'],
+    ['Column I: Formula - How the KPI value is calculated'],
     [''],
     ['=== FORMULA TYPES ==='],
-    ['FO Formula & KR Formula: Use aggregation functions like AVG(KRs), SUM(KPIs), WEIGHTED_AVG, MIN, MAX'],
-    ['KPI Formula: Use mathematical expressions like (current / target) * 100'],
+    ['FO Formula: Aggregation formulas like (KR1 % + KR2 %) / 2, AVG(KRs), SUM(KRs)'],
+    ['KR Formula: Calculation formulas like MIN((Actual KPI % / Target KPI %) × 100,100)'],
+    ['KPI Formula: Mathematical expressions describing how to calculate the KPI value'],
     [''],
     ['=== UNIVERSAL RAG CALCULATION ==='],
     [''],
@@ -72,7 +180,7 @@ function createInstructionsSheet(): XLSX.WorkSheet {
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(instructions);
-  ws['!cols'] = [{ wch: 90 }];
+  ws['!cols'] = [{ wch: 100 }];
   return ws;
 }
 
@@ -82,12 +190,11 @@ function createOKRDataSheet(): XLSX.WorkSheet {
     'Owner', 
     'Organizational Objective',
     'Functional Objective',
-    'FO Formula',
+    'Formula',
     'Key Result',
-    'KR Formula (Apply BODMAS rule)',
+    'Formula (BODMAS rule)',
     'KPI',
-    'KPI Formula',
-    '' // Reserved column
+    'Formula'
   ];
 
   const rows = sampleData.map(row => [
@@ -99,23 +206,21 @@ function createOKRDataSheet(): XLSX.WorkSheet {
     row.keyResult,
     row.krFormula,
     row.kpi,
-    row.kpiFormula,
-    ''
+    row.kpiFormula
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   
   ws['!cols'] = [
-    { wch: 20 },  // Department
+    { wch: 22 },  // Department
     { wch: 18 },  // Owner
-    { wch: 40 },  // Organizational Objective
-    { wch: 35 },  // Functional Objective
-    { wch: 18 },  // FO Formula
-    { wch: 40 },  // Key Result
-    { wch: 25 },  // KR Formula
-    { wch: 30 },  // KPI
-    { wch: 35 },  // KPI Formula
-    { wch: 10 },  // Reserved
+    { wch: 55 },  // Organizational Objective
+    { wch: 50 },  // Functional Objective
+    { wch: 22 },  // Formula (FO)
+    { wch: 80 },  // Key Result
+    { wch: 45 },  // Formula (BODMAS rule)
+    { wch: 40 },  // KPI
+    { wch: 70 },  // Formula (KPI)
   ];
 
   return ws;
