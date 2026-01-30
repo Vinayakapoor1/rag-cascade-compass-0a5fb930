@@ -28,7 +28,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Trash2, AlertTriangle, FileText, Link as LinkIcon, Filter, History } from 'lucide-react';
+import { Trash2, AlertTriangle, FileText, Link as LinkIcon, Filter, History, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -224,7 +224,7 @@ export function AdminDataControls() {
                     evidence_url: null,
                     evidence_type: null,
                     no_evidence_reason: null,
-                    rag_status: 'amber',
+                    rag_status: 'not-set',
                 })
                 .eq('id', indicatorId);
 
@@ -270,7 +270,7 @@ export function AdminDataControls() {
                     evidence_url: null,
                     evidence_type: null,
                     no_evidence_reason: null,
-                    rag_status: 'amber',
+                    rag_status: 'not-set',
                 })
                 .eq('key_result_id', krId);
 
@@ -558,13 +558,13 @@ export function AdminDataControls() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8"
-                                                        title="Delete Data"
+                                                        title="Reset Indicator (Clear Data)"
                                                         onClick={() => {
                                                             setSelectedIndicator(ind.id);
                                                             setDeleteDialogOpen(true);
                                                         }}
                                                     >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                        <RotateCcw className="h-4 w-4 text-orange-500" />
                                                     </Button>
                                                 </div>
                                             </TableCell>
@@ -577,13 +577,13 @@ export function AdminDataControls() {
                 </CardContent>
             </Card>
 
-            {/* Delete Single Indicator Dialog */}
+            {/* Reset Single Indicator Dialog */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Indicator Data?</AlertDialogTitle>
+                        <AlertDialogTitle>Reset Indicator Data?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will reset this indicator to its default state (no value, no evidence, RAG status = amber).
+                            This will reset this indicator to its default state (no value, no evidence, RAG status = not-set/gray).
                             This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -598,7 +598,7 @@ export function AdminDataControls() {
                             }}
                             className="bg-destructive hover:bg-destructive/90"
                         >
-                            Delete
+                            Reset
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -643,7 +643,7 @@ export function AdminDataControls() {
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Reset ALL indicators across ALL departments</li>
                                     <li>Delete ALL indicator history</li>
-                                    <li>Set all RAG statuses to amber</li>
+                                    <li>Set all RAG statuses to not-set (gray)</li>
                                 </ul>
                                 <p className="font-semibold text-destructive mt-4">
                                     This action is IRREVERSIBLE. Are you absolutely sure?

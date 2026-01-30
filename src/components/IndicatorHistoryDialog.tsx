@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { toast } from 'sonner';
-import { History, Download, FileText, Calendar, User, Pencil, Save, X, ExternalLink } from 'lucide-react';
+import { History, Download, FileText, Calendar, User, Pencil, Save, X, ExternalLink, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +50,7 @@ export function IndicatorHistoryDialog({
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     useEffect(() => {
         if (open && indicatorId) {
@@ -89,6 +90,36 @@ export function IndicatorHistoryDialog({
     const cancelEdit = () => {
         setEditingId(null);
         setEditValue('');
+    };
+
+    const deleteHistoryEntry = async (entryId: string, period: string) => {
+        try {
+            const { error } = await supabase
+                .from('indicator_history')
+                .delete()
+                .eq('id', entryId);
+
+            if (error) throw error;
+
+            await logActivity({
+                action: 'delete',
+                entityType: 'indicator',
+                entityId: indicatorId,
+                entityName: indicatorName,
+                oldValue: { period },
+                metadata: { 
+                    deleted_history_entry: true,
+                    period 
+                }
+            });
+
+            toast.success('History entry deleted');
+            setDeleteConfirmId(null);
+            fetchHistory();
+        } catch (error) {
+            console.error('Error deleting history:', error);
+            toast.error('Failed to delete entry');
+        }
     };
 
     const saveEdit = async (entry: HistoryEntry) => {
@@ -324,16 +355,46 @@ export function IndicatorHistoryDialog({
                                                             <X className="h-3 w-3" />
                                                         </Button>
                                                     </div>
+                                                ) : deleteConfirmId === entry.id ? (
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <span className="text-xs text-destructive mr-1">Delete?</span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-destructive"
+                                                            onClick={() => deleteHistoryEntry(entry.id, entry.period)}
+                                                        >
+                                                            Yes
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 px-2"
+                                                            onClick={() => setDeleteConfirmId(null)}
+                                                        >
+                                                            No
+                                                        </Button>
+                                                    </div>
                                                 ) : (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-7 px-2 gap-1"
-                                                        onClick={() => startEdit(entry)}
-                                                    >
-                                                        <Pencil className="h-3 w-3" />
-                                                        <span className="text-xs">Edit</span>
-                                                    </Button>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 px-2 gap-1"
+                                                            onClick={() => startEdit(entry)}
+                                                        >
+                                                            <Pencil className="h-3 w-3" />
+                                                            <span className="text-xs">Edit</span>
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 px-2 gap-1 text-destructive hover:text-destructive"
+                                                            onClick={() => setDeleteConfirmId(entry.id)}
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
                                                 )}
                                             </TableCell>
                                         </TableRow>
