@@ -56,24 +56,28 @@ export function OrgObjectiveStatBlock({
       getGlowClass(displayStatus)
     )}>
       <div className="p-4 h-full flex flex-col">
-        <div className="flex items-start justify-between gap-2 flex-1">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-xs leading-tight">{name}</h3>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground inline-block mt-1">
-                {classification}
-              </span>
-            </div>
+        {/* Title Section - flexible height with minimum */}
+        <div className="flex items-start gap-3 min-h-[48px] flex-1">
+          <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
+            <Target className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <h3 className="font-semibold text-sm leading-snug flex-1">
+            {name}
+          </h3>
+        </div>
+        
+        {/* Status Row - fixed position with badge left, RAG + percentage right */}
+        <div className="flex items-center justify-between mt-2 mb-3">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground">
+            {classification}
+          </span>
+          <div className="flex items-center gap-2">
             <RAGBadge status={displayStatus} size="sm" />
             <span className="text-base font-bold">{Math.round(percentage)}%</span>
           </div>
         </div>
         
+        {/* Progress Bar - bottom */}
         <Progress 
           value={Math.min(percentage, 100)} 
           className={`h-1.5 mt-auto ${getProgressColorClass(displayStatus)}`}
