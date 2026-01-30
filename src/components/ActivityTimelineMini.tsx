@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { FileText, Briefcase, Layers, LayoutGrid, Calendar, ArrowRight } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface ActivityLog {
@@ -218,7 +218,7 @@ export function ActivityTimelineMini({ limit = 10 }: ActivityTimelineMiniProps) 
                             {/* Timestamp */}
                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                 <Calendar className="h-2.5 w-2.5" />
-                                {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                                {format(new Date(log.created_at), 'MMM d, yyyy, h:mm a')}
                             </div>
                         </div>
                     </div>
