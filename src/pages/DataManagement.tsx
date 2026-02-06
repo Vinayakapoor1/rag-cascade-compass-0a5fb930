@@ -12,6 +12,7 @@ import { DepartmentUploader } from '@/components/admin/DepartmentUploader';
 import { CustomerUploader } from '@/components/admin/CustomerUploader';
 import { FeatureUploader } from '@/components/admin/FeatureUploader';
 import { OKRHierarchyTab } from '@/components/admin/OKRHierarchyTab';
+import { OrgObjectivesManager } from '@/components/admin/OrgObjectivesManager';
 import { RAGRulesTab } from '@/components/admin/RAGRulesTab';
 import { TeamAccessTab } from '@/components/admin/TeamAccessTab';
 import { FormulasTab } from '@/components/admin/FormulasTab';
@@ -221,6 +222,7 @@ export default function DataManagement() {
 
           {/* OKR Structure Tab */}
           <TabsContent value="okr" className="space-y-4">
+            <OrgObjectivesManager />
             <OKRHierarchyTab key={refreshKey} />
           </TabsContent>
 
