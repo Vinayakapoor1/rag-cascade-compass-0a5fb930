@@ -1,111 +1,150 @@
 
+# Add Org Objective Classification Editor in Admin Dashboard
 
-# Align CORE and Enabler Classification Badges
+## Overview
 
-## Problem
+Add a dedicated section in the Data Management page to manage Org Objectives, including the ability to edit the **CORE/Enabler** classification, name, color, and description.
 
-The classification badges ("CORE" / "Enabler") are in the status row below the title section. Since the title section uses `min-h-[56px]` and can grow with longer names, the badges are still at different vertical positions across cards - they're pushed down by varying amounts of title text.
+---
+
+## Current State
+
+- The `org_objectives` table has: `id`, `name`, `classification` (CORE/Enabler), `color`, `description`, `business_outcome`
+- The OKR Hierarchy Tab only manages Departments and their children - no UI for editing Org Objectives
+- Classification can only be set via Excel import currently
+
+---
 
 ## Solution
 
-Restructure the card to use a **two-part flex layout**:
-1. **Top section** (flexible): Title area that can grow
-2. **Bottom section** (fixed): Classification + RAG status + Progress bar - always anchored to the bottom
-
-This ensures the CORE/Enabler badges, RAG status, percentages, and progress bars are all perfectly aligned across all cards regardless of title length.
-
----
-
-## File to Modify
-
-`src/components/OrgObjectiveStatBlock.tsx`
+Create a new **Org Objectives Management Card** that displays above or within the OKR Structure tab, allowing admins to:
+1. View all Org Objectives in a table/list
+2. Edit each objective's classification (CORE/Enabler), color, and name
+3. Save changes with immediate feedback
 
 ---
 
-## Technical Changes
+## Files to Create/Modify
 
-### New Card Structure
+### 1. Create `src/components/admin/OrgObjectivesManager.tsx` (NEW)
 
-```text
-┌─────────────────────────────────┐
-│  [Icon]  Objective Name         │  ← Flexible area (flex-1)
-│          (can grow as needed)   │
-│                                 │
-├─────────────────────────────────┤
-│  [CORE]           [RAG] [85%]   │  ← Fixed at bottom (mt-auto)
-│  ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░           │
-└─────────────────────────────────┘
-```
-
-### Updated Layout Code
+A new component that provides a table view of all Org Objectives with inline editing:
 
 ```tsx
-<div className="p-4 h-full flex flex-col">
-  {/* Title Section - flexible, grows with content */}
-  <div className="flex items-start gap-3 flex-1">
-    <div className="p-2 rounded-xl bg-muted/80 flex-shrink-0 shadow-sm">
-      <Target className="h-4 w-4 text-muted-foreground" />
-    </div>
-    <h3 className="font-semibold text-sm leading-tight">
-      {name}
-    </h3>
-  </div>
-  
-  {/* Bottom Section - fixed position, anchored to bottom */}
-  <div className="mt-auto">
-    {/* Status Row */}
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground">
-        {classification}
-      </span>
-      <div className="flex items-center gap-2">
-        <RAGBadge status={displayStatus} size="sm" />
-        <span className="text-base font-bold">{percentage}%</span>
-      </div>
-    </div>
-    
-    {/* Progress Bar */}
-    <Progress ... />
-  </div>
-</div>
+// Key features:
+- Fetches all org_objectives from database
+- Displays in a table with columns: Name, Classification, Color, Actions
+- Classification dropdown: CORE / Enabler
+- Color dropdown matching existing color options
+- Save button per row
+- Toast notifications for success/failure
 ```
 
-### Key Changes
-
-| Element | Before | After |
-|---------|--------|-------|
-| Title container | `min-h-[56px]` (min height) | `flex-1` (takes available space) |
-| Status row | `mt-2 mb-3` (relative to title) | Inside `mt-auto` wrapper (anchored to bottom) |
-| Progress bar | Separate with `mt-auto` | Inside same bottom wrapper |
-
----
-
-## How Alignment Works
-
-1. **CSS Grid** (parent): All cards in the row have the same height (tallest card wins)
-2. **h-full**: Each card fills its grid cell completely
-3. **flex-col** + **flex-1**: Title area expands to fill available space
-4. **mt-auto wrapper**: Classification badge + progress bar group sticks to the bottom
-
-This means regardless of how many lines the title takes, the CORE/Enabler badges, RAG status, and progress bars will always be at the exact same vertical position across all cards.
-
----
-
-## Visual Result
-
+**Component Structure:**
 ```text
-Card 1               Card 2               Card 3
-┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-│ Brand &          │ │ Customer         │ │ Operational      │
-│ Reputation       │ │ Experience &     │ │ Excellence &     │
-│                  │ │ Success          │ │ Cybersecurity    │
-│                  │ │                  │ │ Resilience       │
-│                  │ │                  │ │                  │
-├──────────────────┤ ├──────────────────┤ ├──────────────────┤ ← Same line
-│ [CORE]    [G]85% │ │ [CORE]    [A]72% │ │ [Enabler] [R]68% │
-│ ▓▓▓▓▓▓▓░░░░░░░░░ │ │ ▓▓▓▓▓▓░░░░░░░░░░ │ │ ▓▓▓▓▓░░░░░░░░░░░ │
-└──────────────────┘ └──────────────────┘ └──────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  🎯 Org Objectives                                    [Refresh] │
+│  Manage classification and settings for organizational goals   │
+├─────────────────────────────────────────────────────────────────┤
+│  Name                          │ Classification │ Color │ Save  │
+├────────────────────────────────┼────────────────┼───────┼───────┤
+│  Brand & Reputation            │ [CORE ▾]       │ [🟢▾] │ [💾]  │
+│  Customer Experience & Success │ [CORE ▾]       │ [🟣▾] │ [💾]  │
+│  Sustainable Growth            │ [Enabler ▾]    │ [🔵▾] │ [💾]  │
+│  Operational Excellence...     │ [CORE ▾]       │ [🟠▾] │ [💾]  │
+│  Talent Development & Culture  │ [Enabler ▾]    │ [🟡▾] │ [💾]  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-All CORE/Enabler badges perfectly aligned horizontally ✓
+### 2. Modify `src/pages/DataManagement.tsx`
 
+Add the new OrgObjectivesManager component to the OKR Structure tab:
+
+```tsx
+// In the "okr" TabsContent, add before OKRHierarchyTab:
+<TabsContent value="okr" className="space-y-4">
+  <OrgObjectivesManager />  {/* NEW - Add this */}
+  <OKRHierarchyTab key={refreshKey} />
+</TabsContent>
+```
+
+---
+
+## Technical Implementation
+
+### OrgObjectivesManager Component
+
+```tsx
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { Target, Save, RefreshCw, Loader2 } from 'lucide-react';
+
+interface OrgObjective {
+  id: string;
+  name: string;
+  classification: string;
+  color: string;
+  description: string | null;
+}
+
+const CLASSIFICATION_OPTIONS = ['CORE', 'Enabler'];
+
+const COLOR_OPTIONS = [
+  { value: 'green', label: 'Green', class: 'bg-green-500' },
+  { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
+  { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
+  { value: 'yellow', label: 'Yellow', class: 'bg-yellow-500' },
+  { value: 'orange', label: 'Orange', class: 'bg-orange-500' },
+  { value: 'teal', label: 'Teal', class: 'bg-teal-500' },
+];
+
+export function OrgObjectivesManager() {
+  const [objectives, setObjectives] = useState<OrgObjective[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editedValues, setEditedValues] = useState<Record<string, Partial<OrgObjective>>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  // Fetch org objectives
+  // Handle classification/color changes
+  // Save individual objective
+  // Render table with inline editing
+}
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| Classification Dropdown | Select between "CORE" and "Enabler" |
+| Color Dropdown | Select from 6 identity colors with color preview |
+| Row-level Save | Each objective has its own save button |
+| Loading States | Shows spinner while loading/saving |
+| Dirty State Tracking | Only enables save when values have changed |
+| Toast Feedback | Success/error messages on save |
+
+---
+
+## User Flow
+
+1. Navigate to **Data Management → OKR Structure** tab
+2. See new **Org Objectives** card at the top
+3. Click the classification dropdown for any objective
+4. Select **CORE** or **Enabler**
+5. Click **Save** button for that row
+6. See confirmation toast
+7. Portfolio page reflects the updated classification
+
+---
+
+## Benefits
+
+1. **Direct editing**: No need to re-import Excel to change classification
+2. **Immediate feedback**: See changes reflected in the Portfolio view
+3. **Consistent location**: Part of the existing Data Management workflow
+4. **Admin-only**: Only visible to admin users (inherited from page access control)
