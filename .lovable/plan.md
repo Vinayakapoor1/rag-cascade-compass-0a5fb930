@@ -1,150 +1,66 @@
 
-# Add Org Objective Classification Editor in Admin Dashboard
 
-## Overview
+# Customer Page Enhancements: Trending Graph and Feature Hover
 
-Add a dedicated section in the Data Management page to manage Org Objectives, including the ability to edit the **CORE/Enabler** classification, name, color, and description.
+## 1. Add a KPI Trending Mini-Graph on Customer Cards
+
+### What it does
+Each customer card on the Customers page will show a small sparkline/trend chart next to the Health badge. This chart will visualize the customer's KPI health trend over time based on `indicator_history` data for their linked indicators.
+
+### Current data situation
+The `indicator_history` and `indicator_customer_links` tables are currently empty, so the graph will show a "No data" placeholder until team leaders start entering KPI data. Once data flows in, the chart will automatically render trends.
+
+### How it works
+- For each customer, fetch the last 6 periods of `indicator_history` data for their linked indicators (via `indicator_customer_links`)
+- Calculate an aggregate health score per period (average of current/target ratios)
+- Render a tiny Recharts `<Sparkline>` (LineChart with no axes, ~80x32px) showing the trend
+- Color the line based on the latest RAG status (green/amber/red)
+- When no history data exists, show a subtle "No trend data" text
+
+### File changes
+- **`src/hooks/useCustomerImpact.tsx`**: Add trend data fetching to `fetchCustomersWithImpact` - query `indicator_history` joined with `indicator_customer_links` to get per-period aggregate scores
+- **`src/pages/CustomersPage.tsx`**: Add a mini sparkline chart between the Health badge and KPIs count on each customer card row
 
 ---
 
-## Current State
+## 2. Show Features as Hoverable Badges on Customer Cards
 
-- The `org_objectives` table has: `id`, `name`, `classification` (CORE/Enabler), `color`, `description`, `business_outcome`
-- The OKR Hierarchy Tab only manages Departments and their children - no UI for editing Org Objectives
-- Classification can only be set via Excel import currently
+### What it does
+As shown in the screenshots, feature badges (e.g., "VCRO", "ANNOUNCEMENT", "CUSTOM CONTENT", "+7 more") will appear on each customer card. When hovering over the "+N more" badge, a popover/tooltip will show the full list of features.
 
----
+### Current state
+Features are already fetched and displayed on customer cards (lines 297-311 in CustomersPage.tsx), showing up to 3 badges with a "+N more" count. However, there is no hover behavior on the "+N more" to reveal the full list.
 
-## Solution
+### Changes
+- **`src/pages/CustomersPage.tsx`**: 
+  - Wrap the "+N more" badge in a `HoverCard` component that displays the complete list of features on hover
+  - Style feature badges with uppercase text and darker backgrounds to match the screenshot reference (dark pill-style badges)
+  - The hover popover will show a grid/list of all remaining feature names
 
-Create a new **Org Objectives Management Card** that displays above or within the OKR Structure tab, allowing admins to:
-1. View all Org Objectives in a table/list
-2. Edit each objective's classification (CORE/Enabler), color, and name
-3. Save changes with immediate feedback
-
----
-
-## Files to Create/Modify
-
-### 1. Create `src/components/admin/OrgObjectivesManager.tsx` (NEW)
-
-A new component that provides a table view of all Org Objectives with inline editing:
-
+### Technical detail
 ```tsx
-// Key features:
-- Fetches all org_objectives from database
-- Displays in a table with columns: Name, Classification, Color, Actions
-- Classification dropdown: CORE / Enabler
-- Color dropdown matching existing color options
-- Save button per row
-- Toast notifications for success/failure
-```
-
-**Component Structure:**
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  🎯 Org Objectives                                    [Refresh] │
-│  Manage classification and settings for organizational goals   │
-├─────────────────────────────────────────────────────────────────┤
-│  Name                          │ Classification │ Color │ Save  │
-├────────────────────────────────┼────────────────┼───────┼───────┤
-│  Brand & Reputation            │ [CORE ▾]       │ [🟢▾] │ [💾]  │
-│  Customer Experience & Success │ [CORE ▾]       │ [🟣▾] │ [💾]  │
-│  Sustainable Growth            │ [Enabler ▾]    │ [🔵▾] │ [💾]  │
-│  Operational Excellence...     │ [CORE ▾]       │ [🟠▾] │ [💾]  │
-│  Talent Development & Culture  │ [Enabler ▾]    │ [🟡▾] │ [💾]  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 2. Modify `src/pages/DataManagement.tsx`
-
-Add the new OrgObjectivesManager component to the OKR Structure tab:
-
-```tsx
-// In the "okr" TabsContent, add before OKRHierarchyTab:
-<TabsContent value="okr" className="space-y-4">
-  <OrgObjectivesManager />  {/* NEW - Add this */}
-  <OKRHierarchyTab key={refreshKey} />
-</TabsContent>
+// "+N more" badge wrapped in HoverCard
+<HoverCard>
+  <HoverCardTrigger asChild>
+    <Badge variant="secondary" className="text-xs cursor-pointer">
+      +{features.length - 3} more
+    </Badge>
+  </HoverCardTrigger>
+  <HoverCardContent className="w-64">
+    <div className="flex flex-wrap gap-1.5">
+      {features.slice(3).map(f => (
+        <Badge key={f.id} variant="secondary">{f.name}</Badge>
+      ))}
+    </div>
+  </HoverCardContent>
+</HoverCard>
 ```
 
 ---
 
-## Technical Implementation
+## Summary of File Changes
 
-### OrgObjectivesManager Component
-
-```tsx
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { Target, Save, RefreshCw, Loader2 } from 'lucide-react';
-
-interface OrgObjective {
-  id: string;
-  name: string;
-  classification: string;
-  color: string;
-  description: string | null;
-}
-
-const CLASSIFICATION_OPTIONS = ['CORE', 'Enabler'];
-
-const COLOR_OPTIONS = [
-  { value: 'green', label: 'Green', class: 'bg-green-500' },
-  { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
-  { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
-  { value: 'yellow', label: 'Yellow', class: 'bg-yellow-500' },
-  { value: 'orange', label: 'Orange', class: 'bg-orange-500' },
-  { value: 'teal', label: 'Teal', class: 'bg-teal-500' },
-];
-
-export function OrgObjectivesManager() {
-  const [objectives, setObjectives] = useState<OrgObjective[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editedValues, setEditedValues] = useState<Record<string, Partial<OrgObjective>>>({});
-  const [saving, setSaving] = useState<string | null>(null);
-
-  // Fetch org objectives
-  // Handle classification/color changes
-  // Save individual objective
-  // Render table with inline editing
-}
-```
-
-### Key Features
-
-| Feature | Description |
-|---------|-------------|
-| Classification Dropdown | Select between "CORE" and "Enabler" |
-| Color Dropdown | Select from 6 identity colors with color preview |
-| Row-level Save | Each objective has its own save button |
-| Loading States | Shows spinner while loading/saving |
-| Dirty State Tracking | Only enables save when values have changed |
-| Toast Feedback | Success/error messages on save |
-
----
-
-## User Flow
-
-1. Navigate to **Data Management → OKR Structure** tab
-2. See new **Org Objectives** card at the top
-3. Click the classification dropdown for any objective
-4. Select **CORE** or **Enabler**
-5. Click **Save** button for that row
-6. See confirmation toast
-7. Portfolio page reflects the updated classification
-
----
-
-## Benefits
-
-1. **Direct editing**: No need to re-import Excel to change classification
-2. **Immediate feedback**: See changes reflected in the Portfolio view
-3. **Consistent location**: Part of the existing Data Management workflow
-4. **Admin-only**: Only visible to admin users (inherited from page access control)
+| File | Change |
+|------|--------|
+| `src/hooks/useCustomerImpact.tsx` | Add trend data (last 6 periods) to `CustomerWithImpact` interface and fetcher |
+| `src/pages/CustomersPage.tsx` | Add mini sparkline chart per customer card; wrap "+N more" features badge in HoverCard for full feature list on hover |
