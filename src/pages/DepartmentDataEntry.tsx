@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { CSMDataEntryMatrix } from '@/components/user/CSMDataEntryMatrix';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -110,6 +112,7 @@ export default function DepartmentDataEntry() {
     const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [period, setPeriod] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
+    const [activeTab, setActiveTab] = useState<string>('per-indicator');
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -613,6 +616,19 @@ export default function DepartmentDataEntry() {
                 </Button>
             </div>
 
+            {/* Tab Switcher */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                    <TabsTrigger value="per-indicator">Per Indicator</TabsTrigger>
+                    <TabsTrigger value="feature-matrix">Feature Matrix</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="feature-matrix">
+                    <CSMDataEntryMatrix departmentId={departmentId!} period={period} />
+                </TabsContent>
+
+                <TabsContent value="per-indicator">
+
             {/* Team Leader Data Entry Guide */}
             <Card className="border-primary/30 bg-primary/5">
                 <CardContent className="p-4">
@@ -1005,6 +1021,9 @@ export default function DepartmentDataEntry() {
                     </CardContent>
                 </Card>
             )}
+
+            </TabsContent>
+            </Tabs>
 
             <IndicatorHistoryDialog
                 open={historyDialog.open}
