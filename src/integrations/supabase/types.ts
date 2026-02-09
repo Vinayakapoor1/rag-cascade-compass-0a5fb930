@@ -53,6 +53,57 @@ export type Database = {
         }
         Relationships: []
       }
+      csm_feature_scores: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          feature_id: string
+          id: string
+          indicator_id: string
+          period: string
+          rag_value: number | null
+          score_band: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          feature_id: string
+          id?: string
+          indicator_id: string
+          period: string
+          rag_value?: number | null
+          score_band?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          feature_id?: string
+          id?: string
+          indicator_id?: string
+          period?: string
+          rag_value?: number | null
+          score_band?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csm_feature_scores_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "csm_feature_scores_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       csms: {
         Row: {
           created_at: string | null
@@ -855,6 +906,41 @@ export type Database = {
             columns: ["functional_objective_id"]
             isOneToOne: false
             referencedRelation: "functional_objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_rag_bands: {
+        Row: {
+          band_label: string
+          id: string
+          indicator_id: string
+          rag_color: string
+          rag_numeric: number
+          sort_order: number
+        }
+        Insert: {
+          band_label: string
+          id?: string
+          indicator_id: string
+          rag_color: string
+          rag_numeric: number
+          sort_order?: number
+        }
+        Update: {
+          band_label?: string
+          id?: string
+          indicator_id?: string
+          rag_color?: string
+          rag_numeric?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_rag_bands_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "indicators"
             referencedColumns: ["id"]
           },
         ]
