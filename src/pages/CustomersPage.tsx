@@ -41,22 +41,26 @@ const MOCK_KPI_COLORS: Record<string, string> = {
 function SparklineTooltip({ active, payload, label, isMock }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-lg text-xs space-y-1">
-      <p className="font-semibold text-[11px] border-b border-border pb-1 mb-1">
+    <div className="rounded-md border border-border/60 bg-popover px-3 py-2.5 text-popover-foreground shadow-xl text-xs space-y-1.5 min-w-[160px] backdrop-blur-sm">
+      <p className="font-semibold text-[11px] text-foreground/80">
         Period {label}
       </p>
-      {payload.map((entry: any) => (
-        <div key={entry.dataKey} className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="text-muted-foreground">
-            {isMock ? MOCK_KPI_NAMES[entry.dataKey] || entry.dataKey : 'Health Score'}:
-          </span>
-          <span className="font-semibold ml-auto">{entry.value}%</span>
-        </div>
-      ))}
+      <div className="border-t border-border/40 pt-1.5 space-y-1">
+        {payload.map((entry: any) => (
+          <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+              <span className="text-muted-foreground text-[11px]">
+                {isMock ? MOCK_KPI_NAMES[entry.dataKey] || entry.dataKey : 'Health Score'}
+              </span>
+            </div>
+            <span className="font-semibold text-[11px] tabular-nums">{entry.value}%</span>
+          </div>
+        ))}
+      </div>
       {isMock && (
-        <p className="text-[9px] text-muted-foreground/60 pt-1 border-t border-border mt-1 italic">
-          Sample data — will reflect linked KPIs
+        <p className="text-[9px] text-muted-foreground/50 pt-1 border-t border-border/30 italic">
+          Sample — will reflect linked KPIs
         </p>
       )}
     </div>
@@ -85,8 +89,8 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
   return (
     <div className="flex-1 h-16 min-w-[200px] relative rounded-lg bg-muted/20 border border-border/40 px-2 py-1.5 group hover:bg-muted/40 transition-colors">
       {isMock && (
-        <div className="absolute top-1 right-2 flex items-center gap-1 z-10">
-          <span className="text-[8px] text-muted-foreground/50 font-medium uppercase tracking-wider">Preview</span>
+        <div className="absolute -top-2.5 right-2 z-10">
+          <span className="text-[8px] text-muted-foreground/40 font-medium uppercase tracking-wider bg-background px-1.5 py-0.5 rounded border border-border/30">Sample</span>
         </div>
       )}
       <ResponsiveContainer width="100%" height="100%">
