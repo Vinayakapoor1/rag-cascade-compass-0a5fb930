@@ -16,7 +16,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { LineChart, Line, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, CartesianGrid, YAxis } from 'recharts';
 import { RAGStatus } from '@/types/venture';
 
 const RAG_LINE_COLORS: Record<RAGStatus, string> = {
@@ -27,35 +27,48 @@ const RAG_LINE_COLORS: Record<RAGStatus, string> = {
 };
 
 function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragStatus: RAGStatus }) {
-  const MOCK_DATA: TrendDataPoint[] = [
-    { period: '1', score: 45 },
-    { period: '2', score: 52 },
-    { period: '3', score: 48 },
-    { period: '4', score: 65 },
-    { period: '5', score: 58 },
-    { period: '6', score: 72 },
+  const MOCK_DATA = [
+    { period: '1', kpi1: 45, kpi2: 60, kpi3: 30 },
+    { period: '2', kpi1: 52, kpi2: 55, kpi3: 42 },
+    { period: '3', kpi1: 48, kpi2: 62, kpi3: 38 },
+    { period: '4', kpi1: 65, kpi2: 58, kpi3: 55 },
+    { period: '5', kpi1: 58, kpi2: 70, kpi3: 50 },
+    { period: '6', kpi1: 72, kpi2: 68, kpi3: 62 },
   ];
 
-  const chartData = data.length >= 2 ? data : MOCK_DATA;
-  const isMock = data.length < 2;
+  const hasRealData = data.length >= 2;
+  const isMock = !hasRealData;
+
+  // For real data, use single line; for mock, show multi-KPI preview
+  const chartData = hasRealData
+    ? data.map(d => ({ period: d.period, kpi1: d.score }))
+    : MOCK_DATA;
 
   return (
-    <div className="flex-1 h-10 min-w-[100px] relative">
+    <div className="flex-1 h-14 min-w-[120px] relative rounded-md bg-muted/30 px-1 py-1">
       {isMock && (
-        <span className="absolute -top-3 left-0 text-[8px] text-muted-foreground">
+        <span className="absolute top-0.5 right-1.5 text-[8px] text-muted-foreground/60 font-medium z-10">
           Sample
         </span>
       )}
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
+        <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} horizontal vertical={false} />
+          <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
           <Line
             type="monotone"
-            dataKey="score"
-            stroke={isMock ? 'hsl(var(--muted-foreground))' : RAG_LINE_COLORS[ragStatus]}
-            strokeWidth={1.5}
+            dataKey="kpi1"
+            stroke={isMock ? 'hsl(142, 71%, 45%)' : RAG_LINE_COLORS[ragStatus]}
+            strokeWidth={2}
             dot={false}
-            strokeDasharray={isMock ? '3 3' : undefined}
+            strokeDasharray={isMock ? '4 2' : undefined}
           />
+          {isMock && (
+            <>
+              <Line type="monotone" dataKey="kpi2" stroke="hsl(38, 92%, 50%)" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+              <Line type="monotone" dataKey="kpi3" stroke="hsl(0, 72%, 50%)" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+            </>
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>
