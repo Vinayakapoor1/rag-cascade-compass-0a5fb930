@@ -89,9 +89,7 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
   return (
     <div className="flex-1 h-16 min-w-[200px] relative rounded-lg bg-muted/20 border border-border/40 px-2 py-1.5 group hover:bg-muted/40 transition-colors">
       {isMock && (
-        <div className="absolute -top-2.5 right-2 z-10">
-          <span className="text-[8px] text-muted-foreground/40 font-medium uppercase tracking-wider bg-background px-1.5 py-0.5 rounded border border-border/30">Sample</span>
-        </div>
+        <span className="absolute -top-1.5 left-2 z-10 text-[7px] text-muted-foreground/30 font-medium uppercase tracking-widest leading-none bg-background px-1 rounded">Sample</span>
       )}
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: 0 }}>
