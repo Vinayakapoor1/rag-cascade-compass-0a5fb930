@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useCustomersWithImpact } from '@/hooks/useCustomerImpact';
+import { useCustomersWithImpact, TrendDataPoint } from '@/hooks/useCustomerImpact';
 import { DrilldownBreadcrumb } from '@/components/DrilldownBreadcrumb';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,13 +8,50 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { CustomerFormDialog } from '@/components/CustomerFormDialog';
 import { RAGBadge } from '@/components/RAGBadge';
-import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server } from 'lucide-react';
+import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server, TrendingUp } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
+import { RAGStatus } from '@/types/venture';
+
+const RAG_LINE_COLORS: Record<RAGStatus, string> = {
+  green: 'hsl(142, 71%, 45%)',
+  amber: 'hsl(38, 92%, 50%)',
+  red: 'hsl(0, 72%, 50%)',
+  'not-set': 'hsl(var(--muted-foreground))',
+};
+
+function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragStatus: RAGStatus }) {
+  if (data.length < 2) {
+    return (
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground w-20">
+        <TrendingUp className="h-3 w-3" />
+        <span>No trend</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-20 h-8">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data}>
+          <Line
+            type="monotone"
+            dataKey="score"
+            stroke={RAG_LINE_COLORS[ragStatus]}
+            strokeWidth={1.5}
+            dot={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export default function CustomersPage() {
   const { data: customers, isLoading, refetch } = useCustomersWithImpact();
@@ -295,23 +332,39 @@ export default function CustomersPage() {
                           )}
                         </div>
                         {features.length > 0 && (
-                          <div className="flex items-center gap-1 mt-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                             <Tag className="h-3 w-3 text-muted-foreground" />
                             {features.slice(0, 3).map(feature => (
-                              <Badge key={feature.id} variant="secondary" className="text-xs">
+                              <Badge key={feature.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-foreground/10 text-foreground/80">
                                 {feature.name}
                               </Badge>
                             ))}
                             {features.length > 3 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{features.length - 3} more
-                              </Badge>
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <Badge variant="secondary" className="text-[10px] cursor-pointer hover:bg-primary/20 transition-colors">
+                                    +{features.length - 3} more
+                                  </Badge>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-64" align="start">
+                                  <p className="text-xs font-medium text-muted-foreground mb-2">All Features</p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {features.map(f => (
+                                      <Badge key={f.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-foreground/10 text-foreground/80">
+                                        {f.name}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
                             )}
                           </div>
                         )}
                       </div>
                     </Link>
                     <div className="flex items-center gap-4">
+                      {/* Sparkline Trend */}
+                      <CustomerSparkline data={customer.trendData} ragStatus={customer.ragStatus} />
                       {/* RAG Status */}
                       <div className="flex flex-col items-center">
                         <RAGBadge status={customer.ragStatus} size="md" />

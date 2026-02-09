@@ -345,6 +345,11 @@ export function useCustomerImpact(customerId: string) {
 }
 
 // Fetch all customers with their impact counts
+export interface TrendDataPoint {
+  period: string;
+  score: number;
+}
+
 export interface CustomerWithImpact {
   id: string;
   name: string;
@@ -356,6 +361,7 @@ export interface CustomerWithImpact {
   ragStatus: RAGStatus;
   logoUrl: string | null;
   deploymentType: string | null;
+  trendData: TrendDataPoint[];
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
@@ -393,6 +399,62 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     }
   });
 
+  // Fetch trend data from indicator_history for linked indicators
+  const customerTrendData = new Map<string, TrendDataPoint[]>();
+  
+  // Get all indicator IDs linked to customers
+  const allLinkedIndicatorIds = [...new Set((links || []).map(l => l.indicator_id))];
+  
+  if (allLinkedIndicatorIds.length > 0) {
+    // Fetch indicator history for linked indicators (last 6 periods)
+    const { data: historyData } = await supabase
+      .from('indicator_history')
+      .select('indicator_id, period, value')
+      .in('indicator_id', allLinkedIndicatorIds)
+      .order('period', { ascending: true });
+
+    if (historyData && historyData.length > 0) {
+      // Build a map: indicator_id -> customer_ids
+      const indicatorToCustomers = new Map<string, string[]>();
+      (links || []).forEach(link => {
+        if (!indicatorToCustomers.has(link.indicator_id)) {
+          indicatorToCustomers.set(link.indicator_id, []);
+        }
+        indicatorToCustomers.get(link.indicator_id)!.push(link.customer_id);
+      });
+
+      // For each customer, aggregate history by period
+      const customerPeriodScores = new Map<string, Map<string, number[]>>();
+      
+      for (const entry of historyData) {
+        if (!entry.indicator_id) continue;
+        const custIds = indicatorToCustomers.get(entry.indicator_id) || [];
+        for (const custId of custIds) {
+          if (!customerPeriodScores.has(custId)) {
+            customerPeriodScores.set(custId, new Map());
+          }
+          const periods = customerPeriodScores.get(custId)!;
+          if (!periods.has(entry.period)) {
+            periods.set(entry.period, []);
+          }
+          periods.get(entry.period)!.push(entry.value);
+        }
+      }
+
+      // Convert to trend data (last 6 periods, averaged)
+      for (const [custId, periods] of customerPeriodScores) {
+        const sortedPeriods = [...periods.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .slice(-6);
+        
+        customerTrendData.set(custId, sortedPeriods.map(([period, values]) => ({
+          period,
+          score: values.reduce((a, b) => a + b, 0) / values.length,
+        })));
+      }
+    }
+  }
+
   return customers.map(c => {
     const data = customerData.get(c.id);
     const linkedCount = data?.count || 0;
@@ -400,7 +462,6 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     // Calculate overall RAG status from linked indicators
     let ragStatus: RAGStatus = 'not-set';
     if (data && data.statuses.length > 0) {
-      // Calculate average score: green=100, amber=60, red=30
       const avgScore = data.statuses.reduce((sum, s) => {
         return sum + (s === 'green' ? 100 : s === 'amber' ? 60 : s === 'red' ? 30 : 0);
       }, 0) / data.statuses.length;
@@ -418,6 +479,7 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       ragStatus,
       logoUrl: c.logo_url,
       deploymentType: c.deployment_type,
+      trendData: customerTrendData.get(c.id) || [],
     };
   });
 }
