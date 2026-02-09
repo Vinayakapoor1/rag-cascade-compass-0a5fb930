@@ -1,68 +1,108 @@
 
 
-# Revert Badge Colors and Add Mock Trendline
+# CSM Feature Matrix Data Entry
 
-## 1. Revert Feature Badge Styling
+## Overview
+Add a spreadsheet-style KPI x Feature matrix to the Department Data Entry page, allowing users to score each KPI against each feature using RAG-band dropdowns. The aggregate score per KPI row automatically updates the indicator's current value, driving the existing RAG cascade.
 
-The badge colors were changed unnecessarily. Revert back to the original styling:
+## What Users Will See
 
-**Change in `src/pages/CustomersPage.tsx`:**
-- Line 338: Change `bg-primary/15 text-primary border border-primary/20` back to `bg-foreground/10 text-foreground/80`
-- Line 353: Same revert inside the HoverCard content
+1. A new **"Feature Matrix"** tab on the existing Department Data Entry page (`/department/{id}/data-entry`)
+2. A matrix grid where:
+   - Rows = KPIs (indicators belonging to the department)
+   - Columns = Features (linked via `indicator_feature_links`)
+   - Each cell = a dropdown with RAG band options (e.g., "76-100%", "51-75%", "1-50%")
+   - Cells auto-color based on selection (green/amber/red)
+   - Final column = auto-calculated aggregate percentage
+3. A "Save All" button that persists every cell and updates indicator values
 
-The HoverCard hover-to-reveal behavior stays as-is (no changes needed there).
+## Implementation Steps
 
-## 2. Add Mock Trendline Data
+### Step 1: Database Tables
 
-Add a fallback in `CustomerSparkline` so that when real data is empty, it renders a sample trend to visualize the sparkline. This will be a temporary mock -- a hardcoded array of 6 data points injected when `data.length < 2`, replacing the "No trend" text with an actual chart preview.
+**Table: `csm_feature_scores`** -- stores individual cell values
 
-**Change in `src/pages/CustomersPage.tsx` (CustomerSparkline component):**
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK, default gen_random_uuid() |
+| indicator_id | uuid | FK to indicators |
+| feature_id | uuid | FK to features |
+| score_band | text | e.g. "76-100%" |
+| rag_value | numeric | Green=1, Amber=0.5, Red=0 |
+| period | text | e.g. "2026-02" |
+| created_by | uuid | auth.uid() |
+| created_at | timestamptz | default now() |
+| updated_at | timestamptz | default now() |
 
-Replace the "No trend" placeholder with mock data rendering:
+Unique constraint on (indicator_id, feature_id, period) for upsert.
+RLS: authenticated users can read; users with department access can insert/update via `has_department_access()`.
 
-```tsx
-function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragStatus: RAGStatus }) {
-  const MOCK_DATA: TrendDataPoint[] = [
-    { period: '1', score: 45 },
-    { period: '2', score: 52 },
-    { period: '3', score: 48 },
-    { period: '4', score: 65 },
-    { period: '5', score: 58 },
-    { period: '6', score: 72 },
-  ];
+**Table: `kpi_rag_bands`** -- configurable RAG bands per KPI
 
-  const chartData = data.length >= 2 ? data : MOCK_DATA;
-  const isMock = data.length < 2;
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| indicator_id | uuid | FK to indicators |
+| band_label | text | e.g. "76-100%" |
+| rag_color | text | green/amber/red |
+| rag_numeric | numeric | 1, 0.5, or 0 |
+| sort_order | integer | display order |
 
-  return (
-    <div className="w-36 h-10 relative">
-      {isMock && (
-        <span className="absolute -top-3 left-0 text-[8px] text-muted-foreground">
-          Sample
-        </span>
-      )}
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <Line
-            type="monotone"
-            dataKey="score"
-            stroke={isMock ? 'hsl(var(--muted-foreground))' : RAG_LINE_COLORS[ragStatus]}
-            strokeWidth={1.5}
-            dot={false}
-            strokeDasharray={isMock ? '3 3' : undefined}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
+RLS: anyone can read; authenticated can manage.
+
+If no custom bands exist for a KPI, the system uses default bands: "76-100%" (Green/1), "51-75%" (Amber/0.5), "1-50%" (Red/0).
+
+### Step 2: New Component -- `CSMDataEntryMatrix.tsx`
+
+Located at `src/components/user/CSMDataEntryMatrix.tsx`.
+
+- Receives `departmentId` and `period` as props
+- Fetches indicators for the department (via FO -> KR -> Indicators chain)
+- Fetches linked features per indicator from `indicator_feature_links`
+- Fetches custom RAG bands from `kpi_rag_bands` (falls back to defaults)
+- Loads existing scores from `csm_feature_scores` for the selected period
+- Renders the matrix with:
+  - Sticky first column (KPI names)
+  - Horizontal scroll for many features
+  - Color-coded dropdown cells
+  - Auto-calculated aggregate column with RAG badge
+- On save: upserts to `csm_feature_scores`, then updates each indicator's `current_value` with the aggregate percentage, creates `indicator_history` entries, and logs to `activity_logs`
+
+### Step 3: Integrate into DepartmentDataEntry Page
+
+Modify `src/pages/DepartmentDataEntry.tsx`:
+- Add a tab bar at the top: "Per Indicator" (existing view) | "Feature Matrix" (new)
+- "Feature Matrix" tab renders the `CSMDataEntryMatrix` component
+- Both tabs share the same period selector
+
+### Step 4: Aggregation Formula
+
+For each KPI row:
 ```
+Aggregate % = (SUM of rag_numeric values across features / number_of_features) * 100
+```
+Where Green = 1.0, Amber = 0.5, Red = 0.0
 
-The mock line will be dashed and gray with a tiny "Sample" label so it's clearly not real data.
+This percentage is written to `indicators.current_value` (with `target_value` = 100), triggering the existing RAG cascade up through KR -> FO -> Department -> Org Objective.
 
-## Files Modified
+### Step 5: Admin Configuration (Later Phase)
 
-| File | Change |
-|------|--------|
-| `src/pages/CustomersPage.tsx` | Revert badge colors to original; replace "No trend" with mock sparkline |
+An admin sub-tab on the Data Management page to:
+- Define custom RAG bands per KPI
+- Preview the matrix layout
+
+This can be added as a follow-up since the default bands work immediately.
+
+## Files to Create
+- `src/components/user/CSMDataEntryMatrix.tsx` -- the matrix component
+- Database migration for `csm_feature_scores` and `kpi_rag_bands` tables
+
+## Files to Modify
+- `src/pages/DepartmentDataEntry.tsx` -- add tab switching between existing view and matrix view
+
+## Technical Notes
+- The matrix uses existing `indicator_feature_links` to determine which features appear as columns for each KPI row
+- RLS on `csm_feature_scores` uses the existing `has_department_access()` function
+- The component uses `react-query` for data fetching consistent with the rest of the app
+- Evidence is not required for matrix entries (unlike per-indicator entry) since the matrix itself serves as the data source documentation
 
