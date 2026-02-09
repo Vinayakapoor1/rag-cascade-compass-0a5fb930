@@ -53,6 +53,64 @@ export type Database = {
         }
         Relationships: []
       }
+      csm_customer_feature_scores: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          feature_id: string
+          id: string
+          indicator_id: string
+          period: string
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          feature_id: string
+          id?: string
+          indicator_id: string
+          period: string
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          feature_id?: string
+          id?: string
+          indicator_id?: string
+          period?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csm_customer_feature_scores_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "csm_customer_feature_scores_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "csm_customer_feature_scores_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       csm_feature_scores: {
         Row: {
           created_at: string
