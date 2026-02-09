@@ -27,25 +27,34 @@ const RAG_LINE_COLORS: Record<RAGStatus, string> = {
 };
 
 function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragStatus: RAGStatus }) {
-  if (data.length < 2) {
-    return (
-      <div className="flex items-center gap-1 text-[10px] text-muted-foreground w-36">
-        <TrendingUp className="h-3 w-3" />
-        <span>No trend</span>
-      </div>
-    );
-  }
+  const MOCK_DATA: TrendDataPoint[] = [
+    { period: '1', score: 45 },
+    { period: '2', score: 52 },
+    { period: '3', score: 48 },
+    { period: '4', score: 65 },
+    { period: '5', score: 58 },
+    { period: '6', score: 72 },
+  ];
+
+  const chartData = data.length >= 2 ? data : MOCK_DATA;
+  const isMock = data.length < 2;
 
   return (
-    <div className="w-36 h-10">
+    <div className="w-36 h-10 relative">
+      {isMock && (
+        <span className="absolute -top-3 left-0 text-[8px] text-muted-foreground">
+          Sample
+        </span>
+      )}
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
+        <LineChart data={chartData}>
           <Line
             type="monotone"
             dataKey="score"
-            stroke={RAG_LINE_COLORS[ragStatus]}
+            stroke={isMock ? 'hsl(var(--muted-foreground))' : RAG_LINE_COLORS[ragStatus]}
             strokeWidth={1.5}
             dot={false}
+            strokeDasharray={isMock ? '3 3' : undefined}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -335,7 +344,7 @@ export default function CustomersPage() {
                           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                             <Tag className="h-3 w-3 text-muted-foreground" />
                             {features.slice(0, 3).map(feature => (
-                              <Badge key={feature.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-primary/15 text-primary border border-primary/20">
+                              <Badge key={feature.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-foreground/10 text-foreground/80">
                                 {feature.name}
                               </Badge>
                             ))}
@@ -350,7 +359,7 @@ export default function CustomersPage() {
                                   <p className="text-xs font-medium text-muted-foreground mb-2">All Features</p>
                                   <div className="flex flex-wrap gap-1.5">
                                     {features.map(f => (
-                                      <Badge key={f.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-primary/15 text-primary border border-primary/20">
+                                      <Badge key={f.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-foreground/10 text-foreground/80">
                                         {f.name}
                                       </Badge>
                                     ))}
