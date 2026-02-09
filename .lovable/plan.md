@@ -1,108 +1,115 @@
 
 
-# CSM Feature Matrix Data Entry
+# KPI-Driven Customer x Feature Data Entry Matrix
 
 ## Overview
-Add a spreadsheet-style KPI x Feature matrix to the Department Data Entry page, allowing users to score each KPI against each feature using RAG-band dropdowns. The aggregate score per KPI row automatically updates the indicator's current value, driving the existing RAG cascade.
+Rewrite the `CSMDataEntryMatrix` component to display all KPIs for the department statically (no selector), each with its own Customer x Feature grid. The CSM fills in percentage values per customer-feature cell. Scores auto-aggregate up to the KPI level and feed the existing RAG cascade.
 
 ## What Users Will See
 
-1. A new **"Feature Matrix"** tab on the existing Department Data Entry page (`/department/{id}/data-entry`)
-2. A matrix grid where:
-   - Rows = KPIs (indicators belonging to the department)
-   - Columns = Features (linked via `indicator_feature_links`)
-   - Each cell = a dropdown with RAG band options (e.g., "76-100%", "51-75%", "1-50%")
-   - Cells auto-color based on selection (green/amber/red)
-   - Final column = auto-calculated aggregate percentage
-3. A "Save All" button that persists every cell and updates indicator values
+On the "Feature Matrix" tab of the Department Data Entry page:
+
+- Each KPI linked to features is shown as a **collapsible section** (all expanded by default)
+- Inside each KPI section is a grid:
+  - **Rows** = Customers who use at least one of the KPI's linked features (derived from `indicator_feature_links` + `customer_features`)
+  - **Columns** = Features linked to the KPI
+  - **Cells** = Percentage input (0-100), auto-colored by RAG thresholds. Only editable where the customer uses that feature ("--" otherwise)
+  - **Per-customer aggregate** column = average of that customer's filled cells
+  - **KPI aggregate** badge at the top = average of all customer aggregates
+- A single "Save All" button at the top persists everything and updates `indicators.current_value`
+
+```text
+-- KPI: Adoption Rate  [Aggregate: 72% Amber] --
++-------------------+-------+-------+-------+-------+-----------+
+| Customer          | LMS   | VCRO  | Phish | Portal| Avg       |
++-------------------+-------+-------+-------+-------+-----------+
+| DHA               | [85 ] | [90 ] |  --   | [70 ] |   82%  G  |
+| VOIS              | [60 ] | [75 ] | [80 ] |  --   |   72%  A  |
+| Edge Group        |  --   | [40 ] | [55 ] | [90 ] |   62%  A  |
++-------------------+-------+-------+-------+-------+-----------+
+
+-- KPI: NPS Score  [Aggregate: 65% Amber] --
++-------------------+-------+-------+-----------+
+| Customer          | LMS   | VCRO  | Avg       |
++-------------------+-------+-------+-----------+
+| DHA               | [70 ] | [60 ] |   65%  A  |
++-------------------+-------+-------+-----------+
+```
+
+## Data Connections
+
+The relationship chain uses existing tables only -- no new mapping needed:
+
+1. **KPI to Features**: `indicator_feature_links` tells us which features are relevant to each KPI
+2. **Features to Customers**: `customer_features` tells us which customers use each feature
+3. **Intersection**: A cell is editable only when both links exist (the KPI tracks that feature AND the customer uses that feature)
 
 ## Implementation Steps
 
-### Step 1: Database Tables
+### Step 1: New Database Table
 
-**Table: `csm_feature_scores`** -- stores individual cell values
+**`csm_customer_feature_scores`** -- stores the granular percentage per cell
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | uuid | PK, default gen_random_uuid() |
-| indicator_id | uuid | FK to indicators |
-| feature_id | uuid | FK to features |
-| score_band | text | e.g. "76-100%" |
-| rag_value | numeric | Green=1, Amber=0.5, Red=0 |
+| id | uuid | PK, gen_random_uuid() |
+| indicator_id | uuid | FK -- which KPI |
+| customer_id | uuid | FK -- which customer row |
+| feature_id | uuid | FK -- which feature column |
+| value | numeric | Percentage 0-100 |
 | period | text | e.g. "2026-02" |
 | created_by | uuid | auth.uid() |
 | created_at | timestamptz | default now() |
 | updated_at | timestamptz | default now() |
 
-Unique constraint on (indicator_id, feature_id, period) for upsert.
-RLS: authenticated users can read; users with department access can insert/update via `has_department_access()`.
+- Unique constraint: (indicator_id, customer_id, feature_id, period)
+- RLS: anyone authenticated can read; authenticated can insert/update/delete
+- Trigger: auto-update `updated_at` on change
 
-**Table: `kpi_rag_bands`** -- configurable RAG bands per KPI
+### Step 2: Rewrite `CSMDataEntryMatrix.tsx`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| indicator_id | uuid | FK to indicators |
-| band_label | text | e.g. "76-100%" |
-| rag_color | text | green/amber/red |
-| rag_numeric | numeric | 1, 0.5, or 0 |
-| sort_order | integer | display order |
+Complete rewrite of the component logic:
 
-RLS: anyone can read; authenticated can manage.
+**Data fetching:**
+1. Get all indicators for the department (FO -> KR -> Indicators chain, same as now)
+2. For each indicator with feature links, fetch linked features from `indicator_feature_links`
+3. For those features, fetch customers who use them from `customer_features`
+4. Load existing scores from `csm_customer_feature_scores` for the period
 
-If no custom bands exist for a KPI, the system uses default bands: "76-100%" (Green/1), "51-75%" (Amber/0.5), "1-50%" (Red/0).
+**Rendering -- per KPI section:**
+- Collapsible card with KPI name, hierarchy path (FO -> KR), and aggregate badge
+- Table with customer rows, feature columns, percentage inputs
+- Cells are disabled/greyed where customer does not use the feature
+- Auto-color cells: Green (76-100), Amber (51-75), Red (1-50), Gray (empty)
+- Customer aggregate column (rightmost)
+- Customer name search/filter at the top of each section (since there could be 77 customers)
 
-### Step 2: New Component -- `CSMDataEntryMatrix.tsx`
-
-Located at `src/components/user/CSMDataEntryMatrix.tsx`.
-
-- Receives `departmentId` and `period` as props
-- Fetches indicators for the department (via FO -> KR -> Indicators chain)
-- Fetches linked features per indicator from `indicator_feature_links`
-- Fetches custom RAG bands from `kpi_rag_bands` (falls back to defaults)
-- Loads existing scores from `csm_feature_scores` for the selected period
-- Renders the matrix with:
-  - Sticky first column (KPI names)
-  - Horizontal scroll for many features
-  - Color-coded dropdown cells
-  - Auto-calculated aggregate column with RAG badge
-- On save: upserts to `csm_feature_scores`, then updates each indicator's `current_value` with the aggregate percentage, creates `indicator_history` entries, and logs to `activity_logs`
-
-### Step 3: Integrate into DepartmentDataEntry Page
-
-Modify `src/pages/DepartmentDataEntry.tsx`:
-- Add a tab bar at the top: "Per Indicator" (existing view) | "Feature Matrix" (new)
-- "Feature Matrix" tab renders the `CSMDataEntryMatrix` component
-- Both tabs share the same period selector
-
-### Step 4: Aggregation Formula
-
-For each KPI row:
+**Aggregation:**
+```text
+Customer Avg = AVG(filled cells for that customer)
+KPI Aggregate = AVG(all customer averages)
 ```
-Aggregate % = (SUM of rag_numeric values across features / number_of_features) * 100
-```
-Where Green = 1.0, Amber = 0.5, Red = 0.0
 
-This percentage is written to `indicators.current_value` (with `target_value` = 100), triggering the existing RAG cascade up through KR -> FO -> Department -> Org Objective.
+**Save logic:**
+- Upsert all cells to `csm_customer_feature_scores`
+- For each KPI, compute aggregate and write to `indicators.current_value` (target=100)
+- Create `indicator_history` entries
+- Log to `activity_logs`
 
-### Step 5: Admin Configuration (Later Phase)
+### Step 3: No Changes to DepartmentDataEntry Page
 
-An admin sub-tab on the Data Management page to:
-- Define custom RAG bands per KPI
-- Preview the matrix layout
-
-This can be added as a follow-up since the default bands work immediately.
+The parent page already has the "Feature Matrix" tab wired up. Only the component internals change.
 
 ## Files to Create
-- `src/components/user/CSMDataEntryMatrix.tsx` -- the matrix component
-- Database migration for `csm_feature_scores` and `kpi_rag_bands` tables
+- Database migration for `csm_customer_feature_scores` table
 
 ## Files to Modify
-- `src/pages/DepartmentDataEntry.tsx` -- add tab switching between existing view and matrix view
+- `src/components/user/CSMDataEntryMatrix.tsx` -- full rewrite: KPI sections with Customer x Feature grids using percentage inputs
 
 ## Technical Notes
-- The matrix uses existing `indicator_feature_links` to determine which features appear as columns for each KPI row
-- RLS on `csm_feature_scores` uses the existing `has_department_access()` function
-- The component uses `react-query` for data fetching consistent with the rest of the app
-- Evidence is not required for matrix entries (unlike per-indicator entry) since the matrix itself serves as the data source documentation
+- 77 customers x 17 features is manageable without virtualization, but a search filter per section keeps it usable
+- The existing `csm_feature_scores` table remains untouched for backward compatibility
+- Cell key format: `indicator_id::customer_id::feature_id`
+- Period is passed from the parent page's period selector (already wired)
+- Evidence is not required for matrix entries -- the granular per-customer data serves as documentation
 
