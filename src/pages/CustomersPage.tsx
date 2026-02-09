@@ -405,14 +405,19 @@ export default function CustomersPage() {
                               </Badge>
                             ))}
                             {features.length > 3 && (
-                              <HoverCard>
+                              <HoverCard openDelay={0} closeDelay={200}>
                                 <HoverCardTrigger asChild>
-                                  <Badge variant="secondary" className="text-[10px] cursor-pointer hover:bg-primary/20 transition-colors">
-                                    +{features.length - 3} more
-                                  </Badge>
+                                  <span
+                                    className="inline-flex"
+                                    onClick={(e) => e.preventDefault()}
+                                  >
+                                    <Badge variant="secondary" className="text-[10px] cursor-pointer hover:bg-primary/20 transition-colors">
+                                      +{features.length - 3} more
+                                    </Badge>
+                                  </span>
                                 </HoverCardTrigger>
-                                <HoverCardContent className="w-64" align="start">
-                                  <p className="text-xs font-medium text-muted-foreground mb-2">All Features</p>
+                                <HoverCardContent className="w-72 z-50" align="start" side="top">
+                                  <p className="text-xs font-semibold text-muted-foreground mb-2">All Features ({features.length})</p>
                                   <div className="flex flex-wrap gap-1.5">
                                     {features.map(f => (
                                       <Badge key={f.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-foreground/10 text-foreground/80">
