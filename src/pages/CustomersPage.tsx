@@ -40,7 +40,7 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
   const isMock = data.length < 2;
 
   return (
-    <div className="w-36 h-10 relative">
+    <div className="flex-1 h-10 min-w-[100px] relative">
       {isMock && (
         <span className="absolute -top-3 left-0 text-[8px] text-muted-foreground">
           Sample
