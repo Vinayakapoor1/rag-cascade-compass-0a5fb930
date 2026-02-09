@@ -16,7 +16,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { LineChart, Line, ResponsiveContainer, CartesianGrid, YAxis } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, CartesianGrid, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { RAGStatus } from '@/types/venture';
 
 const RAG_LINE_COLORS: Record<RAGStatus, string> = {
@@ -26,6 +26,43 @@ const RAG_LINE_COLORS: Record<RAGStatus, string> = {
   'not-set': 'hsl(var(--muted-foreground))',
 };
 
+const MOCK_KPI_NAMES: Record<string, string> = {
+  kpi1: 'Adoption Rate',
+  kpi2: 'Satisfaction Score',
+  kpi3: 'Usage Frequency',
+};
+
+const MOCK_KPI_COLORS: Record<string, string> = {
+  kpi1: 'hsl(142, 71%, 45%)',
+  kpi2: 'hsl(38, 92%, 50%)',
+  kpi3: 'hsl(0, 72%, 50%)',
+};
+
+function SparklineTooltip({ active, payload, label, isMock }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-lg text-xs space-y-1">
+      <p className="font-semibold text-[11px] border-b border-border pb-1 mb-1">
+        Period {label}
+      </p>
+      {payload.map((entry: any) => (
+        <div key={entry.dataKey} className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+          <span className="text-muted-foreground">
+            {isMock ? MOCK_KPI_NAMES[entry.dataKey] || entry.dataKey : 'Health Score'}:
+          </span>
+          <span className="font-semibold ml-auto">{entry.value}%</span>
+        </div>
+      ))}
+      {isMock && (
+        <p className="text-[9px] text-muted-foreground/60 pt-1 border-t border-border mt-1 italic">
+          Sample data — will reflect linked KPIs
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragStatus: RAGStatus }) {
   const MOCK_DATA = [
     { period: '1', kpi1: 45, kpi2: 60, kpi3: 30 },
@@ -34,39 +71,45 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
     { period: '4', kpi1: 65, kpi2: 58, kpi3: 55 },
     { period: '5', kpi1: 58, kpi2: 70, kpi3: 50 },
     { period: '6', kpi1: 72, kpi2: 68, kpi3: 62 },
+    { period: '7', kpi1: 78, kpi2: 65, kpi3: 70 },
+    { period: '8', kpi1: 74, kpi2: 72, kpi3: 68 },
   ];
 
   const hasRealData = data.length >= 2;
   const isMock = !hasRealData;
 
-  // For real data, use single line; for mock, show multi-KPI preview
   const chartData = hasRealData
     ? data.map(d => ({ period: d.period, kpi1: d.score }))
     : MOCK_DATA;
 
   return (
-    <div className="flex-1 h-14 min-w-[120px] relative rounded-md bg-muted/30 px-1 py-1">
+    <div className="flex-1 h-16 min-w-[200px] relative rounded-lg bg-muted/20 border border-border/40 px-2 py-1.5 group hover:bg-muted/40 transition-colors">
       {isMock && (
-        <span className="absolute top-0.5 right-1.5 text-[8px] text-muted-foreground/60 font-medium z-10">
-          Sample
-        </span>
+        <div className="absolute top-1 right-2 flex items-center gap-1 z-10">
+          <span className="text-[8px] text-muted-foreground/50 font-medium uppercase tracking-wider">Preview</span>
+        </div>
       )}
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} horizontal vertical={false} />
+        <LineChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} horizontal vertical={false} />
           <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+          <RechartsTooltip
+            content={<SparklineTooltip isMock={isMock} />}
+            cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
+          />
           <Line
             type="monotone"
             dataKey="kpi1"
-            stroke={isMock ? 'hsl(142, 71%, 45%)' : RAG_LINE_COLORS[ragStatus]}
+            stroke={isMock ? MOCK_KPI_COLORS.kpi1 : RAG_LINE_COLORS[ragStatus]}
             strokeWidth={2}
             dot={false}
+            activeDot={{ r: 3, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
             strokeDasharray={isMock ? '4 2' : undefined}
           />
           {isMock && (
             <>
-              <Line type="monotone" dataKey="kpi2" stroke="hsl(38, 92%, 50%)" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-              <Line type="monotone" dataKey="kpi3" stroke="hsl(0, 72%, 50%)" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+              <Line type="monotone" dataKey="kpi2" stroke={MOCK_KPI_COLORS.kpi2} strokeWidth={1.5} dot={false} activeDot={{ r: 3, strokeWidth: 1, stroke: 'hsl(var(--background))' }} strokeDasharray="4 2" />
+              <Line type="monotone" dataKey="kpi3" stroke={MOCK_KPI_COLORS.kpi3} strokeWidth={1.5} dot={false} activeDot={{ r: 3, strokeWidth: 1, stroke: 'hsl(var(--background))' }} strokeDasharray="4 2" />
             </>
           )}
         </LineChart>
