@@ -29,7 +29,7 @@ const RAG_LINE_COLORS: Record<RAGStatus, string> = {
 function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragStatus: RAGStatus }) {
   if (data.length < 2) {
     return (
-      <div className="flex items-center gap-1 text-[10px] text-muted-foreground w-20">
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground w-36">
         <TrendingUp className="h-3 w-3" />
         <span>No trend</span>
       </div>
@@ -37,7 +37,7 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
   }
 
   return (
-    <div className="w-20 h-8">
+    <div className="w-36 h-10">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
           <Line
@@ -335,7 +335,7 @@ export default function CustomersPage() {
                           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                             <Tag className="h-3 w-3 text-muted-foreground" />
                             {features.slice(0, 3).map(feature => (
-                              <Badge key={feature.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-foreground/10 text-foreground/80">
+                              <Badge key={feature.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-primary/15 text-primary border border-primary/20">
                                 {feature.name}
                               </Badge>
                             ))}
@@ -350,7 +350,7 @@ export default function CustomersPage() {
                                   <p className="text-xs font-medium text-muted-foreground mb-2">All Features</p>
                                   <div className="flex flex-wrap gap-1.5">
                                     {features.map(f => (
-                                      <Badge key={f.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-foreground/10 text-foreground/80">
+                                      <Badge key={f.id} variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-primary/15 text-primary border border-primary/20">
                                         {f.name}
                                       </Badge>
                                     ))}
