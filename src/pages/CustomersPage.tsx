@@ -284,10 +284,10 @@ export default function CustomersPage() {
         {/* Tier Filter */}
         <Select value={tierFilter} onValueChange={setTierFilter}>
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="All Tiers" />
+            <SelectValue placeholder="Tiers" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Tiers</SelectItem>
+            <SelectItem value="all">Tiers</SelectItem>
             {tiers.map(tier => (
               <SelectItem key={tier} value={tier}>{tier}</SelectItem>
             ))}
@@ -297,10 +297,10 @@ export default function CustomersPage() {
         {/* Status Filter */}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="All Statuses" />
+            <SelectValue placeholder="Statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="all">Statuses</SelectItem>
             {statuses.map(status => (
               <SelectItem key={status} value={status}>{status}</SelectItem>
             ))}
@@ -310,10 +310,10 @@ export default function CustomersPage() {
         {/* Deployment Type Filter */}
         <Select value={deploymentFilter} onValueChange={setDeploymentFilter}>
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Deployment" />
+            <SelectValue placeholder="Deployments" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Deployments</SelectItem>
+            <SelectItem value="all">Deployments</SelectItem>
             {deploymentTypes.map(type => (
               <SelectItem key={type} value={type}>{type}</SelectItem>
             ))}
@@ -323,10 +323,10 @@ export default function CustomersPage() {
         {/* Region Filter */}
         <Select value={regionFilter} onValueChange={setRegionFilter}>
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All Regions" />
+            <SelectValue placeholder="Regions" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Regions</SelectItem>
+            <SelectItem value="all">Regions</SelectItem>
             {regions.map(r => (
               <SelectItem key={r} value={r}>{r}</SelectItem>
             ))}
@@ -336,10 +336,10 @@ export default function CustomersPage() {
         {/* Industry Filter */}
         <Select value={industryFilter} onValueChange={setIndustryFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Industries" />
+            <SelectValue placeholder="Industries" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Industries</SelectItem>
+            <SelectItem value="all">Industries</SelectItem>
             {industries.map(i => (
               <SelectItem key={i} value={i}>{i}</SelectItem>
             ))}
@@ -349,10 +349,10 @@ export default function CustomersPage() {
         {/* CSM Filter */}
         <Select value={csmFilter} onValueChange={setCsmFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All CSMs" />
+            <SelectValue placeholder="CSMs" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All CSMs</SelectItem>
+            <SelectItem value="all">CSMs</SelectItem>
             {csmNames.map(name => (
               <SelectItem key={name} value={name}>{name}</SelectItem>
             ))}
@@ -362,10 +362,10 @@ export default function CustomersPage() {
         {/* RAG Status Filter */}
         <Select value={ragFilter} onValueChange={setRagFilter}>
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All RAG" />
+            <SelectValue placeholder="RAG" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All RAG Status</SelectItem>
+            <SelectItem value="all">RAG</SelectItem>
             <SelectItem value="green">Green</SelectItem>
             <SelectItem value="amber">Amber</SelectItem>
             <SelectItem value="red">Red</SelectItem>
