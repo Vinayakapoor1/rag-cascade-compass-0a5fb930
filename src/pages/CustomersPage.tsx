@@ -394,8 +394,17 @@ export default function CustomersPage() {
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <Link to={`/customers/${customer.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                      {/* Status Badge - Prominent */}
+                      <Badge
+                        className={cn(
+                          "text-xs font-bold px-3 py-1 shrink-0",
+                          getStatusBadgeClasses(customer.status)
+                        )}
+                      >
+                        {customer.status}
+                      </Badge>
                       {/* Customer Avatar/Logo */}
-                      <Avatar className="h-10 w-10">
+                      <Avatar className="h-10 w-10 shrink-0">
                         {customer.logoUrl && <AvatarImage src={customer.logoUrl} alt={customer.name} />}
                         <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
                           {getInitials(customer.name)}
@@ -405,14 +414,14 @@ export default function CustomersPage() {
                         <h3 className="font-semibold">{customer.name}</h3>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="outline">{customer.tier}</Badge>
-                          <Badge
-                            variant="outline"
-                            className={getStatusBadgeClasses(customer.status)}
-                          >
-                            {customer.status}
-                          </Badge>
+                          {customer.region && (
+                            <span className="text-xs text-muted-foreground">{customer.region}</span>
+                          )}
+                          {customer.industry && (
+                            <span className="text-xs text-muted-foreground">• {customer.industry}</span>
+                          )}
                           {customer.deploymentType && (
-                            <Badge variant="outline" className="gap-1">
+                            <Badge variant="outline" className="gap-1 text-[10px]">
                               {customer.deploymentType?.toLowerCase().includes('cloud') ? (
                                 <Cloud className="h-3 w-3" />
                               ) : customer.deploymentType === 'On Prem' || customer.deploymentType === 'Hybrid' ? (
@@ -421,16 +430,10 @@ export default function CustomersPage() {
                               {customer.deploymentType}
                             </Badge>
                           )}
-                          {customer.region && (
-                            <span className="text-xs text-muted-foreground">{customer.region}</span>
-                          )}
-                          {customer.industry && (
-                            <span className="text-xs text-muted-foreground">• {customer.industry}</span>
-                          )}
-                          {customer.csmName && (
-                            <span className="text-xs text-muted-foreground">• CSM: {customer.csmName}</span>
-                          )}
                         </div>
+                        {customer.csmName && (
+                          <p className="text-xs text-muted-foreground mt-1">CSM: {customer.csmName}</p>
+                        )}
                         {features.length > 0 && (
                           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                             <Tag className="h-3 w-3 text-muted-foreground" />
