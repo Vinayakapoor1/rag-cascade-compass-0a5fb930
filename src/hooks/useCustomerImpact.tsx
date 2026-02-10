@@ -366,8 +366,8 @@ export interface CustomerWithImpact {
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
-  // Fetch all customers and CSMs in parallel
-  const [customersResult, csmsResult] = await Promise.all([
+  // Fetch all customers, CSMs, customer_features, and indicator_feature_links in parallel
+  const [customersResult, csmsResult, cfResult, iflResult] = await Promise.all([
     supabase
       .from('customers')
       .select('id, name, tier, region, industry, status, logo_url, deployment_type, csm_id')
@@ -375,6 +375,12 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     supabase
       .from('csms')
       .select('id, name'),
+    supabase
+      .from('customer_features')
+      .select('customer_id, feature_id'),
+    supabase
+      .from('indicator_feature_links')
+      .select('feature_id, indicator_id'),
   ]);
   
   if (customersResult.error) throw customersResult.error;
@@ -383,56 +389,86 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
   const customers = customersResult.data;
   const csmMap = new Map((csmsResult.data || []).map(c => [c.id, c.name]));
 
-  // Fetch all indicator links with indicator data for RAG calculation
-  const { data: links, error: linksError } = await supabase
-    .from('indicator_customer_links')
-    .select('customer_id, indicator_id, indicators(current_value, target_value)');
-  
-  if (linksError) throw linksError;
+  // Build feature -> indicator mapping
+  const featureToIndicators = new Map<string, Set<string>>();
+  (iflResult.data || []).forEach(link => {
+    if (!featureToIndicators.has(link.feature_id)) {
+      featureToIndicators.set(link.feature_id, new Set());
+    }
+    featureToIndicators.get(link.feature_id)!.add(link.indicator_id);
+  });
 
-  // Calculate link counts and RAG status per customer
+  // Build customer -> indicator set (derived through features)
+  const customerIndicatorMap = new Map<string, Set<string>>();
+  (cfResult.data || []).forEach(cf => {
+    const indicators = featureToIndicators.get(cf.feature_id);
+    if (indicators) {
+      if (!customerIndicatorMap.has(cf.customer_id)) {
+        customerIndicatorMap.set(cf.customer_id, new Set());
+      }
+      const custSet = customerIndicatorMap.get(cf.customer_id)!;
+      indicators.forEach(indId => custSet.add(indId));
+    }
+  });
+
+  // Collect all unique indicator IDs across all customers
+  const allIndicatorIds = new Set<string>();
+  customerIndicatorMap.forEach(indSet => indSet.forEach(id => allIndicatorIds.add(id)));
+
+  // Fetch indicator data for RAG calculation
+  let indicatorDataMap = new Map<string, { current_value: number | null; target_value: number | null }>();
+  if (allIndicatorIds.size > 0) {
+    const idArray = [...allIndicatorIds];
+    // Fetch in batches of 500 to avoid query limits
+    for (let i = 0; i < idArray.length; i += 500) {
+      const batch = idArray.slice(i, i + 500);
+      const { data: indData } = await supabase
+        .from('indicators')
+        .select('id, current_value, target_value')
+        .in('id', batch);
+      (indData || []).forEach(ind => {
+        indicatorDataMap.set(ind.id, { current_value: ind.current_value, target_value: ind.target_value });
+      });
+    }
+  }
+
+  // Calculate RAG status per customer from derived indicators
   const customerData = new Map<string, { count: number; statuses: RAGStatus[] }>();
-  
-  (links || []).forEach(link => {
-    if (!customerData.has(link.customer_id)) {
-      customerData.set(link.customer_id, { count: 0, statuses: [] });
-    }
-    const data = customerData.get(link.customer_id)!;
-    data.count++;
-    
-    // Calculate indicator RAG status
-    const indicator = link.indicators as any;
-    if (indicator && indicator.current_value != null && indicator.target_value != null && indicator.target_value > 0) {
-      const progress = (indicator.current_value / indicator.target_value) * 100;
-      data.statuses.push(percentageToRAG(progress));
-    }
+  customerIndicatorMap.forEach((indSet, custId) => {
+    const statuses: RAGStatus[] = [];
+    indSet.forEach(indId => {
+      const ind = indicatorDataMap.get(indId);
+      if (ind && ind.current_value != null && ind.target_value != null && ind.target_value > 0) {
+        const progress = (ind.current_value / ind.target_value) * 100;
+        statuses.push(percentageToRAG(progress));
+      }
+    });
+    customerData.set(custId, { count: indSet.size, statuses });
   });
 
   // Fetch trend data from indicator_history for linked indicators
   const customerTrendData = new Map<string, TrendDataPoint[]>();
   
-  // Get all indicator IDs linked to customers
-  const allLinkedIndicatorIds = [...new Set((links || []).map(l => l.indicator_id))];
-  
-  if (allLinkedIndicatorIds.length > 0) {
-    // Fetch indicator history for linked indicators (last 6 periods)
+  if (allIndicatorIds.size > 0) {
+    const allLinkedIndicatorIds = [...allIndicatorIds];
     const { data: historyData } = await supabase
       .from('indicator_history')
       .select('indicator_id, period, value')
-      .in('indicator_id', allLinkedIndicatorIds)
+      .in('indicator_id', allLinkedIndicatorIds.slice(0, 1000))
       .order('period', { ascending: true });
 
     if (historyData && historyData.length > 0) {
-      // Build a map: indicator_id -> customer_ids
+      // Build indicator -> customer mapping
       const indicatorToCustomers = new Map<string, string[]>();
-      (links || []).forEach(link => {
-        if (!indicatorToCustomers.has(link.indicator_id)) {
-          indicatorToCustomers.set(link.indicator_id, []);
-        }
-        indicatorToCustomers.get(link.indicator_id)!.push(link.customer_id);
+      customerIndicatorMap.forEach((indSet, custId) => {
+        indSet.forEach(indId => {
+          if (!indicatorToCustomers.has(indId)) {
+            indicatorToCustomers.set(indId, []);
+          }
+          indicatorToCustomers.get(indId)!.push(custId);
+        });
       });
 
-      // For each customer, aggregate history by period
       const customerPeriodScores = new Map<string, Map<string, number[]>>();
       
       for (const entry of historyData) {
@@ -450,7 +486,6 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
         }
       }
 
-      // Convert to trend data (last 6 periods, averaged)
       for (const [custId, periods] of customerPeriodScores) {
         const sortedPeriods = [...periods.entries()]
           .sort((a, b) => a[0].localeCompare(b[0]))
@@ -468,7 +503,6 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     const data = customerData.get(c.id);
     const linkedCount = data?.count || 0;
     
-    // Calculate overall RAG status from linked indicators
     let ragStatus: RAGStatus = 'not-set';
     if (data && data.statuses.length > 0) {
       const avgScore = data.statuses.reduce((sum, s) => {
