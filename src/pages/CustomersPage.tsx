@@ -316,13 +316,15 @@ export default function CustomersPage() {
                       </Badge>
                     ))}
                     {overflow.length > 0 && (
-                      <HoverCard>
-                        <HoverCardTrigger asChild>
-                          <Badge variant="outline" className="text-[11px] px-2 py-0.5 font-normal text-muted-foreground cursor-pointer hover:bg-muted/50">
-                            +{overflow.length} more
-                          </Badge>
+                      <HoverCard openDelay={0} closeDelay={150}>
+                        <HoverCardTrigger>
+                          <button type="button" className="inline-flex">
+                            <Badge variant="outline" className="text-[11px] px-2 py-0.5 font-normal text-muted-foreground cursor-pointer hover:bg-muted/50">
+                              +{overflow.length} more
+                            </Badge>
+                          </button>
                         </HoverCardTrigger>
-                        <HoverCardContent className="w-auto p-2" side="bottom" align="start">
+                        <HoverCardContent className="w-auto p-2 z-50 bg-popover border shadow-md" side="bottom" align="start">
                           <div className="flex flex-wrap gap-1.5 max-w-[240px]">
                             {overflow.map(({ name, count }) => (
                               <Badge key={name} variant="secondary" className="text-[11px] px-2 py-0.5 font-normal">
@@ -343,13 +345,13 @@ export default function CustomersPage() {
                       </div>
                     ))}
                     {overflow.length > 0 && (
-                      <HoverCard>
-                        <HoverCardTrigger asChild>
-                          <div className="text-[11px] text-muted-foreground pt-0.5 cursor-pointer hover:text-foreground transition-colors">
+                      <HoverCard openDelay={0} closeDelay={150}>
+                        <HoverCardTrigger>
+                          <button type="button" className="text-[11px] text-muted-foreground pt-0.5 cursor-pointer hover:text-foreground transition-colors">
                             +{overflow.length} more
-                          </div>
+                          </button>
                         </HoverCardTrigger>
-                        <HoverCardContent className="w-auto p-3" side="bottom" align="start">
+                        <HoverCardContent className="w-auto p-3 z-50 bg-popover border shadow-md" side="bottom" align="start">
                           <div className="space-y-1 min-w-[120px]">
                             {overflow.map(({ name, count }) => (
                               <div key={name} className="flex items-center justify-between text-xs">
