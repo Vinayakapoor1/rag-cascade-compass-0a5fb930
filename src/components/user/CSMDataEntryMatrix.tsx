@@ -17,18 +17,24 @@ interface CSMDataEntryMatrixProps {
   period: string;
 }
 
-interface KPISection {
+interface IndicatorInfo {
   id: string;
   name: string;
   current_value: number | null;
   target_value: number | null;
   kr_name: string;
   fo_name: string;
-  features: { id: string; name: string }[];
-  customers: { id: string; name: string; featureIds: Set<string> }[];
 }
 
-// Cell key: indicator_id::customer_id::feature_id
+interface CustomerSection {
+  id: string;
+  name: string;
+  features: { id: string; name: string }[];
+  indicators: IndicatorInfo[];
+  /** Which features are linked to which indicator */
+  indicatorFeatureMap: Record<string, Set<string>>;
+}
+
 function cellKey(indicatorId: string, customerId: string, featureId: string) {
   return `${indicatorId}::${customerId}::${featureId}`;
 }
@@ -60,18 +66,19 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [kpiSections, setKpiSections] = useState<KPISection[]>([]);
+  const [customerSections, setCustomerSections] = useState<CustomerSection[]>([]);
+  const [allIndicators, setAllIndicators] = useState<IndicatorInfo[]>([]);
   const [scores, setScores] = useState<ScoreMap>({});
   const [originalScores, setOriginalScores] = useState<ScoreMap>({});
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
-  const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchData = useCallback(async () => {
     if (!departmentId || !user) return;
     setLoading(true);
 
     try {
-      // 0. Determine if current user is a CSM — filter customers accordingly
+      // 0. CSM filter
       let csmId: string | null = null;
       if (!isAdmin) {
         const { data: csmRow } = await supabase
@@ -82,130 +89,127 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         if (csmRow) csmId = csmRow.id;
       }
 
-      // 1. Get FOs for dept
+      // 1. FOs for dept
       const { data: fos } = await supabase
         .from('functional_objectives')
         .select('id, name')
         .eq('department_id', departmentId);
+      if (!fos?.length) { setCustomerSections([]); setLoading(false); return; }
 
-      if (!fos?.length) { setKpiSections([]); setLoading(false); return; }
-
-      // 2. Get KRs
+      // 2. KRs
       const { data: krs } = await supabase
         .from('key_results')
         .select('id, name, functional_objective_id')
         .in('functional_objective_id', fos.map(f => f.id));
+      if (!krs?.length) { setCustomerSections([]); setLoading(false); return; }
 
-      if (!krs?.length) { setKpiSections([]); setLoading(false); return; }
-
-      // 3. Get indicators
+      // 3. Indicators
       const { data: indicators } = await supabase
         .from('indicators')
         .select('id, name, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
-
-      if (!indicators?.length) { setKpiSections([]); setLoading(false); return; }
+      if (!indicators?.length) { setCustomerSections([]); setLoading(false); return; }
 
       const indIds = indicators.map(i => i.id);
-
-      // 4. Get feature links for all indicators
-      const { data: featureLinks } = await supabase
-        .from('indicator_feature_links')
-        .select('indicator_id, feature_id, features(id, name)')
-        .in('indicator_id', indIds);
-
-      // 5. Collect all feature IDs that are linked to any indicator
-      const allLinkedFeatureIds = new Set<string>();
-      (featureLinks || []).forEach((fl: any) => {
-        if (fl.features) allLinkedFeatureIds.add(fl.features.id);
-      });
-
-      if (allLinkedFeatureIds.size === 0) { setKpiSections([]); setLoading(false); return; }
-
-      // 6. Get customer_features for those features, filtered by CSM if applicable
-      let customerFeaturesQuery = supabase
-        .from('customer_features')
-        .select('customer_id, feature_id, customers(id, name, csm_id)')
-        .in('feature_id', Array.from(allLinkedFeatureIds));
-
-      if (csmId) {
-        // We'll filter after fetching since we need to join through customers
-      }
-
-      const { data: customerFeatures } = await customerFeaturesQuery;
-
-      // 7. Load existing scores
-      const { data: existingScores } = await supabase
-        .from('csm_customer_feature_scores' as any)
-        .select('*')
-        .in('indicator_id', indIds)
-        .eq('period', period);
-
-      // Build lookup maps
       const krMap = new Map(krs.map(k => [k.id, k]));
       const foMap = new Map(fos.map(f => [f.id, f]));
 
-      // Features per indicator
-      const featuresByInd: Record<string, { id: string; name: string }[]> = {};
-      (featureLinks || []).forEach((fl: any) => {
-        if (!fl.features) return;
-        if (!featuresByInd[fl.indicator_id]) featuresByInd[fl.indicator_id] = [];
-        featuresByInd[fl.indicator_id].push({ id: fl.features.id, name: fl.features.name });
-      });
-
-      // Customer -> features mapping (filtered by CSM if applicable)
-      const customerFeatureMap = new Map<string, Set<string>>();
-      const customerNameMap = new Map<string, string>();
-      (customerFeatures || []).forEach((cf: any) => {
-        if (!cf.customers) return;
-        // Filter by CSM: skip customers not assigned to the logged-in CSM
-        if (csmId && cf.customers.csm_id !== csmId) return;
-        customerNameMap.set(cf.customer_id, cf.customers.name);
-        if (!customerFeatureMap.has(cf.customer_id)) customerFeatureMap.set(cf.customer_id, new Set());
-        customerFeatureMap.get(cf.customer_id)!.add(cf.feature_id);
-      });
-
-      // Build KPI sections
-      const sections: KPISection[] = [];
-      for (const ind of indicators) {
-        const features = featuresByInd[ind.id];
-        if (!features?.length) continue;
-
-        const featureIdSet = new Set(features.map(f => f.id));
-
-        // Find customers who use at least one of this KPI's linked features
-        const relevantCustomers: KPISection['customers'] = [];
-        for (const [custId, custFeatures] of customerFeatureMap) {
-          const intersection = new Set([...custFeatures].filter(fid => featureIdSet.has(fid)));
-          if (intersection.size > 0) {
-            relevantCustomers.push({
-              id: custId,
-              name: customerNameMap.get(custId) || 'Unknown',
-              featureIds: intersection,
-            });
-          }
-        }
-
-        // Sort customers alphabetically
-        relevantCustomers.sort((a, b) => a.name.localeCompare(b.name));
-
+      const indicatorInfos: IndicatorInfo[] = indicators.map(ind => {
         const kr = krMap.get(ind.key_result_id!);
         const fo = kr ? foMap.get(kr.functional_objective_id!) : undefined;
-
-        sections.push({
+        return {
           id: ind.id,
           name: ind.name,
           current_value: ind.current_value != null ? Number(ind.current_value) : null,
           target_value: ind.target_value != null ? Number(ind.target_value) : null,
           kr_name: kr?.name || '',
           fo_name: fo?.name || '',
+        };
+      });
+      setAllIndicators(indicatorInfos);
+
+      // 4. Feature links per indicator
+      const { data: featureLinks } = await supabase
+        .from('indicator_feature_links')
+        .select('indicator_id, feature_id, features(id, name)')
+        .in('indicator_id', indIds);
+
+      // indicator -> Set<featureId>, and feature id->name map
+      const indFeatureMap: Record<string, Set<string>> = {};
+      const featureNameMap = new Map<string, string>();
+      (featureLinks || []).forEach((fl: any) => {
+        if (!fl.features) return;
+        if (!indFeatureMap[fl.indicator_id]) indFeatureMap[fl.indicator_id] = new Set();
+        indFeatureMap[fl.indicator_id].add(fl.features.id);
+        featureNameMap.set(fl.features.id, fl.features.name);
+      });
+
+      const allLinkedFeatureIds = new Set<string>();
+      Object.values(indFeatureMap).forEach(s => s.forEach(id => allLinkedFeatureIds.add(id)));
+      if (allLinkedFeatureIds.size === 0) { setCustomerSections([]); setLoading(false); return; }
+
+      // 5. Customer-feature mappings
+      const { data: customerFeatures } = await supabase
+        .from('customer_features')
+        .select('customer_id, feature_id, customers(id, name, csm_id)')
+        .in('feature_id', Array.from(allLinkedFeatureIds));
+
+      // Build customer -> features
+      const custFeatureMap = new Map<string, Set<string>>();
+      const custNameMap = new Map<string, string>();
+      (customerFeatures || []).forEach((cf: any) => {
+        if (!cf.customers) return;
+        if (csmId && cf.customers.csm_id !== csmId) return;
+        custNameMap.set(cf.customer_id, cf.customers.name);
+        if (!custFeatureMap.has(cf.customer_id)) custFeatureMap.set(cf.customer_id, new Set());
+        custFeatureMap.get(cf.customer_id)!.add(cf.feature_id);
+      });
+
+      // 6. Existing scores
+      const { data: existingScores } = await supabase
+        .from('csm_customer_feature_scores' as any)
+        .select('*')
+        .in('indicator_id', indIds)
+        .eq('period', period);
+
+      // 7. Build customer sections
+      const sections: CustomerSection[] = [];
+      for (const [custId, custFeatures] of custFeatureMap) {
+        // Only features that are also linked to at least one indicator
+        const relevantFeatureIds = [...custFeatures].filter(fid => allLinkedFeatureIds.has(fid));
+        if (relevantFeatureIds.length === 0) continue;
+
+        const features = relevantFeatureIds
+          .map(fid => ({ id: fid, name: featureNameMap.get(fid) || 'Unknown' }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        // Which indicators are relevant (linked to at least one of this customer's features)
+        const relevantIndicators: IndicatorInfo[] = [];
+        const indicatorFeatureMapForCust: Record<string, Set<string>> = {};
+        for (const ind of indicatorInfos) {
+          const indFeats = indFeatureMap[ind.id];
+          if (!indFeats) continue;
+          const intersection = new Set([...indFeats].filter(fid => custFeatures.has(fid)));
+          if (intersection.size > 0) {
+            relevantIndicators.push(ind);
+            indicatorFeatureMapForCust[ind.id] = intersection;
+          }
+        }
+
+        if (relevantIndicators.length === 0) continue;
+
+        sections.push({
+          id: custId,
+          name: custNameMap.get(custId) || 'Unknown',
           features,
-          customers: relevantCustomers,
+          indicators: relevantIndicators,
+          indicatorFeatureMap: indicatorFeatureMapForCust,
         });
       }
 
-      setKpiSections(sections);
-      setOpenSections(new Set(sections.map(s => s.id))); // All expanded by default
+      sections.sort((a, b) => a.name.localeCompare(b.name));
+      setCustomerSections(sections);
+      setOpenSections(new Set()); // all collapsed by default
 
       // Build scores map
       const scoreMap: ScoreMap = {};
@@ -236,24 +240,40 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     setScores(prev => ({ ...prev, [key]: clamped }));
   };
 
-  const getCustomerAggregate = (indicatorId: string, customer: KPISection['customers'][0]): number | null => {
+  /** Average of all feature scores for a customer across a specific indicator */
+  const getCustomerIndicatorAvg = (custId: string, indId: string, featureIds: Set<string>): number | null => {
     const values: number[] = [];
-    for (const fid of customer.featureIds) {
-      const v = scores[cellKey(indicatorId, customer.id, fid)];
+    for (const fid of featureIds) {
+      const v = scores[cellKey(indId, custId, fid)];
       if (v != null) values.push(v);
     }
-    if (values.length === 0) return null;
-    return values.reduce((a, b) => a + b, 0) / values.length;
+    return values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
   };
 
-  const getKPIAggregate = (section: KPISection): number | null => {
-    const custAvgs: number[] = [];
-    for (const cust of section.customers) {
-      const avg = getCustomerAggregate(section.id, cust);
-      if (avg != null) custAvgs.push(avg);
+  /** Overall customer average across all their indicator-feature scores */
+  const getCustomerOverallAvg = (section: CustomerSection): number | null => {
+    const allVals: number[] = [];
+    for (const ind of section.indicators) {
+      const feats = section.indicatorFeatureMap[ind.id];
+      if (!feats) continue;
+      for (const fid of feats) {
+        const v = scores[cellKey(ind.id, section.id, fid)];
+        if (v != null) allVals.push(v);
+      }
     }
-    if (custAvgs.length === 0) return null;
-    return custAvgs.reduce((a, b) => a + b, 0) / custAvgs.length;
+    return allVals.length === 0 ? null : allVals.reduce((a, b) => a + b, 0) / allVals.length;
+  };
+
+  /** Feature row average across all KPI columns */
+  const getFeatureRowAvg = (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>): number | null => {
+    const values: number[] = [];
+    for (const ind of indicators) {
+      const feats = indFeatMap[ind.id];
+      if (!feats?.has(featureId)) continue;
+      const v = scores[cellKey(ind.id, custId, featureId)];
+      if (v != null) values.push(v);
+    }
+    return values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
   };
 
   const hasChanges = useMemo(() => {
@@ -271,16 +291,17 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     try {
       // Collect all cells with values
       const upserts: any[] = [];
-      for (const section of kpiSections) {
-        for (const cust of section.customers) {
-          for (const feat of section.features) {
-            if (!cust.featureIds.has(feat.id)) continue;
-            const key = cellKey(section.id, cust.id, feat.id);
+      for (const section of customerSections) {
+        for (const feat of section.features) {
+          for (const ind of section.indicators) {
+            const feats = section.indicatorFeatureMap[ind.id];
+            if (!feats?.has(feat.id)) continue;
+            const key = cellKey(ind.id, section.id, feat.id);
             const val = scores[key];
             if (val != null) {
               upserts.push({
-                indicator_id: section.id,
-                customer_id: cust.id,
+                indicator_id: ind.id,
+                customer_id: section.id,
                 feature_id: feat.id,
                 value: val,
                 period,
@@ -292,7 +313,6 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
       }
 
       if (upserts.length > 0) {
-        // Batch upsert in chunks of 500
         for (let i = 0; i < upserts.length; i += 500) {
           const chunk = upserts.slice(i, i + 500);
           const { error } = await supabase
@@ -302,23 +322,38 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         }
       }
 
-      // Update each KPI's current_value with aggregate
-      for (const section of kpiSections) {
-        const agg = getKPIAggregate(section);
-        if (agg === null) continue;
+      // Update each indicator's current_value with aggregate across ALL customers
+      const indicatorAggregates = new Map<string, number[]>();
+      for (const section of customerSections) {
+        for (const ind of section.indicators) {
+          const feats = section.indicatorFeatureMap[ind.id];
+          if (!feats) continue;
+          for (const fid of feats) {
+            const v = scores[cellKey(ind.id, section.id, fid)];
+            if (v != null) {
+              if (!indicatorAggregates.has(ind.id)) indicatorAggregates.set(ind.id, []);
+              indicatorAggregates.get(ind.id)!.push(v);
+            }
+          }
+        }
+      }
 
-        const aggRounded = Math.round(agg * 100) / 100;
+      for (const ind of allIndicators) {
+        const vals = indicatorAggregates.get(ind.id);
+        if (!vals?.length) continue;
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const aggRounded = Math.round(avg * 100) / 100;
         const ragStatus = percentToRAG(aggRounded);
 
         await supabase
           .from('indicators')
           .update({ current_value: aggRounded, target_value: 100, rag_status: ragStatus })
-          .eq('id', section.id);
+          .eq('id', ind.id);
 
         await supabase
           .from('indicator_history')
           .insert({
-            indicator_id: section.id,
+            indicator_id: ind.id,
             value: aggRounded,
             period,
             notes: 'Updated via Customer x Feature Matrix',
@@ -328,9 +363,9 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         await logActivity({
           action: 'update',
           entityType: 'indicator',
-          entityId: section.id,
-          entityName: section.name,
-          oldValue: { current_value: section.current_value },
+          entityId: ind.id,
+          entityName: ind.name,
+          oldValue: { current_value: ind.current_value },
           newValue: { current_value: aggRounded },
           metadata: {
             department_id: departmentId,
@@ -361,6 +396,12 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     });
   };
 
+  const filteredCustomers = useMemo(() => {
+    if (!searchTerm) return customerSections;
+    const lower = searchTerm.toLowerCase();
+    return customerSections.filter(c => c.name.toLowerCase().includes(lower));
+  }, [customerSections, searchTerm]);
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -371,15 +412,15 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     );
   }
 
-  if (kpiSections.length === 0) {
+  if (customerSections.length === 0) {
     return (
       <Card>
         <CardContent className="p-8 text-center">
           <Info className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
           <h3 className="text-lg font-semibold mb-1">No Feature-Linked Indicators</h3>
           <p className="text-muted-foreground text-sm">
-            This department has no indicators linked to features via the indicator-feature mapping.
-            Link features to indicators in the admin panel to enable the matrix view.
+            This department has no indicators linked to features via the indicator-feature mapping,
+            or no customers are mapped to those features. Link features to indicators and customers in the admin panel.
           </p>
         </CardContent>
       </Card>
@@ -388,61 +429,64 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
   return (
     <div className="space-y-4">
-      {/* Save bar */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {kpiSections.length} KPI{kpiSections.length !== 1 ? 's' : ''} with customer-feature grids
-        </p>
+      {/* Top bar */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <p className="text-sm text-muted-foreground whitespace-nowrap">
+            {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
+          </p>
+          {customerSections.length > 5 && (
+            <div className="relative max-w-xs flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+          )}
+        </div>
         <Button onClick={handleSaveAll} disabled={saving || !hasChanges} className="gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save All
         </Button>
       </div>
 
-      {/* KPI sections */}
-      {kpiSections.map(section => (
-        <KPISectionCard
+      {/* Customer sections */}
+      {filteredCustomers.map(section => (
+        <CustomerSectionCard
           key={section.id}
           section={section}
           isOpen={openSections.has(section.id)}
           onToggle={() => toggleSection(section.id)}
           scores={scores}
           onCellChange={handleCellChange}
-          getCustomerAggregate={getCustomerAggregate}
-          getKPIAggregate={getKPIAggregate}
-          searchTerm={searchTerms[section.id] || ''}
-          onSearchChange={(term) => setSearchTerms(prev => ({ ...prev, [section.id]: term }))}
+          getFeatureRowAvg={getFeatureRowAvg}
+          getCustomerOverallAvg={getCustomerOverallAvg}
         />
       ))}
     </div>
   );
 }
 
-// --- KPI Section Card ---
-interface KPISectionCardProps {
-  section: KPISection;
+// --- Customer Section Card ---
+interface CustomerSectionCardProps {
+  section: CustomerSection;
   isOpen: boolean;
   onToggle: () => void;
   scores: ScoreMap;
   onCellChange: (indicatorId: string, customerId: string, featureId: string, value: string) => void;
-  getCustomerAggregate: (indicatorId: string, customer: KPISection['customers'][0]) => number | null;
-  getKPIAggregate: (section: KPISection) => number | null;
-  searchTerm: string;
-  onSearchChange: (term: string) => void;
+  getFeatureRowAvg: (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => number | null;
+  getCustomerOverallAvg: (section: CustomerSection) => number | null;
 }
 
-function KPISectionCard({
+function CustomerSectionCard({
   section, isOpen, onToggle, scores, onCellChange,
-  getCustomerAggregate, getKPIAggregate, searchTerm, onSearchChange,
-}: KPISectionCardProps) {
-  const kpiAgg = getKPIAggregate(section);
-  const aggRag = kpiAgg != null ? percentToRAG(Math.round(kpiAgg)) : null;
-
-  const filteredCustomers = useMemo(() => {
-    if (!searchTerm) return section.customers;
-    const lower = searchTerm.toLowerCase();
-    return section.customers.filter(c => c.name.toLowerCase().includes(lower));
-  }, [section.customers, searchTerm]);
+  getFeatureRowAvg, getCustomerOverallAvg,
+}: CustomerSectionCardProps) {
+  const custAvg = getCustomerOverallAvg(section);
+  const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
 
   return (
     <Card>
@@ -455,17 +499,14 @@ function KPISectionCard({
                 <div>
                   <CardTitle className="text-base">{section.name}</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {section.fo_name} → {section.kr_name}
+                    {section.features.length} feature{section.features.length !== 1 ? 's' : ''} × {section.indicators.length} KPI{section.indicators.length !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">
-                  {section.customers.length} customer{section.customers.length !== 1 ? 's' : ''} × {section.features.length} feature{section.features.length !== 1 ? 's' : ''}
-                </span>
-                {kpiAgg != null && aggRag ? (
-                  <Badge className={cn(RAG_BADGE_STYLES[aggRag], 'text-xs')}>
-                    {Math.round(kpiAgg)}%
+                {custAvg != null && custRag ? (
+                  <Badge className={cn(RAG_BADGE_STYLES[custRag], 'text-xs')}>
+                    {Math.round(custAvg)}%
                   </Badge>
                 ) : (
                   <Badge className={RAG_BADGE_STYLES.gray}>No data</Badge>
@@ -477,97 +518,74 @@ function KPISectionCard({
 
         <CollapsibleContent>
           <CardContent className="pt-0 pb-4">
-            {/* Search filter */}
-            {section.customers.length > 10 && (
-              <div className="relative mb-3 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search customers..."
-                  value={searchTerm}
-                  onChange={e => onSearchChange(e.target.value)}
-                  className="pl-9 h-9 text-sm"
-                />
-              </div>
-            )}
-
-            {/* Matrix table */}
             <div className="overflow-x-auto border rounded-md">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[180px] border-r">
-                      Customer
+                    <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r">
+                      Feature
                     </th>
-                    {section.features.map(f => (
-                      <th key={f.id} className="px-2 py-2 text-center font-medium min-w-[100px] border-r">
-                        <span className="truncate block max-w-[90px] mx-auto text-xs">{f.name}</span>
+                    {section.indicators.map(ind => (
+                      <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[90px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
+                        <span className="truncate block max-w-[80px] mx-auto text-xs">{ind.name}</span>
                       </th>
                     ))}
-                    <th className="px-3 py-2 text-center font-semibold min-w-[80px] bg-muted/30">
+                    <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
                       Avg
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCustomers.length === 0 ? (
-                    <tr>
-                      <td colSpan={section.features.length + 2} className="text-center py-6 text-muted-foreground">
-                        {searchTerm ? 'No customers match the search' : 'No customers linked to these features'}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCustomers.map(cust => {
-                      const custAgg = getCustomerAggregate(section.id, cust);
-                      const custRag = custAgg != null ? percentToRAG(Math.round(custAgg)) : null;
+                  {section.features.map(feat => {
+                    const rowAvg = getFeatureRowAvg(section.id, feat.id, section.indicators, section.indicatorFeatureMap);
+                    const rowRag = rowAvg != null ? percentToRAG(Math.round(rowAvg)) : null;
 
-                      return (
-                        <tr key={cust.id} className="border-t hover:bg-muted/20 transition-colors">
-                          <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium text-xs border-r">
-                            {cust.name}
-                          </td>
-                          {section.features.map(feat => {
-                            const canEdit = cust.featureIds.has(feat.id);
-                            const key = cellKey(section.id, cust.id, feat.id);
-                            const val = scores[key];
+                    return (
+                      <tr key={feat.id} className="border-t hover:bg-muted/20 transition-colors">
+                        <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium text-xs border-r">
+                          {feat.name}
+                        </td>
+                        {section.indicators.map(ind => {
+                          const canEdit = section.indicatorFeatureMap[ind.id]?.has(feat.id) ?? false;
+                          const key = cellKey(ind.id, section.id, feat.id);
+                          const val = scores[key];
 
-                            if (!canEdit) {
-                              return (
-                                <td key={feat.id} className="px-2 py-1.5 text-center border-r">
-                                  <span className="text-muted-foreground/30 text-xs">—</span>
-                                </td>
-                              );
-                            }
-
-                            const ragColor = val != null ? RAG_CELL_BG[percentToRAG(val)] : '';
-
+                          if (!canEdit) {
                             return (
-                              <td key={feat.id} className={cn('px-1 py-1 text-center border-r', ragColor)}>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  value={val ?? ''}
-                                  onChange={e => onCellChange(section.id, cust.id, feat.id, e.target.value)}
-                                  className="h-7 w-16 mx-auto text-center text-xs border-0 bg-transparent shadow-none focus-visible:ring-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  placeholder="—"
-                                />
+                              <td key={ind.id} className="px-2 py-1.5 text-center border-r">
+                                <span className="text-muted-foreground/30 text-xs">—</span>
                               </td>
                             );
-                          })}
-                          {/* Customer aggregate */}
-                          <td className="px-3 py-1.5 text-center bg-muted/10">
-                            {custAgg != null && custRag ? (
-                              <Badge className={cn(RAG_BADGE_STYLES[custRag], 'text-[10px] px-1.5 py-0.5')}>
-                                {Math.round(custAgg)}%
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground/40 text-xs">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                          }
+
+                          const ragColor = val != null ? RAG_CELL_BG[percentToRAG(val)] : '';
+
+                          return (
+                            <td key={ind.id} className={cn('px-1 py-1 text-center border-r', ragColor)}>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={val ?? ''}
+                                onChange={e => onCellChange(ind.id, section.id, feat.id, e.target.value)}
+                                className="h-7 w-16 mx-auto text-center text-xs border-0 bg-transparent shadow-none focus-visible:ring-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="—"
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="px-3 py-1.5 text-center bg-muted/10">
+                          {rowAvg != null && rowRag ? (
+                            <Badge className={cn(RAG_BADGE_STYLES[rowRag], 'text-[10px] px-1.5 py-0.5')}>
+                              {Math.round(rowAvg)}%
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground/40 text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
