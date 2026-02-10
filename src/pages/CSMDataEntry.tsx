@@ -3,11 +3,30 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { CSMDataEntryMatrix } from '@/components/user/CSMDataEntryMatrix';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ClipboardCheck, Calendar, Info } from 'lucide-react';
+import { ClipboardCheck, Calendar as CalendarIcon, Info, ToggleLeft, ToggleRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format, startOfWeek, getISOWeek, getYear } from 'date-fns';
+
+type PeriodMode = 'monthly' | 'weekly';
+
+function getISOWeekString(date: Date): string {
+  const week = getISOWeek(date);
+  const year = getYear(date);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+function dateToPeriod(date: Date, mode: PeriodMode): string {
+  if (mode === 'weekly') return getISOWeekString(date);
+  return format(date, 'yyyy-MM');
+}
 
 export default function CSMDataEntry() {
   const { user, isCSM, isAdmin, csmId, loading: authLoading } = useAuth();
@@ -15,8 +34,11 @@ export default function CSMDataEntry() {
 
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('monthly');
   const [period, setPeriod] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [periodsWithData, setPeriodsWithData] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -29,11 +51,32 @@ export default function CSMDataEntry() {
     fetchDepartments();
   }, [user, isCSM, isAdmin, authLoading]);
 
+  // Fetch periods that have data
+  useEffect(() => {
+    async function fetchPeriodsWithData() {
+      const { data } = await supabase
+        .from('csm_customer_feature_scores')
+        .select('period');
+      if (data) {
+        setPeriodsWithData(new Set(data.map(r => r.period)));
+      }
+    }
+    fetchPeriodsWithData();
+  }, []);
+
+  // When mode changes, reset period to current
+  useEffect(() => {
+    if (periodMode === 'monthly') {
+      setPeriod(new Date().toISOString().slice(0, 7));
+    } else {
+      setPeriod(getISOWeekString(new Date()));
+    }
+  }, [periodMode]);
+
   const fetchDepartments = async () => {
     setLoading(true);
     try {
       if (isCSM && !isAdmin && csmId) {
-        // Trace: CSM -> customers -> customer_features -> indicator_feature_links -> indicators -> key_results -> functional_objectives -> departments
         const { data: customers } = await supabase
           .from('customers')
           .select('id')
@@ -96,7 +139,6 @@ export default function CSMDataEntry() {
           setDepartmentId(depts[0].id);
         }
       } else {
-        // Admin: show all departments
         const { data: depts } = await supabase
           .from('departments')
           .select('id, name')
@@ -115,14 +157,29 @@ export default function CSMDataEntry() {
     }
   };
 
-  const generatePeriodOptions = () => {
+  const generatePeriodOptions = (): string[] => {
     const options: string[] = [];
     const now = new Date();
-    for (let i = -3; i <= 3; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      options.push(d.toISOString().slice(0, 7));
+    if (periodMode === 'monthly') {
+      for (let i = -12; i <= 1; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        options.push(format(d, 'yyyy-MM'));
+      }
+    } else {
+      for (let i = -12; i <= 1; i++) {
+        const d = new Date(now.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+        options.push(getISOWeekString(d));
+      }
+      // Deduplicate
+      return [...new Set(options)];
     }
     return options;
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setPeriod(dateToPeriod(date, periodMode));
+    setCalendarOpen(false);
   };
 
   if (authLoading || loading) {
@@ -133,6 +190,8 @@ export default function CSMDataEntry() {
       </div>
     );
   }
+
+  const periodOptions = generatePeriodOptions();
 
   return (
     <div className="space-y-6">
@@ -148,7 +207,7 @@ export default function CSMDataEntry() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {departments.length > 1 && (
             <Select value={departmentId || ''} onValueChange={setDepartmentId}>
               <SelectTrigger className="w-[200px]">
@@ -162,17 +221,53 @@ export default function CSMDataEntry() {
             </Select>
           )}
 
+          {/* Mode Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPeriodMode(m => m === 'monthly' ? 'weekly' : 'monthly')}
+            className="gap-1.5"
+          >
+            {periodMode === 'monthly' ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
+            {periodMode === 'monthly' ? 'Monthly' : 'Weekly'}
+          </Button>
+
+          {/* Period Dropdown */}
           <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[160px]">
-              <Calendar className="h-4 w-4 mr-2" />
+            <SelectTrigger className="w-[180px]">
+              <CalendarIcon className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {generatePeriodOptions().map(p => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
+              {periodOptions.map(p => (
+                <SelectItem key={p} value={p}>
+                  <span className="flex items-center gap-2">
+                    {p}
+                    {periodsWithData.has(p) && (
+                      <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+                    )}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          {/* Calendar Picker */}
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" title="Pick a date">
+                <CalendarIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                onSelect={handleCalendarSelect}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

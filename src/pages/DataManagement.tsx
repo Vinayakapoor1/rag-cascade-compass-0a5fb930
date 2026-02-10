@@ -5,7 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, FolderTree, Settings, Users, LogOut, Home, Database } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Loader2, AlertCircle, FolderTree, Settings, Users, LogOut, Home, Database, ClipboardCheck, Calendar as CalendarIcon, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { DepartmentUploader } from '@/components/admin/DepartmentUploader';
@@ -20,6 +23,22 @@ import { SnapshotsTab } from '@/components/admin/SnapshotsTab';
 import { AdminDashboardCard } from '@/components/admin/AdminDashboardCard';
 import { AdminDataControls } from '@/components/admin/AdminDataControls';
 import { RAGLegend } from '@/components/RAGLegend';
+import { CSMDataEntryMatrix } from '@/components/user/CSMDataEntryMatrix';
+import { cn } from '@/lib/utils';
+import { format, getISOWeek, getYear } from 'date-fns';
+
+type PeriodMode = 'monthly' | 'weekly';
+
+function getISOWeekString(date: Date): string {
+  const week = getISOWeek(date);
+  const year = getYear(date);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+function dateToPeriod(date: Date, mode: PeriodMode): string {
+  if (mode === 'weekly') return getISOWeekString(date);
+  return format(date, 'yyyy-MM');
+}
 
 export default function DataManagement() {
   const navigate = useNavigate();
@@ -27,9 +46,17 @@ export default function DataManagement() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeMainTab, setActiveMainTab] = useState('okr');
 
-  // Department head state - always declare hooks at top level
+  // Department head state
   const [departments, setDepartments] = useState<Array<{ department_id: string; departments: { id: string; name: string } }>>([]);
   const [deptLoading, setDeptLoading] = useState(true);
+
+  // CSM Entries tab state
+  const [csmDepartments, setCsmDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [csmDeptId, setCsmDeptId] = useState<string | null>(null);
+  const [csmPeriodMode, setCsmPeriodMode] = useState<PeriodMode>('monthly');
+  const [csmPeriod, setCsmPeriod] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [csmCalendarOpen, setCsmCalendarOpen] = useState(false);
+  const [csmPeriodsWithData, setCsmPeriodsWithData] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -51,7 +78,6 @@ export default function DataManagement() {
         .eq('user_id', user.id);
 
       if (data && data.length === 1) {
-        // Auto-redirect to bulk entry for single department
         navigate(`/department/${data[0].department_id}/data-entry`, { replace: true });
       } else if (data) {
         setDepartments(data);
@@ -61,13 +87,54 @@ export default function DataManagement() {
     fetchDepartments();
   }, [user, isDepartmentHead, isAdmin, navigate]);
 
-  const handleImportComplete = () => {
-    setRefreshKey((k) => k + 1);
+  // Fetch all departments + periods with data for CSM Entries tab
+  useEffect(() => {
+    if (!isAdmin) return;
+    async function fetchCsmData() {
+      const [{ data: depts }, { data: periods }] = await Promise.all([
+        supabase.from('departments').select('id, name').order('name'),
+        supabase.from('csm_customer_feature_scores').select('period'),
+      ]);
+      if (depts?.length) {
+        setCsmDepartments(depts);
+        setCsmDeptId(depts[0].id);
+      }
+      if (periods) {
+        setCsmPeriodsWithData(new Set(periods.map(r => r.period)));
+      }
+    }
+    fetchCsmData();
+  }, [isAdmin]);
+
+  // Reset CSM period when mode changes
+  useEffect(() => {
+    if (csmPeriodMode === 'monthly') {
+      setCsmPeriod(new Date().toISOString().slice(0, 7));
+    } else {
+      setCsmPeriod(getISOWeekString(new Date()));
+    }
+  }, [csmPeriodMode]);
+
+  const generateCsmPeriodOptions = (): string[] => {
+    const options: string[] = [];
+    const now = new Date();
+    if (csmPeriodMode === 'monthly') {
+      for (let i = -12; i <= 1; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        options.push(format(d, 'yyyy-MM'));
+      }
+    } else {
+      for (let i = -12; i <= 1; i++) {
+        const d = new Date(now.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+        options.push(getISOWeekString(d));
+      }
+      return [...new Set(options)];
+    }
+    return options;
   };
 
-  const handleDataChange = () => {
-    setRefreshKey((k) => k + 1);
-  };
+  const handleImportComplete = () => setRefreshKey((k) => k + 1);
+  const handleDataChange = () => setRefreshKey((k) => k + 1);
 
   const handleSignOut = async () => {
     await signOut();
@@ -109,16 +176,13 @@ export default function DataManagement() {
       );
     }
 
-    // Show department selector for multiple departments
     return (
       <AppLayout>
         <div className="container mx-auto py-8 space-y-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-3xl font-bold">Select Department</h1>
-              <p className="text-muted-foreground mt-1">
-                Choose a department to enter data
-              </p>
+              <p className="text-muted-foreground mt-1">Choose a department to enter data</p>
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline">{user.email}</Badge>
@@ -126,21 +190,15 @@ export default function DataManagement() {
                 <Link to="/"><Home className="h-4 w-4 mr-2" />Dashboard</Link>
               </Button>
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+                <LogOut className="h-4 w-4 mr-2" />Sign Out
               </Button>
             </div>
           </div>
-
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {departments.map((dept) => (
               <Card key={dept.department_id} className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardContent className="p-6">
-                  <Button
-                    variant="ghost"
-                    className="w-full h-auto p-0 hover:bg-transparent"
-                    asChild
-                  >
+                  <Button variant="ghost" className="w-full h-auto p-0 hover:bg-transparent" asChild>
                     <Link to={`/department/${dept.department_id}/data-entry`}>
                       <div className="text-left w-full">
                         <h3 className="text-lg font-semibold mb-2">{dept.departments.name}</h3>
@@ -157,17 +215,16 @@ export default function DataManagement() {
     );
   }
 
-  // Admin/Viewer view with simplified tabs
+  const csmPeriodOptions = generateCsmPeriodOptions();
+
+  // Admin/Viewer view
   return (
     <AppLayout>
       <div className="container mx-auto py-8 space-y-6">
-        {/* Header with user info and actions */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">Data Management</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage your OKR hierarchy and system configuration
-            </p>
+            <p className="text-muted-foreground mt-1">Manage your OKR hierarchy and system configuration</p>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline">{user.email}</Badge>
@@ -177,13 +234,11 @@ export default function DataManagement() {
               <Link to="/"><Home className="h-4 w-4 mr-2" />Dashboard</Link>
             </Button>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              <LogOut className="h-4 w-4 mr-2" />Sign Out
             </Button>
           </div>
         </div>
 
-        {/* Admin Dashboard Card */}
         <AdminDashboardCard onQuickAction={handleQuickAction} userEmail={user.email} />
 
         {!isAdmin && (
@@ -197,7 +252,6 @@ export default function DataManagement() {
           </Card>
         )}
 
-        {/* Main Tab Structure */}
         <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="space-y-6">
           <TabsList className="h-auto p-1 bg-muted/50">
             <TabsTrigger value="okr" className="gap-2 px-4 py-2.5">
@@ -214,19 +268,23 @@ export default function DataManagement() {
                 Data Controls
               </TabsTrigger>
             )}
+            {isAdmin && (
+              <TabsTrigger value="csm-entries" className="gap-2 px-4 py-2.5">
+                <ClipboardCheck className="h-4 w-4" />
+                CSM Entries
+              </TabsTrigger>
+            )}
             <TabsTrigger value="admin" className="gap-2 px-4 py-2.5">
               <Users className="h-4 w-4" />
               Team & Uploads
             </TabsTrigger>
           </TabsList>
 
-          {/* OKR Structure Tab */}
           <TabsContent value="okr" className="space-y-4">
             <OrgObjectivesManager />
             <OKRHierarchyTab key={refreshKey} />
           </TabsContent>
 
-          {/* Configuration Tab with Sub-tabs */}
           <TabsContent value="config" className="space-y-4">
             <Tabs defaultValue="rag">
               <TabsList className="mb-4">
@@ -246,10 +304,91 @@ export default function DataManagement() {
             </Tabs>
           </TabsContent>
 
-          {/* Data Controls Tab (Admin Only) */}
           {isAdmin && (
             <TabsContent value="data-controls" className="space-y-4">
               <AdminDataControls />
+            </TabsContent>
+          )}
+
+          {/* CSM Entries Tab */}
+          {isAdmin && (
+            <TabsContent value="csm-entries" className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <ClipboardCheck className="h-5 w-5" />
+                    CSM Feature Scores
+                  </h2>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Review and edit CSM-submitted feature adoption scores across all departments
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Select value={csmDeptId || ''} onValueChange={setCsmDeptId}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {csmDepartments.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCsmPeriodMode(m => m === 'monthly' ? 'weekly' : 'monthly')}
+                    className="gap-1.5"
+                  >
+                    {csmPeriodMode === 'monthly' ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
+                    {csmPeriodMode === 'monthly' ? 'Monthly' : 'Weekly'}
+                  </Button>
+
+                  <Select value={csmPeriod} onValueChange={setCsmPeriod}>
+                    <SelectTrigger className="w-[180px]">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {csmPeriodOptions.map(p => (
+                        <SelectItem key={p} value={p}>
+                          <span className="flex items-center gap-2">
+                            {p}
+                            {csmPeriodsWithData.has(p) && (
+                              <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+                            )}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Popover open={csmCalendarOpen} onOpenChange={setCsmCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon" title="Pick a date">
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        onSelect={(date) => {
+                          if (!date) return;
+                          setCsmPeriod(dateToPeriod(date, csmPeriodMode));
+                          setCsmCalendarOpen(false);
+                        }}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {csmDeptId && (
+                <CSMDataEntryMatrix departmentId={csmDeptId} period={csmPeriod} />
+              )}
             </TabsContent>
           )}
 
