@@ -297,10 +297,10 @@ export default function CustomersPage() {
         {/* Status Filter */}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Statuses" />
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Statuses</SelectItem>
+            <SelectItem value="all">Status</SelectItem>
             {statuses.map(status => (
               <SelectItem key={status} value={status}>{status}</SelectItem>
             ))}
