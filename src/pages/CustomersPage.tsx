@@ -130,7 +130,7 @@ export default function CustomersPage() {
   // Get unique tiers, statuses, and deployment types for filters
   const { tiers, statuses, deploymentTypes, regions, industries, csmNames } = useMemo(() => {
     if (!customers) return { tiers: [], statuses: [], deploymentTypes: [], regions: [], industries: [], csmNames: [] };
-    const deployments = [...new Set(customers.map(c => c.deploymentType).filter(Boolean))].sort();
+    const deployments = [...new Set(customers.map(c => c.deploymentType).filter(Boolean))].filter(d => d !== 'Cloud').sort();
     return {
       tiers: [...new Set(customers.map(c => c.tier))].sort(),
       statuses: [...new Set(customers.map(c => c.status))].sort(),
