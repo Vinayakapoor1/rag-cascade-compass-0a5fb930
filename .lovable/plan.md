@@ -1,51 +1,42 @@
 
 
-# CSM-Filtered Customer x Feature Matrix
+# Populate Indicator-Feature Links for Customer Success
 
-## Overview
-Filter the Feature Matrix so each Customer Success Manager only sees customers assigned to them, and each customer row only shows features that are mapped to that customer.
+## What This Does
 
-## Current State
-- The `customers` table has a `csm_id` field linking each customer to a CSM (77 out of 78 customers have a CSM assigned)
-- There are 11 CSMs in the `csms` table
-- The `csms` table currently has no `email` or `user_id` column to link CSMs to logged-in users
-- The matrix currently shows all customers and uses "--" for unmapped feature cells
+Creates 170 entries in `indicator_feature_links` by cross-joining all 10 Customer Success KPI indicators with all 17 features. This will immediately make the Feature Matrix tab show data entry grids.
 
-## What Changes
+## Database Migration
 
-### 1. Link CSMs to User Accounts
+A single SQL migration that:
 
-Add a `user_id` column to the `csms` table so the system knows which logged-in user is which CSM.
+1. Finds all indicators under the Customer Success department (id: `5cb9dccf-c064-4a13-9cbe-470ea4284ab0`) by traversing: Department → Functional Objectives → Key Results → Indicators
+2. Cross-joins those indicators with all rows in the `features` table
+3. Inserts the results into `indicator_feature_links` with `impact_weight = 1.0`
+4. Uses `ON CONFLICT DO NOTHING` to avoid duplicates if run again
 
-| Column | Type | Notes |
-|--------|------|-------|
-| user_id | uuid | References auth user, nullable until mapped |
-
-You mentioned you will provide this mapping data later, so the column will be created now but left empty. Once mapped, the matrix will automatically filter.
-
-### 2. Filter Customers by Logged-In CSM
-
-When a CSM logs in, the matrix will:
-- Look up their `csm_id` from the `csms` table using their `auth.uid()`
-- Only fetch customers where `customers.csm_id` matches
-- If no CSM match is found (e.g., admin users), show all customers (fallback to current behavior)
-
-### 3. Feature Columns Per Customer
-
-Currently, unmapped customer-feature cells show "--". The matrix already handles this correctly -- cells are only editable where the customer uses that feature. No column hiding is needed since different customers within the same KPI section may use different features, so all linked feature columns must remain visible.
-
-## Files to Modify
-- **Database migration**: Add `user_id` column to `csms` table
-- **`src/components/user/CSMDataEntryMatrix.tsx`**: Add CSM lookup and customer filtering logic
-
-## Technical Details
-
-```text
-Login (auth.uid()) --> csms.user_id --> csm_id --> customers.csm_id --> filtered customer list
+```sql
+INSERT INTO indicator_feature_links (indicator_id, feature_id, impact_weight)
+SELECT i.id, f.id, 1.0
+FROM indicators i
+CROSS JOIN features f
+WHERE i.key_result_id IN (
+  SELECT kr.id FROM key_results kr
+  WHERE kr.functional_objective_id IN (
+    SELECT fo.id FROM functional_objectives fo
+    WHERE fo.department_id = '5cb9dccf-c064-4a13-9cbe-470ea4284ab0'
+  )
+)
+ON CONFLICT DO NOTHING;
 ```
 
-The filtering happens at the data fetch level: after determining the logged-in user's `csm_id`, the query for customers is scoped to only those assigned to that CSM. Admin users bypass this filter and see all customers.
+## Result
 
-## Next Steps After Implementation
-- You will provide the CSM-to-user mapping data (which auth user corresponds to which CSM)
-- Once mapped, each CSM will only see their assigned customers in the matrix
+- 10 KPIs x 17 features = 170 new link rows
+- The Feature Matrix tab will immediately show 10 collapsible KPI sections
+- Each section will have up to 77 customer rows and 17 feature columns
+- Cells will be editable where the customer is mapped to that feature in `customer_features`
+
+## Files to Modify
+- None -- database migration only
+
