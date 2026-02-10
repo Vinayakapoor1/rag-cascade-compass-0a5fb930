@@ -1,32 +1,70 @@
 
-# Remove Mock Data
+# Venture Selector Button
 
-Two locations contain mock/placeholder data that should be cleaned up:
+## Overview
+Add a **Venture Selector** dropdown button to the top-right of the Portfolio page (alongside the OKR Structure and RAG Legend buttons). This selector acts as a data lens/filter -- selecting a venture scopes all displayed data to that product. Currently, all data maps to **HumanFirewall**. Future ventures include EmailRemediator, CyberForceHQ, SecurityRating, etc.
 
-## 1. Customers Page Sparkline (`src/pages/CustomersPage.tsx`)
+## What This Involves
 
-Currently, when a customer has fewer than 2 trend data points, a fake "Sample" sparkline is shown with three dashed colored lines and mock KPI names. This will be replaced with a simple empty state (e.g., a muted "No trend data" label or a flat line placeholder).
+### 1. Database: Create a `ventures` table
+A new table to store available ventures/products:
 
-**What gets removed:**
-- `MOCK_KPI_NAMES` constant (lines ~29-33)
-- `MOCK_KPI_COLORS` constant (lines ~35-39)
-- `MOCK_DATA` array inside `CustomerSparkline` (lines ~71-80)
-- All `isMock` conditional branches (the "Sample" badge, dashed lines, extra kpi2/kpi3 Line elements, tooltip mock label)
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid (PK) | Auto-generated |
+| name | text | e.g. "HumanFirewall" |
+| display_name | text | e.g. "Human Firewall" |
+| description | text | Optional |
+| is_active | boolean | Default true |
+| created_at | timestamptz | Auto |
 
-**What replaces it:**
-- When `data.length < 2`, render a small muted text like "No trend data yet" inside the sparkline container instead of fake lines.
+Seed it with:
+- **HumanFirewall** (active, default)
+- **EmailRemediator** (inactive placeholder)
+- **CyberForceHQ** (inactive placeholder)
+- **SecurityRating** (inactive placeholder)
 
-## 2. Data Entry Timeline (`src/pages/DataEntryTimeline.tsx`)
+Also add a `venture_id` column to `org_objectives` so each objective can be associated with a venture. All existing objectives will default to the HumanFirewall venture.
 
-The comment says "Mock user data" but the actual issue is that `user.email` is hardcoded to `'Unknown User'` instead of being fetched. This is a placeholder, not mock data per se.
+### 2. UI: Venture Selector Component
+A new `VentureSelector` component -- a dropdown button styled consistently with the existing OKR Structure and RAG Legend buttons. It will:
+- Show the currently selected venture name (defaults to "HumanFirewall")
+- List all active ventures in a dropdown
+- Inactive ventures shown greyed out with a "Coming Soon" badge
+- Store the selection in React state (passed down via the Portfolio page)
 
-**What changes:**
-- Remove the misleading "Mock user data" comments (lines ~95-96, 98-99)
-- Attempt to fetch the actual user email from `activity_log.user_id` via a profiles lookup, or fall back to displaying a truncated user ID instead of the generic "Unknown User" string.
+### 3. Data Filtering
+The `useOrgObjectives` hook will accept an optional `ventureId` parameter. When provided, the query filters `org_objectives` by that venture. Since all current data belongs to HumanFirewall, selecting it shows everything as-is. Selecting a future venture would show an empty state until data is imported for it.
 
-## Files Modified
+## Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/CustomersPage.tsx` | Remove all mock sparkline data and replace with empty state |
-| `src/pages/DataEntryTimeline.tsx` | Remove misleading mock comments, show real user ID as fallback |
+| **Migration SQL** | Create `ventures` table, seed 4 ventures, add `venture_id` to `org_objectives`, backfill existing rows |
+| `src/components/VentureSelector.tsx` | **New** -- dropdown button component |
+| `src/pages/Portfolio.tsx` | Add VentureSelector to the top-right button row, pass selected venture to data hook |
+| `src/hooks/useOrgObjectives.tsx` | Accept optional `ventureId` filter parameter |
+
+## Visual Layout
+
+The top-right area of Portfolio will look like:
+
+```text
+[HumanFirewall v]  [OKR Structure]  [RAG Legend]
+```
+
+The dropdown when clicked:
+
+```text
++---------------------------+
+| HumanFirewall        (check) |
+| EmailRemediator   Coming Soon |
+| CyberForceHQ      Coming Soon |
+| SecurityRating    Coming Soon |
++---------------------------+
+```
+
+## Technical Notes
+- The `ventures` table gets RLS policies allowing all authenticated users to read ventures
+- The `venture_id` foreign key on `org_objectives` is nullable initially for backward compatibility, then backfilled to HumanFirewall's ID
+- Selected venture is stored in component state (no persistence needed yet -- defaults to HumanFirewall on page load)
