@@ -15,7 +15,8 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Building2, BarChart3, Settings, Activity, Filter, X, Loader2, Target, Info, Clock } from 'lucide-react';
+import { Building2, BarChart3, Settings, Activity, Filter, X, Loader2, Target, Info, Clock, Eye } from 'lucide-react';
+import { IndicatorDerivationDialog } from '@/components/IndicatorDerivationDialog';
 import { RAGStatus, OrgObjectiveColor } from '@/types/venture';
 import { getOrgObjectiveColorClasses, scoreToRAG } from '@/lib/ragUtils';
 import { parseFormulaType, aggregateProgress, progressToRAG } from '@/lib/formulaCalculations';
@@ -435,10 +436,12 @@ function KRStatBlock({
 // Indicator Stat Block Component (flat view - no parent label)
 function IndicatorStatBlock({
   ind,
-  filterStatus
+  filterStatus,
+  onClick
 }: {
   ind: DBIndicator;
   filterStatus: RAGStatus | null;
+  onClick?: () => void;
 }) {
   const status = calculateIndicatorStatus(ind);
   const displayStatus = filterStatus || status;
@@ -448,7 +451,10 @@ function IndicatorStatBlock({
     : 0;
 
   return (
-    <Card className={`border-l-4 h-full ${getBorderColorClass(displayStatus)}`}>
+    <Card
+      className={`border-l-4 h-full ${getBorderColorClass(displayStatus)} ${onClick ? 'cursor-pointer hover:shadow-md hover:border-primary/30 transition-shadow' : ''}`}
+      onClick={onClick}
+    >
       <CardContent className="p-4">
         <div className="flex items-start gap-3 mb-3">
           <div className="p-2 rounded-lg bg-muted flex-shrink-0">
@@ -467,6 +473,7 @@ function IndicatorStatBlock({
                   unit: ind.unit
                 }}
               />
+              {onClick && <Eye className="h-3.5 w-3.5 text-muted-foreground/50" />}
             </div>
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
@@ -498,6 +505,7 @@ export default function DepartmentDetail() {
   const [statusFilter, setStatusFilter] = useState<RAGStatus | 'all'>(initialFilter || 'all');
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [featureFilter, setFeatureFilter] = useState<string>('all');
+  const [derivationIndicator, setDerivationIndicator] = useState<DBIndicator | null>(null);
 
 
   // Sync filter state if URL param changes
@@ -934,9 +942,8 @@ export default function DepartmentDetail() {
                                           <div className="w-2 h-px bg-border" />
                                         </div>
 
-                                        {/* KPI Card */}
                                         <div className="w-80 flex-shrink-0">
-                                          <IndicatorStatBlock ind={ind} filterStatus={statusFilter === 'all' ? null : statusFilter} />
+                                          <IndicatorStatBlock ind={ind} filterStatus={statusFilter === 'all' ? null : statusFilter} onClick={() => setDerivationIndicator(ind)} />
                                         </div>
                                       </div>
                                     ))}
@@ -959,6 +966,19 @@ export default function DepartmentDetail() {
           </Card>
         )}
       </div>
+
+      {/* Indicator Derivation Dialog */}
+      {derivationIndicator && (
+        <IndicatorDerivationDialog
+          indicatorId={derivationIndicator.id}
+          indicatorName={derivationIndicator.name}
+          currentValue={derivationIndicator.current_value}
+          targetValue={derivationIndicator.target_value}
+          unit={derivationIndicator.unit}
+          open={!!derivationIndicator}
+          onOpenChange={(open) => { if (!open) setDerivationIndicator(null); }}
+        />
+      )}
     </div>
   );
 }
