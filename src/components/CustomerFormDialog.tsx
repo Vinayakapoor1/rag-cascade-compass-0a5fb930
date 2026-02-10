@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, X, Upload, Image } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface Customer {
@@ -265,16 +265,16 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                <DialogHeader>
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+                <DialogHeader className="shrink-0">
                     <DialogTitle>{customer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
                     <DialogDescription>
                         {customer ? 'Update customer information and feature mappings' : 'Create a new customer and assign features'}
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    <ScrollArea className="flex-1 max-h-[calc(85vh-140px)] pr-4">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                    <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 180px)' }}>
                         <div className="space-y-4 pb-4">
                             {/* Logo Upload */}
                             <div className="space-y-2">
@@ -432,9 +432,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                                 <p className="text-xs text-muted-foreground">Click to select/deselect features</p>
                             </div>
                         </div>
-                    </ScrollArea>
+                    </div>
 
-                    <DialogFooter className="mt-4">
+                    <DialogFooter className="mt-4 shrink-0">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
                         <Button type="submit" disabled={loading}>
                             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
