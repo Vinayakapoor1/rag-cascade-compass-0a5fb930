@@ -1,43 +1,37 @@
 
 
-# Fix CSM Department Filtering
+# Add Dynamic Filter Breakdown Stat Cards
 
-## Problem
+## Overview
 
-When a CSM logs in and navigates to the data entry page, they see **all departments** (e.g., Finance, HR, Customer Success, etc.) instead of only the department(s) relevant to their assigned customers. This is because the `fetchDepartments` function in `CSMDataEntry.tsx` runs an unfiltered query on the `departments` table.
+Add a row of compact stat cards below the existing summary stats that show individual counts for each active filter's values, computed from the currently filtered customer list. This gives at-a-glance visibility into the composition of the filtered results.
 
-## Solution
+## What You'll See
 
-For CSM users (non-admin), filter the departments by tracing the CSM's assigned customers through to their linked department:
+Below the existing 3 summary cards (Total Customers, Customers with KPIs, Unique KPIs Linked), a new section will appear showing breakdowns for each filter dimension:
 
-```
-CSM (user_id) -> csms table (csm_id) -> customers (csm_id) -> customer_features -> indicator_feature_links -> indicators -> key_results -> functional_objectives -> departments
-```
+- **By Tier**: e.g., Tier1: 30, Tier2: 25, Tier3: 28
+- **By Status**: e.g., Active: 75, Inactive: 8
+- **By Deployment**: e.g., On Prem: 40, Hybrid: 20, Private Cloud: 15
+- **By Region**: e.g., India: 50, UAE: 33
+- **By Industry**: e.g., Finance: 12, Aviation: 8, BPO/KPO: 6, ...
+- **By CSM**: e.g., John: 15, Jane: 20, ...
+- **By RAG**: e.g., Green: 40, Amber: 25, Red: 10, Not Set: 8
 
-Since this chain is complex, a simpler and more reliable approach is:
-1. Look up the CSM's `id` from the `csms` table using `user_id`
-2. Find all customers assigned to that CSM
-3. Find all features those customers use (via `customer_features`)
-4. Find all indicators linked to those features (via `indicator_feature_links`)
-5. Trace those indicators back to departments (via `key_results` and `functional_objectives`)
-6. Show only those departments
+Each breakdown section will display as a compact card with the category name and individual value counts as small badges/chips, all dynamically updating as filters change.
 
-However, given that the current system focuses on **Customer Success** as the primary department, and CSMs are inherently part of the Customer Success function, a practical approach is to filter departments to only those that have indicators linked to features used by the CSM's customers.
+## Technical Details
 
-## File Changes
+### File: `src/pages/CustomersPage.tsx`
 
-### `src/pages/CSMDataEntry.tsx`
+1. **Add a new `useMemo` hook** to compute breakdowns from `filteredCustomers`:
+   - Count customers per tier, status, deployment type, region, industry, CSM, and RAG status
+   - Return as an object of `{ label: string, counts: { name: string, count: number }[] }[]`
 
-Update `fetchDepartments` to filter for CSM users:
+2. **Render breakdown cards** in a responsive grid below the existing stats section:
+   - Each card shows the dimension name (e.g., "Tiers") and a list of value-count pairs
+   - Use compact Badge components for each value
+   - Cards only show dimensions that have more than one distinct value in the filtered set
 
-- If the user is a CSM (not admin), use `csmId` from auth context to:
-  1. Query `customers` where `csm_id` matches
-  2. Query `customer_features` for those customers
-  3. Query `indicator_feature_links` for those features
-  4. Query `indicators` for those indicator IDs, then `key_results`, then `functional_objectives` to get `department_id`s
-  5. Query `departments` filtered to only those IDs
-- If the user is an admin, show all departments (current behavior)
-- Auto-select the first (and likely only) department
-
-This ensures the CSM sees only "Customer Success" (or whichever department their customers' features map to), and can immediately start entering data without confusion.
+3. **Styling**: Match existing card style with small text and badges for a clean, information-dense layout
 
