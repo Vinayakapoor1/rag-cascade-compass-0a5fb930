@@ -22,6 +22,7 @@ import DepartmentDataEntry from "./pages/DepartmentDataEntry";
 import DataEntryTimeline from "./pages/DataEntryTimeline";
 import AdminDepartmentStatus from "./pages/AdminDepartmentStatus";
 import AdminDashboard from "./pages/AdminDashboard";
+import CSMDataEntry from "./pages/CSMDataEntry";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,9 @@ const App = () => (
               {/* Feature impact routes */}
               <Route path="/features" element={<AppLayout><FeaturesPage /></AppLayout>} />
               <Route path="/features/:featureId" element={<AppLayout><FeatureDetailPage /></AppLayout>} />
+
+              {/* CSM data entry route */}
+              <Route path="/csm/data-entry" element={<AppLayout><CSMDataEntry /></AppLayout>} />
 
               {/* Utility routes */}
               <Route path="/admin" element={<AppLayout><AdminDashboard /></AppLayout>} />
