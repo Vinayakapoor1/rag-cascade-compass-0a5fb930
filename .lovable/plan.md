@@ -1,115 +1,51 @@
 
 
-# KPI-Driven Customer x Feature Data Entry Matrix
+# CSM-Filtered Customer x Feature Matrix
 
 ## Overview
-Rewrite the `CSMDataEntryMatrix` component to display all KPIs for the department statically (no selector), each with its own Customer x Feature grid. The CSM fills in percentage values per customer-feature cell. Scores auto-aggregate up to the KPI level and feed the existing RAG cascade.
+Filter the Feature Matrix so each Customer Success Manager only sees customers assigned to them, and each customer row only shows features that are mapped to that customer.
 
-## What Users Will See
+## Current State
+- The `customers` table has a `csm_id` field linking each customer to a CSM (77 out of 78 customers have a CSM assigned)
+- There are 11 CSMs in the `csms` table
+- The `csms` table currently has no `email` or `user_id` column to link CSMs to logged-in users
+- The matrix currently shows all customers and uses "--" for unmapped feature cells
 
-On the "Feature Matrix" tab of the Department Data Entry page:
+## What Changes
 
-- Each KPI linked to features is shown as a **collapsible section** (all expanded by default)
-- Inside each KPI section is a grid:
-  - **Rows** = Customers who use at least one of the KPI's linked features (derived from `indicator_feature_links` + `customer_features`)
-  - **Columns** = Features linked to the KPI
-  - **Cells** = Percentage input (0-100), auto-colored by RAG thresholds. Only editable where the customer uses that feature ("--" otherwise)
-  - **Per-customer aggregate** column = average of that customer's filled cells
-  - **KPI aggregate** badge at the top = average of all customer aggregates
-- A single "Save All" button at the top persists everything and updates `indicators.current_value`
+### 1. Link CSMs to User Accounts
 
-```text
--- KPI: Adoption Rate  [Aggregate: 72% Amber] --
-+-------------------+-------+-------+-------+-------+-----------+
-| Customer          | LMS   | VCRO  | Phish | Portal| Avg       |
-+-------------------+-------+-------+-------+-------+-----------+
-| DHA               | [85 ] | [90 ] |  --   | [70 ] |   82%  G  |
-| VOIS              | [60 ] | [75 ] | [80 ] |  --   |   72%  A  |
-| Edge Group        |  --   | [40 ] | [55 ] | [90 ] |   62%  A  |
-+-------------------+-------+-------+-------+-------+-----------+
-
--- KPI: NPS Score  [Aggregate: 65% Amber] --
-+-------------------+-------+-------+-----------+
-| Customer          | LMS   | VCRO  | Avg       |
-+-------------------+-------+-------+-----------+
-| DHA               | [70 ] | [60 ] |   65%  A  |
-+-------------------+-------+-------+-----------+
-```
-
-## Data Connections
-
-The relationship chain uses existing tables only -- no new mapping needed:
-
-1. **KPI to Features**: `indicator_feature_links` tells us which features are relevant to each KPI
-2. **Features to Customers**: `customer_features` tells us which customers use each feature
-3. **Intersection**: A cell is editable only when both links exist (the KPI tracks that feature AND the customer uses that feature)
-
-## Implementation Steps
-
-### Step 1: New Database Table
-
-**`csm_customer_feature_scores`** -- stores the granular percentage per cell
+Add a `user_id` column to the `csms` table so the system knows which logged-in user is which CSM.
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | uuid | PK, gen_random_uuid() |
-| indicator_id | uuid | FK -- which KPI |
-| customer_id | uuid | FK -- which customer row |
-| feature_id | uuid | FK -- which feature column |
-| value | numeric | Percentage 0-100 |
-| period | text | e.g. "2026-02" |
-| created_by | uuid | auth.uid() |
-| created_at | timestamptz | default now() |
-| updated_at | timestamptz | default now() |
+| user_id | uuid | References auth user, nullable until mapped |
 
-- Unique constraint: (indicator_id, customer_id, feature_id, period)
-- RLS: anyone authenticated can read; authenticated can insert/update/delete
-- Trigger: auto-update `updated_at` on change
+You mentioned you will provide this mapping data later, so the column will be created now but left empty. Once mapped, the matrix will automatically filter.
 
-### Step 2: Rewrite `CSMDataEntryMatrix.tsx`
+### 2. Filter Customers by Logged-In CSM
 
-Complete rewrite of the component logic:
+When a CSM logs in, the matrix will:
+- Look up their `csm_id` from the `csms` table using their `auth.uid()`
+- Only fetch customers where `customers.csm_id` matches
+- If no CSM match is found (e.g., admin users), show all customers (fallback to current behavior)
 
-**Data fetching:**
-1. Get all indicators for the department (FO -> KR -> Indicators chain, same as now)
-2. For each indicator with feature links, fetch linked features from `indicator_feature_links`
-3. For those features, fetch customers who use them from `customer_features`
-4. Load existing scores from `csm_customer_feature_scores` for the period
+### 3. Feature Columns Per Customer
 
-**Rendering -- per KPI section:**
-- Collapsible card with KPI name, hierarchy path (FO -> KR), and aggregate badge
-- Table with customer rows, feature columns, percentage inputs
-- Cells are disabled/greyed where customer does not use the feature
-- Auto-color cells: Green (76-100), Amber (51-75), Red (1-50), Gray (empty)
-- Customer aggregate column (rightmost)
-- Customer name search/filter at the top of each section (since there could be 77 customers)
-
-**Aggregation:**
-```text
-Customer Avg = AVG(filled cells for that customer)
-KPI Aggregate = AVG(all customer averages)
-```
-
-**Save logic:**
-- Upsert all cells to `csm_customer_feature_scores`
-- For each KPI, compute aggregate and write to `indicators.current_value` (target=100)
-- Create `indicator_history` entries
-- Log to `activity_logs`
-
-### Step 3: No Changes to DepartmentDataEntry Page
-
-The parent page already has the "Feature Matrix" tab wired up. Only the component internals change.
-
-## Files to Create
-- Database migration for `csm_customer_feature_scores` table
+Currently, unmapped customer-feature cells show "--". The matrix already handles this correctly -- cells are only editable where the customer uses that feature. No column hiding is needed since different customers within the same KPI section may use different features, so all linked feature columns must remain visible.
 
 ## Files to Modify
-- `src/components/user/CSMDataEntryMatrix.tsx` -- full rewrite: KPI sections with Customer x Feature grids using percentage inputs
+- **Database migration**: Add `user_id` column to `csms` table
+- **`src/components/user/CSMDataEntryMatrix.tsx`**: Add CSM lookup and customer filtering logic
 
-## Technical Notes
-- 77 customers x 17 features is manageable without virtualization, but a search filter per section keeps it usable
-- The existing `csm_feature_scores` table remains untouched for backward compatibility
-- Cell key format: `indicator_id::customer_id::feature_id`
-- Period is passed from the parent page's period selector (already wired)
-- Evidence is not required for matrix entries -- the granular per-customer data serves as documentation
+## Technical Details
 
+```text
+Login (auth.uid()) --> csms.user_id --> csm_id --> customers.csm_id --> filtered customer list
+```
+
+The filtering happens at the data fetch level: after determining the logged-in user's `csm_id`, the query for customers is scoped to only those assigned to that CSM. Admin users bypass this filter and see all customers.
+
+## Next Steps After Implementation
+- You will provide the CSM-to-user mapping data (which auth user corresponds to which CSM)
+- Once mapped, each CSM will only see their assigned customers in the matrix
