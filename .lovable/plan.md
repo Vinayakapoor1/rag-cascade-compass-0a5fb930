@@ -1,42 +1,88 @@
 
 
-# Populate Indicator-Feature Links for Customer Success
+# Restructure Feature Matrix: Customer-First Data Entry
 
-## What This Does
+## The Problem Today
 
-Creates 170 entries in `indicator_feature_links` by cross-joining all 10 Customer Success KPI indicators with all 17 features. This will immediately make the Feature Matrix tab show data entry grids.
+The current matrix is **KPI-first**: 10 collapsible KPI sections, each with a grid of 77 customers x 17 features = ~13,000 cells. This is overwhelming and forces CSMs to jump between KPI sections to fill data for the same customer.
 
-## Database Migration
+## New Structure: Customer-First
 
-A single SQL migration that:
+Flip the hierarchy so the **Customer** is primary. Each customer expands to show only their mapped features as rows, with the 10 KPIs as columns.
 
-1. Finds all indicators under the Customer Success department (id: `5cb9dccf-c064-4a13-9cbe-470ea4284ab0`) by traversing: Department → Functional Objectives → Key Results → Indicators
-2. Cross-joins those indicators with all rows in the `features` table
-3. Inserts the results into `indicator_feature_links` with `impact_weight = 1.0`
-4. Uses `ON CONFLICT DO NOTHING` to avoid duplicates if run again
-
-```sql
-INSERT INTO indicator_feature_links (indicator_id, feature_id, impact_weight)
-SELECT i.id, f.id, 1.0
-FROM indicators i
-CROSS JOIN features f
-WHERE i.key_result_id IN (
-  SELECT kr.id FROM key_results kr
-  WHERE kr.functional_objective_id IN (
-    SELECT fo.id FROM functional_objectives fo
-    WHERE fo.department_id = '5cb9dccf-c064-4a13-9cbe-470ea4284ab0'
-  )
-)
-ON CONFLICT DO NOTHING;
+```text
+Before (KPI-first):                    After (Customer-first):
+  KPI: Adoption Rate                     Customer: VOIS (16 features)
+    Customer A  [F1][F2][F3]...            Feature: Phishing Email  [Adoption][NPS][CSAT]...
+    Customer B  [F1][F2][F3]...            Feature: LMS             [Adoption][NPS][CSAT]...
+    Customer C  [F1][F2][F3]...            Feature: Gamification    [Adoption][NPS][CSAT]...
+  KPI: NPS Score                         Customer: DHA (16 features)
+    Customer A  [F1][F2][F3]...            Feature: Phishing Email  [Adoption][NPS][CSAT]...
+    Customer B  [F1][F2][F3]...            ...
+    ...
 ```
 
-## Result
+## User Journey
 
-- 10 KPIs x 17 features = 170 new link rows
-- The Feature Matrix tab will immediately show 10 collapsible KPI sections
-- Each section will have up to 77 customer rows and 17 feature columns
-- Cells will be editable where the customer is mapped to that feature in `customer_features`
+1. CSM opens the Feature Matrix tab
+2. Sees a list of their assigned customers (filtered by CSM mapping)
+3. Expands a customer -- sees only the features that customer uses
+4. For each feature row, fills in scores across the 10 KPIs (0-100%)
+5. Clicks "Save All" -- scores are saved and KPI indicator values are recalculated
+
+## What Stays the Same
+
+- **Rollup logic**: Per-indicator AVG of all customer-feature scores becomes the indicator's `current_value`
+- **RAG calculation**: Standard thresholds (Green >= 76%, Amber >= 51%, Red >= 1%)
+- **Cascade**: Indicator values flow up through Key Results, Functional Objectives, and Department via existing formulas
+- **CSM filtering**: Non-admin users only see customers assigned to them
+- **Data storage**: Same `csm_customer_feature_scores` table with same structure
 
 ## Files to Modify
-- None -- database migration only
+
+- **`src/components/user/CSMDataEntryMatrix.tsx`**: Complete restructure of the component
+  - Data model changes from `KPISection[]` to `CustomerSection[]`
+  - Each `CustomerSection` contains the customer's features and all applicable KPIs
+  - Grid renders features as rows, KPIs as columns
+  - Aggregation functions adapted to new grouping but same math
+  - Customer-level search filter at top level (not per-section)
+  - Each customer card shows an overall RAG badge (average across all their feature-KPI scores)
+
+## Technical Details
+
+### New Data Model
+
+```text
+CustomerSection {
+  id: string (customer_id)
+  name: string
+  features: { id, name }[]              -- only features this customer uses
+  indicators: { id, name, kr_name, fo_name }[]  -- all KPIs linked to any of their features
+  indicatorFeatureMap: Map<indicator_id, Set<feature_id>>  -- which features apply to which KPI
+}
+```
+
+### Grid Layout Per Customer
+
+| Feature              | Adoption Rate | NPS Score | CSAT Score | ... (10 KPI columns) | Avg |
+|----------------------|:---:|:---:|:---:|:---:|:---:|
+| Phishing Email       | [85] | [72] | [90] | ... | 82% |
+| LMS                  | [60] | [--] | [75] | ... | 68% |
+| Gamification         | [--] | [45] | [--] | ... | 45% |
+| **Customer Avg**     |      |      |      |     | **65%** |
+
+- Cells show "--" where that feature is not linked to that KPI (via `indicator_feature_links`)
+- Customer Avg badge shows overall health
+
+### Aggregation (unchanged math)
+
+1. **Per indicator**: Collect all non-null scores for that indicator across all customers and features, compute AVG
+2. **Save**: Update `indicators.current_value` with the aggregate, set `target_value = 100`, derive RAG status
+3. **Cascade**: Existing formula system handles KR/FO/Dept rollup
+
+### Estimated Grid Size
+
+- Typical customer has 6-7 features x 10 KPIs = ~60-70 cells per customer
+- CSM with ~7 customers = ~420-490 total cells (vs 13,000 before)
+- Much more manageable data entry experience
 
