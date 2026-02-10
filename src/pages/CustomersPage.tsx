@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { CustomerFormDialog } from '@/components/CustomerFormDialog';
 import { RAGBadge } from '@/components/RAGBadge';
-import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server, TrendingUp } from 'lucide-react';
+import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server, TrendingUp, Globe, Factory, UserCheck, Settings } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -174,27 +174,26 @@ export default function CustomersPage() {
   const filterBreakdowns = useMemo(() => {
     if (!filteredCustomers.length) return [];
 
-    const countBy = (key: (c: typeof filteredCustomers[0]) => string | null | undefined, label: string) => {
+    const countBy = (key: (c: typeof filteredCustomers[0]) => string | null | undefined, label: string, icon: string, maxVisible?: number) => {
       const counts: Record<string, number> = {};
       filteredCustomers.forEach(c => {
-        const val = key(c) || 'Unknown';
+        const val = key(c) || 'Unassigned';
         counts[val] = (counts[val] || 0) + 1;
       });
       const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-      return entries.length > 0 ? { label, counts: entries.map(([name, count]) => ({ name, count })) } : null;
+      if (entries.length === 0) return null;
+      const totalDistinct = entries.length;
+      return { label, icon, counts: entries.map(([name, count]) => ({ name, count })), maxVisible, totalDistinct };
     };
 
-    const ragLabel: Record<string, string> = { green: 'Green', amber: 'Amber', red: 'Red', 'not-set': 'Not Set' };
-
     return [
-      countBy(c => c.tier, 'Tier'),
-      countBy(c => c.status, 'Status'),
-      countBy(c => c.deploymentType, 'Deployment'),
-      countBy(c => c.region, 'Region'),
-      countBy(c => c.industry, 'Industry'),
-      countBy(c => c.csmName, 'CSM'),
-      countBy(c => ragLabel[c.ragStatus] || c.ragStatus, 'RAG'),
-    ].filter(Boolean) as { label: string; counts: { name: string; count: number }[] }[];
+      countBy(c => c.region, 'By Region', 'globe'),
+      countBy(c => c.industry, 'By Industry', 'factory'),
+      countBy(c => c.csmName, 'By CSM', 'usercheck', 7),
+      countBy(c => c.deploymentType, 'By Deployment', 'server'),
+      countBy(c => c.tier, 'By Tier', 'tag'),
+      countBy(c => c.status, 'By Status', 'activity'),
+    ].filter(Boolean) as { label: string; icon: string; counts: { name: string; count: number }[]; maxVisible?: number; totalDistinct: number }[];
   }, [filteredCustomers]);
 
   // Get status badge styling
@@ -292,19 +291,52 @@ export default function CustomersPage() {
 
       {/* Filter Breakdown Stat Cards */}
       {filterBreakdowns.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          {filterBreakdowns.map(breakdown => (
-            <Card key={breakdown.label} className="p-3">
-              <p className="text-xs font-semibold text-muted-foreground mb-2">{breakdown.label}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {breakdown.counts.map(({ name, count }) => (
-                  <Badge key={name} variant="secondary" className="text-[11px] px-2 py-0.5 font-medium">
-                    {name}: {count}
-                  </Badge>
-                ))}
-              </div>
-            </Card>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {filterBreakdowns.map(breakdown => {
+            const IconComponent = { globe: Globe, factory: Factory, usercheck: UserCheck, server: Server, tag: Tag, activity: Activity }[breakdown.icon] || Tag;
+            const maxShow = breakdown.maxVisible || breakdown.counts.length;
+            const visible = breakdown.counts.slice(0, maxShow);
+            const remaining = breakdown.counts.length - maxShow;
+            const isBadgeStyle = breakdown.icon === 'usercheck';
+
+            return (
+              <Card key={breakdown.label} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <IconComponent className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold text-foreground">{breakdown.label}</span>
+                  {breakdown.totalDistinct > 1 && (
+                    <span className="text-[10px] text-muted-foreground ml-auto">{breakdown.totalDistinct} total</span>
+                  )}
+                </div>
+                {isBadgeStyle ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {visible.map(({ name, count }) => (
+                      <Badge key={name} variant="secondary" className="text-[11px] px-2 py-0.5 font-normal">
+                        {name}: {count}
+                      </Badge>
+                    ))}
+                    {remaining > 0 && (
+                      <Badge variant="outline" className="text-[11px] px-2 py-0.5 font-normal text-muted-foreground">
+                        +{remaining} more
+                      </Badge>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {visible.map(({ name, count }) => (
+                      <div key={name} className="flex items-center justify-between text-xs">
+                        <span className={cn("truncate", name === 'Unassigned' ? 'text-warning' : 'text-foreground')}>{name}</span>
+                        <span className="font-semibold tabular-nums text-foreground ml-2">{count}</span>
+                      </div>
+                    ))}
+                    {remaining > 0 && (
+                      <div className="text-[11px] text-muted-foreground pt-0.5">+{remaining} more</div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
 
