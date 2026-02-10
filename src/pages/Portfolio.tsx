@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOrgObjectives, useVentures, DBOrgObjective } from '@/hooks/useOrgObjectives';
+import { useAuth } from '@/hooks/useAuth';
 import { BusinessOutcomeSection } from '@/components/BusinessOutcomeSection';
 import { RAGBadge } from '@/components/RAGBadge';
 import { OKRHierarchyLegend } from '@/components/OKRHierarchyLegend';
@@ -157,6 +158,7 @@ export default function Portfolio() {
   const [featureCount, setFeatureCount] = useState<number>(0);
   const { data: ventures } = useVentures();
   const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
+  const { user, isAdmin, accessibleDepartments } = useAuth();
 
   // Auto-select HumanFirewall on first load
   useEffect(() => {
@@ -166,7 +168,22 @@ export default function Portfolio() {
     }
   }, [ventures, selectedVentureId]);
 
-  const { data: orgObjectives, isLoading, refetch } = useOrgObjectives(selectedVentureId ?? undefined);
+  const { data: rawOrgObjectives, isLoading, refetch } = useOrgObjectives(selectedVentureId ?? undefined);
+
+  // Department-scoped filtering: non-admin logged-in users only see their assigned departments
+  const orgObjectives = useMemo(() => {
+    if (!rawOrgObjectives) return rawOrgObjectives;
+    // Admins and unauthenticated users see everything
+    if (isAdmin || !user) return rawOrgObjectives;
+    
+    // Filter departments within each org objective
+    return rawOrgObjectives
+      .map(obj => ({
+        ...obj,
+        departments: obj.departments.filter(d => accessibleDepartments.includes(d.id))
+      }))
+      .filter(obj => obj.departments.length > 0);
+  }, [rawOrgObjectives, isAdmin, user, accessibleDepartments]);
 
   // Fetch customer and feature counts
   useEffect(() => {
@@ -331,20 +348,25 @@ export default function Portfolio() {
     );
   }
 
-  // Empty state
+  // Empty state - differentiate between no data and no access
   if (!orgObjectives || orgObjectives.length === 0) {
+    const hasNoAccess = user && !isAdmin && rawOrgObjectives && rawOrgObjectives.length > 0;
     return (
       <div className="space-y-8">
         <BusinessOutcomeSection businessOutcome="3X Revenue" status="not-set" />
         <div className="glass-card max-w-md mx-auto p-8 text-center">
           <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Data Yet</h3>
+          <h3 className="text-lg font-semibold mb-2">{hasNoAccess ? 'No Departments Assigned' : 'No Data Yet'}</h3>
           <p className="text-muted-foreground text-sm mb-4">
-            Import OKR data to see your organizational objectives and health metrics.
+            {hasNoAccess 
+              ? 'You don\'t have access to any departments yet. Please contact your administrator to get department access.'
+              : 'Import OKR data to see your organizational objectives and health metrics.'}
           </p>
-          <Link to="/data" className="text-primary hover:underline text-sm font-medium">
-            Go to Data Management →
-          </Link>
+          {!hasNoAccess && (
+            <Link to="/data" className="text-primary hover:underline text-sm font-medium">
+              Go to Data Management →
+            </Link>
+          )}
         </div>
       </div>
     );
