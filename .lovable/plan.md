@@ -1,35 +1,42 @@
 
 
-# Show CSM Names and Ensure Dynamic KPI Data on Customers Page
+# Fix: 2 Missing Customers (CCED and Viresec)
 
-## What Changes
+## Root Cause
 
-### 1. Show CSM Name on Each Customer Card
-Each customer has a `csm_id` foreign key linking to the `csms` table. Currently the Customers page doesn't fetch or display the CSM name. We'll add it as a small label on each customer card (e.g., "CSM: John Doe" next to region/industry).
+The database has two CHECK constraints that reject values from your Excel file:
 
-### 2. Confirm KPI Counts Are Dynamic
-The "Linked to KPIs" and "Total KPI Links" summary stats are already dynamically calculated from the `indicator_customer_links` table -- no mock data. The per-customer KPI count shown on the right side of each card is also live. No changes needed here, but we'll make sure the summary cards reflect filtered results (they already do).
+1. **`customers_tier_check`** -- only allows `Tier1`, `Tier2`, `Tier3`. Your file has "Unassigned" (CCED's tier), which the importer now correctly preserves but the database rejects.
 
-## Technical Changes
+2. **`customers_deployment_type_check`** -- only allows `On Prem`, `Cloud`, `Hybrid`. Your file has `India Cloud`, `UAE Cloud`, `Private Cloud`, etc. These silently fail, causing the column to be NULL for existing records (updated via prior imports), but for brand-new customers like CCED and Viresec, the entire INSERT is rejected.
 
-### File: `src/hooks/useCustomerImpact.tsx`
+This is why 80 of 82 customers exist: the other 80 were likely imported before these constraints existed, or their updates partially succeeded. CCED and Viresec are new and fail on insert.
 
-**Add `csmName` to the `CustomerWithImpact` interface and fetch it:**
-- Update the customer query to also fetch `csm_id`
-- Fetch all CSMs from the `csms` table in parallel
-- Map `csm_id` to CSM name for each customer
-- Add `csmName: string | null` to the returned data
+## Fix
 
-### File: `src/pages/CustomersPage.tsx`
+### 1. Database Migration -- Relax CHECK Constraints
 
-**Display CSM name on each customer card:**
-- Show a small "CSM: [Name]" label in the metadata row (next to region and industry)
-- If no CSM is assigned, skip the label
+Update both constraints to allow real-world values:
+
+| Constraint | Current Values | New Values |
+|---|---|---|
+| `customers_tier_check` | Tier1, Tier2, Tier3 | Tier1, Tier2, Tier3, **Unassigned** |
+| `customers_deployment_type_check` | On Prem, Cloud, Hybrid | On Prem, Cloud, Hybrid, **India Cloud**, **UAE Cloud**, **Private Cloud** |
+
+### 2. Code Change -- Normalize Deployment Type in Importer
+
+Update `src/lib/customerExcelImporter.ts` to pass through all deployment type values as-is (they're already clean strings from the Excel). No normalization needed since we're expanding the constraint.
+
+### 3. Backfill Deployment Types
+
+Run an update to set the correct `deployment_type` for existing customers that had it silently nulled out. This will happen automatically on the next re-import of the same Excel file.
 
 ## Files Modified
 
 | File | Change |
-|------|--------|
-| `src/hooks/useCustomerImpact.tsx` | Add `csmName` field, fetch CSMs, join by `csm_id` |
-| `src/pages/CustomersPage.tsx` | Display `customer.csmName` on each card |
+|---|---|
+| **Database migration** | Drop and recreate both CHECK constraints with expanded allowed values |
+| `src/lib/customerExcelImporter.ts` | No code change needed -- deployment_type is already passed through as-is |
+
+After this migration, re-importing the same Excel file will successfully import all 82 customers including CCED and Viresec, and backfill deployment types for existing records.
 
