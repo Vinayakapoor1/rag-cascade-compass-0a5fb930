@@ -1,37 +1,65 @@
 
 
-# Add Dynamic Filter Breakdown Stat Cards
+# CSM Matrix: Band Dropdown Input with Vector Calculation
 
 ## Overview
+Replace the current percentage input cells in the CSM Feature Matrix with dropdown selectors showing RAG band labels (Green/Amber/Red). Each selection maps to a fixed vector weight (Green=1, Amber=0.5, Red=0). The aggregation ("Agg RAG") becomes the average of these vector weights, converted to a percentage (x100).
 
-Add a row of compact stat cards below the existing summary stats that show individual counts for each active filter's values, computed from the currently filtered customer list. This gives at-a-glance visibility into the composition of the filtered results.
+## What Changes
 
-## What You'll See
+### 1. Cell Input: Percentage Fields to Band Dropdowns
+- Each editable cell becomes a compact dropdown with 3 options: **Green** (1), **Amber** (0.5), **Red** (0), plus an empty/unset state
+- Cells display a colored dot + label (e.g., a green dot with "Green")
+- This replaces the current `<Input type="number">` fields
 
-Below the existing 3 summary cards (Total Customers, Customers with KPIs, Unique KPIs Linked), a new section will appear showing breakdowns for each filter dimension:
+### 2. Storage
+- The `csm_customer_feature_scores.value` column will store the vector weight (1, 0.5, or 0) instead of a raw percentage
+- No database schema changes needed -- the `numeric` column already supports these values
 
-- **By Tier**: e.g., Tier1: 30, Tier2: 25, Tier3: 28
-- **By Status**: e.g., Active: 75, Inactive: 8
-- **By Deployment**: e.g., On Prem: 40, Hybrid: 20, Private Cloud: 15
-- **By Region**: e.g., India: 50, UAE: 33
-- **By Industry**: e.g., Finance: 12, Aviation: 8, BPO/KPO: 6, ...
-- **By CSM**: e.g., John: 15, Jane: 20, ...
-- **By RAG**: e.g., Green: 40, Amber: 25, Red: 10, Not Set: 8
+### 3. Aggregation Calculation
+- **Per-KPI aggregate** = AVG of all vector weights for that KPI across features and customers
+- **Per-customer average** = AVG of all vector weights across that customer's cells
+- Final percentage = aggregate * 100 (so 0.8 becomes 80%)
+- This 80% is saved as the indicator's `current_value` and mapped to RAG thresholds as before
 
-Each breakdown section will display as a compact card with the category name and individual value counts as small badges/chips, all dynamically updating as filters change.
+### 4. Display Updates
+- **Row Avg** and **Customer Avg** badges will show the computed percentage from vector averages
+- **Apply to Row / Apply to Column** controls change from a number input to a band dropdown, applying that vector weight across cells
+
+### 5. Excel Template Updates
+- Downloaded template cells will contain band labels ("Green", "Amber", "Red") instead of numbers
+- Upload parser will map band labels back to vector weights (1, 0.5, 0)
 
 ## Technical Details
 
-### File: `src/pages/CustomersPage.tsx`
+### Files Modified
 
-1. **Add a new `useMemo` hook** to compute breakdowns from `filteredCustomers`:
-   - Count customers per tier, status, deployment type, region, industry, CSM, and RAG status
-   - Return as an object of `{ label: string, counts: { name: string, count: number }[] }[]`
+**`src/components/user/CSMDataEntryMatrix.tsx`**
+- Add constant: `VECTOR_WEIGHTS = { green: 1, amber: 0.5, red: 0 }`
+- Replace `<Input type="number">` in data cells with a `<Select>` component offering Green/Amber/Red options
+- Update `handleCellChange` to accept band values ('green'|'amber'|'red') and store corresponding vector weight
+- Update `getCustomerOverallAvg` and `getFeatureRowAvg` to compute average of vector weights, then multiply by 100 for display
+- Update `applyToRow`/`applyToColumn` to work with band selection instead of numeric input
+- Update `handleSaveAll`: the indicator aggregate calculation uses vector weight averages x 100
 
-2. **Render breakdown cards** in a responsive grid below the existing stats section:
-   - Each card shows the dimension name (e.g., "Tiers") and a list of value-count pairs
-   - Use compact Badge components for each value
-   - Cards only show dimensions that have more than one distinct value in the filtered set
+**`src/lib/matrixExcelHelper.ts`**
+- `generateMatrixTemplate`: Write band labels in cells instead of raw numbers; add a legend sheet explaining Green=1, Amber=0.5, Red=0
+- `parseMatrixExcel`: Map band labels ("Green", "Amber", "Red") and numeric values (1, 0.5, 0) back to vector weights
 
-3. **Styling**: Match existing card style with small text and badges for a clean, information-dense layout
+### Calculation Flow
+
+```text
+Cell Inputs (per feature per customer per KPI):
+  Green -> 1, Amber -> 0.5, Red -> 0
+
+KPI Aggregate = AVG(all vector weights for that KPI) x 100
+  Example: 3 Green + 2 Amber = (1+1+1+0.5+0.5)/5 = 0.8 -> 80%
+
+Indicator current_value = 80 (saved to DB)
+RAG derivation: 80% >= 76% -> Green
+```
+
+### No Database Migration Required
+- `csm_customer_feature_scores.value` is `numeric` and already supports storing 0, 0.5, 1
+- `kpi_rag_bands` table exists but won't be used since weights are fixed globally
 
