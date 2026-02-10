@@ -13,11 +13,35 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+
+// ============= Vector Weight Constants =============
+const VECTOR_WEIGHTS = { green: 1, amber: 0.5, red: 0 } as const;
+type BandKey = keyof typeof VECTOR_WEIGHTS;
+
+const BAND_OPTIONS: { value: BandKey; label: string; dotClass: string }[] = [
+  { value: 'green', label: 'Green', dotClass: 'bg-rag-green' },
+  { value: 'amber', label: 'Amber', dotClass: 'bg-rag-amber' },
+  { value: 'red', label: 'Red', dotClass: 'bg-rag-red' },
+];
+
+function vectorToBand(val: number | null): BandKey | undefined {
+  if (val === null || val === undefined) return undefined;
+  if (val >= 1) return 'green';
+  if (val >= 0.5) return 'amber';
+  return 'red';
+}
 
 interface CSMDataEntryMatrixProps {
   departmentId: string;
@@ -222,16 +246,16 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleCellChange = (indicatorId: string, customerId: string, featureId: string, rawValue: string) => {
+  const handleCellChange = (indicatorId: string, customerId: string, featureId: string, band: string) => {
     const key = cellKey(indicatorId, customerId, featureId);
-    if (rawValue === '') {
+    if (band === '' || band === 'unset') {
       setScores(prev => ({ ...prev, [key]: null }));
       return;
     }
-    const num = parseFloat(rawValue);
-    if (isNaN(num)) return;
-    const clamped = Math.min(100, Math.max(0, num));
-    setScores(prev => ({ ...prev, [key]: clamped }));
+    const weight = VECTOR_WEIGHTS[band as BandKey];
+    if (weight !== undefined) {
+      setScores(prev => ({ ...prev, [key]: weight }));
+    }
   };
 
   const applyToRow = (custId: string, featureId: string, value: number, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => {
@@ -268,7 +292,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         if (v != null) allVals.push(v);
       }
     }
-    return allVals.length === 0 ? null : allVals.reduce((a, b) => a + b, 0) / allVals.length;
+    if (allVals.length === 0) return null;
+    return (allVals.reduce((a, b) => a + b, 0) / allVals.length) * 100;
   };
 
   const getFeatureRowAvg = (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>): number | null => {
@@ -278,7 +303,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
       const v = scores[cellKey(ind.id, custId, featureId)];
       if (v != null) values.push(v);
     }
-    return values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
+    if (values.length === 0) return null;
+    return (values.reduce((a, b) => a + b, 0) / values.length) * 100;
   };
 
   const hasChanges = useMemo(() => {
@@ -345,21 +371,21 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         const vals = indicatorAggregates.get(ind.id);
         if (!vals?.length) continue;
         const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-        const aggRounded = Math.round(avg * 100) / 100;
-        const ragStatus = percentToRAG(aggRounded);
+        const aggPercentage = Math.round(avg * 100 * 100) / 100; // vector avg * 100
+        const ragStatus = percentToRAG(aggPercentage);
 
         await supabase
           .from('indicators')
-          .update({ current_value: aggRounded, target_value: 100, rag_status: ragStatus })
+          .update({ current_value: aggPercentage, target_value: 100, rag_status: ragStatus })
           .eq('id', ind.id);
 
         await supabase
           .from('indicator_history')
           .insert({
             indicator_id: ind.id,
-            value: aggRounded,
+            value: aggPercentage,
             period,
-            notes: 'Updated via Customer x Feature Matrix',
+            notes: 'Updated via Customer x Feature Matrix (vector weights)',
             created_by: user.id,
           });
 
@@ -369,12 +395,12 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           entityId: ind.id,
           entityName: ind.name,
           oldValue: { current_value: ind.current_value },
-          newValue: { current_value: aggRounded },
+          newValue: { current_value: aggPercentage },
           metadata: {
             department_id: departmentId,
             period,
             source: 'customer_feature_matrix',
-            aggregate_percentage: aggRounded,
+            aggregate_percentage: aggPercentage,
             rag_status: ragStatus,
           },
         });
@@ -479,6 +505,15 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Band legend */}
+          <div className="flex items-center gap-3 mr-2 text-xs text-muted-foreground">
+            {BAND_OPTIONS.map(b => (
+              <span key={b.value} className="flex items-center gap-1">
+                <span className={cn('h-2 w-2 rounded-full', b.dotClass)} />
+                {b.label} = {VECTOR_WEIGHTS[b.value]}
+              </span>
+            ))}
+          </div>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -534,6 +569,51 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   );
 }
 
+function BandDropdown({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: number | null;
+  onChange: (band: string) => void;
+  compact?: boolean;
+}) {
+  const band = vectorToBand(value);
+
+  return (
+    <Select value={band || 'unset'} onValueChange={onChange}>
+      <SelectTrigger className={cn(
+        'border-0 bg-transparent shadow-none focus:ring-1 text-xs mx-auto',
+        compact ? 'h-6 w-[80px] px-1' : 'h-7 w-[90px] px-1.5',
+      )}>
+        <SelectValue placeholder="—">
+          {band ? (
+            <span className="flex items-center gap-1.5">
+              <span className={cn('h-2 w-2 rounded-full shrink-0', BAND_OPTIONS.find(b => b.value === band)?.dotClass)} />
+              <span>{BAND_OPTIONS.find(b => b.value === band)?.label}</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent className="z-50 bg-popover">
+        <SelectItem value="unset">
+          <span className="text-muted-foreground">Clear</span>
+        </SelectItem>
+        {BAND_OPTIONS.map(b => (
+          <SelectItem key={b.value} value={b.value}>
+            <span className="flex items-center gap-1.5">
+              <span className={cn('h-2 w-2 rounded-full', b.dotClass)} />
+              {b.label}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 interface CustomerSectionCardProps {
   section: CustomerSection;
   isOpen: boolean;
@@ -553,8 +633,8 @@ function CustomerSectionCard({
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
 
-  const [applyRowValue, setApplyRowValue] = useState<Record<string, string>>({});
-  const [applyColValue, setApplyColValue] = useState<Record<string, string>>({});
+  const [applyRowBand, setApplyRowBand] = useState<Record<string, BandKey | ''>>({});
+  const [applyColBand, setApplyColBand] = useState<Record<string, BandKey | ''>>({});
 
   return (
     <Card>
@@ -612,27 +692,34 @@ function CustomerSectionCard({
                     {section.indicators.map(ind => (
                       <td key={ind.id} className="px-1 py-1 text-center border-r">
                         <div className="flex items-center gap-0.5 justify-center">
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={applyColValue[ind.id] || ''}
-                            onChange={e => setApplyColValue(prev => ({ ...prev, [ind.id]: e.target.value }))}
-                            className="h-6 w-12 text-center text-xs border-muted [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="—"
-                          />
+                          <Select
+                            value={applyColBand[ind.id] || 'unset'}
+                            onValueChange={(val) => setApplyColBand(prev => ({ ...prev, [ind.id]: val === 'unset' ? '' : val as BandKey }))}
+                          >
+                            <SelectTrigger className="h-6 w-[70px] px-1 text-xs border-muted">
+                              <SelectValue placeholder="—" />
+                            </SelectTrigger>
+                            <SelectContent className="z-50 bg-popover">
+                              <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                              {BAND_OPTIONS.map(b => (
+                                <SelectItem key={b.value} value={b.value}>
+                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', b.dotClass)} />{b.label}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 shrink-0"
-                            disabled={!applyColValue[ind.id]}
+                            disabled={!applyColBand[ind.id]}
                             onClick={(e) => {
                               e.stopPropagation();
-                              const val = parseFloat(applyColValue[ind.id]);
-                              if (isNaN(val)) return;
-                              const clamped = Math.min(100, Math.max(0, val));
-                              applyToColumn(section.id, ind.id, clamped, section.features, section.indicatorFeatureMap);
-                              toast.success(`Applied ${clamped}% to all ${ind.name} cells`);
+                              const band = applyColBand[ind.id] as BandKey;
+                              if (!band) return;
+                              const weight = VECTOR_WEIGHTS[band];
+                              applyToColumn(section.id, ind.id, weight, section.features, section.indicatorFeatureMap);
+                              toast.success(`Applied ${band} to all ${ind.name} cells`);
                             }}
                           >
                             <CopyCheck className="h-3 w-3" />
@@ -667,18 +754,14 @@ function CustomerSectionCard({
                             );
                           }
 
-                          const ragColor = val != null ? RAG_CELL_BG[percentToRAG(val)] : '';
+                          const band = vectorToBand(val);
+                          const ragColor = band ? RAG_CELL_BG[band] : '';
 
                           return (
                             <td key={ind.id} className={cn('px-1 py-1 text-center border-r', ragColor)}>
-                              <Input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={val ?? ''}
-                                onChange={e => onCellChange(ind.id, section.id, feat.id, e.target.value)}
-                                className="h-7 w-16 mx-auto text-center text-xs border-0 bg-transparent shadow-none focus-visible:ring-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder="—"
+                              <BandDropdown
+                                value={val ?? null}
+                                onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
                               />
                             </td>
                           );
@@ -694,26 +777,33 @@ function CustomerSectionCard({
                         </td>
                         <td className="px-1 py-1 text-center border-l">
                           <div className="flex items-center gap-0.5 justify-center">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={applyRowValue[feat.id] || ''}
-                              onChange={e => setApplyRowValue(prev => ({ ...prev, [feat.id]: e.target.value }))}
-                              className="h-6 w-12 text-center text-xs border-muted [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              placeholder="—"
-                            />
+                            <Select
+                              value={applyRowBand[feat.id] || 'unset'}
+                              onValueChange={(val) => setApplyRowBand(prev => ({ ...prev, [feat.id]: val === 'unset' ? '' : val as BandKey }))}
+                            >
+                              <SelectTrigger className="h-6 w-[70px] px-1 text-xs border-muted">
+                                <SelectValue placeholder="—" />
+                              </SelectTrigger>
+                              <SelectContent className="z-50 bg-popover">
+                                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                                {BAND_OPTIONS.map(b => (
+                                  <SelectItem key={b.value} value={b.value}>
+                                    <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', b.dotClass)} />{b.label}</span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 shrink-0"
-                              disabled={!applyRowValue[feat.id]}
+                              disabled={!applyRowBand[feat.id]}
                               onClick={() => {
-                                const val = parseFloat(applyRowValue[feat.id]);
-                                if (isNaN(val)) return;
-                                const clamped = Math.min(100, Math.max(0, val));
-                                applyToRow(section.id, feat.id, clamped, section.indicators, section.indicatorFeatureMap);
-                                toast.success(`Applied ${clamped}% to all KPIs for ${feat.name}`);
+                                const band = applyRowBand[feat.id] as BandKey;
+                                if (!band) return;
+                                const weight = VECTOR_WEIGHTS[band];
+                                applyToRow(section.id, feat.id, weight, section.indicators, section.indicatorFeatureMap);
+                                toast.success(`Applied ${band} to all KPIs for ${feat.name}`);
                               }}
                             >
                               <CopyCheck className="h-3 w-3" />
