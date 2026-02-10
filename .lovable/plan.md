@@ -1,88 +1,79 @@
 
 
-# Restructure Feature Matrix: Customer-First Data Entry
+# Unified Customer Bulk Importer + Improved Matrix Template
 
-## The Problem Today
+## Problem 1: Confusing Matrix Template
+The current scores template lists each customer name repeatedly (once per feature), making it hard to read. We will restructure it so **customer names appear once** as merged section headers, with features listed beneath.
 
-The current matrix is **KPI-first**: 10 collapsible KPI sections, each with a grid of 77 customers x 17 features = ~13,000 cells. This is overwhelming and forces CSMs to jump between KPI sections to fill data for the same customer.
+## Problem 2: No Single-Sheet Customer Setup
+Currently, CSM-to-customer mapping requires manual steps. The existing customer importer already supports a "CSM" column but there is no clear single-sheet path that also maps features. We will enhance the customer importer to handle everything in one sheet.
 
-## New Structure: Customer-First
+---
 
-Flip the hierarchy so the **Customer** is primary. Each customer expands to show only their mapped features as rows, with the 10 KPIs as columns.
+## Changes
 
-```text
-Before (KPI-first):                    After (Customer-first):
-  KPI: Adoption Rate                     Customer: VOIS (16 features)
-    Customer A  [F1][F2][F3]...            Feature: Phishing Email  [Adoption][NPS][CSAT]...
-    Customer B  [F1][F2][F3]...            Feature: LMS             [Adoption][NPS][CSAT]...
-    Customer C  [F1][F2][F3]...            Feature: Gamification    [Adoption][NPS][CSAT]...
-  KPI: NPS Score                         Customer: DHA (16 features)
-    Customer A  [F1][F2][F3]...            Feature: Phishing Email  [Adoption][NPS][CSAT]...
-    Customer B  [F1][F2][F3]...            ...
-    ...
+### 1. Enhance Customer Excel Importer (`src/lib/customerExcelImporter.ts`)
+
+The existing importer already supports these columns: Company Name, Contact Person, Email, Region, Tier, Industry, CSM, Features, Additional Features, Managed Services.
+
+- **CSM mapping already works**: The importer creates CSM records and links them via `csm_id`.
+- **Feature linking already works**: Comma-separated features in the "Features" column are parsed, created if missing, and linked via `customer_features`.
+- **No schema changes needed** -- the existing database already has `customers.csm_id` referencing `csms.id`, and `customer_features` linking customers to features.
+
+What we will improve:
+- Update the **template** to include clearer sample data showing multiple CSMs and realistic feature lists.
+- Add a **"Deployment Type"** column mapping (the DB already has this field).
+- Show a **CSM mapping summary** in the import preview (e.g., "Sahil Kapoor: 5 customers, Pooja Singh: 8 customers").
+- Show a **features-per-customer count** in the preview so users can verify mappings before importing.
+
+### 2. Update the Customer Template (`generateCustomerTemplate`)
+
+New sample data will include:
+- Multiple customers with different CSMs
+- Comma-separated feature lists matching existing features
+- All relevant columns filled out realistically
+
+### 3. Fix Matrix Excel Template (`src/lib/matrixExcelHelper.ts`)
+
+Restructure the "Scores" sheet so each customer appears as a **section header row** (merged across all columns, highlighted), with feature rows beneath. This eliminates the repeated customer name on every row.
+
+```
+Before:
+  Customer    | Feature         | Adoption | NPS | ...
+  VOIS        | Phishing Email  | 85       | 72  | ...
+  VOIS        | LMS             | 60       |     | ...
+  VOIS        | Gamification    |          | 45  | ...
+  DHA         | Phishing Email  | 90       | 80  | ...
+
+After:
+  VOIS  (merged header row, highlighted blue)
+  Feature         | Adoption | NPS | ...
+  Phishing Email  | 85       | 72  | ...
+  LMS             | 60       |     | ...
+  Gamification    |          | 45  | ...
+  (blank separator row)
+  DHA   (merged header row, highlighted blue)
+  Feature         | Adoption | NPS | ...
+  Phishing Email  | 90       | 80  | ...
 ```
 
-## User Journey
+Update `parseMatrixExcel` to handle the new section-header format when re-importing.
 
-1. CSM opens the Feature Matrix tab
-2. Sees a list of their assigned customers (filtered by CSM mapping)
-3. Expands a customer -- sees only the features that customer uses
-4. For each feature row, fills in scores across the 10 KPIs (0-100%)
-5. Clicks "Save All" -- scores are saved and KPI indicator values are recalculated
+### 4. Update CustomerUploader Preview (`src/components/admin/CustomerUploader.tsx`)
 
-## What Stays the Same
+Add to the import preview:
+- CSM assignment summary (CSM name -> customer count)
+- Features per customer average
 
-- **Rollup logic**: Per-indicator AVG of all customer-feature scores becomes the indicator's `current_value`
-- **RAG calculation**: Standard thresholds (Green >= 76%, Amber >= 51%, Red >= 1%)
-- **Cascade**: Indicator values flow up through Key Results, Functional Objectives, and Department via existing formulas
-- **CSM filtering**: Non-admin users only see customers assigned to them
-- **Data storage**: Same `csm_customer_feature_scores` table with same structure
+---
 
-## Files to Modify
+## Files Modified
 
-- **`src/components/user/CSMDataEntryMatrix.tsx`**: Complete restructure of the component
-  - Data model changes from `KPISection[]` to `CustomerSection[]`
-  - Each `CustomerSection` contains the customer's features and all applicable KPIs
-  - Grid renders features as rows, KPIs as columns
-  - Aggregation functions adapted to new grouping but same math
-  - Customer-level search filter at top level (not per-section)
-  - Each customer card shows an overall RAG badge (average across all their feature-KPI scores)
+| File | Change |
+|------|--------|
+| `src/lib/customerExcelImporter.ts` | Add deployment_type mapping, improve template sample data, add CSM summary to preview |
+| `src/lib/matrixExcelHelper.ts` | Restructure template with customer section headers; update parser for new format |
+| `src/components/admin/CustomerUploader.tsx` | Show CSM mapping summary in preview |
 
-## Technical Details
-
-### New Data Model
-
-```text
-CustomerSection {
-  id: string (customer_id)
-  name: string
-  features: { id, name }[]              -- only features this customer uses
-  indicators: { id, name, kr_name, fo_name }[]  -- all KPIs linked to any of their features
-  indicatorFeatureMap: Map<indicator_id, Set<feature_id>>  -- which features apply to which KPI
-}
-```
-
-### Grid Layout Per Customer
-
-| Feature              | Adoption Rate | NPS Score | CSAT Score | ... (10 KPI columns) | Avg |
-|----------------------|:---:|:---:|:---:|:---:|:---:|
-| Phishing Email       | [85] | [72] | [90] | ... | 82% |
-| LMS                  | [60] | [--] | [75] | ... | 68% |
-| Gamification         | [--] | [45] | [--] | ... | 45% |
-| **Customer Avg**     |      |      |      |     | **65%** |
-
-- Cells show "--" where that feature is not linked to that KPI (via `indicator_feature_links`)
-- Customer Avg badge shows overall health
-
-### Aggregation (unchanged math)
-
-1. **Per indicator**: Collect all non-null scores for that indicator across all customers and features, compute AVG
-2. **Save**: Update `indicators.current_value` with the aggregate, set `target_value = 100`, derive RAG status
-3. **Cascade**: Existing formula system handles KR/FO/Dept rollup
-
-### Estimated Grid Size
-
-- Typical customer has 6-7 features x 10 KPIs = ~60-70 cells per customer
-- CSM with ~7 customers = ~420-490 total cells (vs 13,000 before)
-- Much more manageable data entry experience
-
+## No Database Changes Required
+All needed columns and relationships already exist.
