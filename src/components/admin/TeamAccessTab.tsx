@@ -155,7 +155,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
         .delete()
         .eq('user_id', selectedUser.id);
 
-      if (formData.role === 'department_head' && formData.departmentIds.length > 0) {
+      if (formData.role !== 'admin' && formData.departmentIds.length > 0) {
         await supabase
           .from('department_access')
           .insert(
@@ -363,9 +363,12 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                 </div>
               )}
 
-              {formData.role === 'department_head' && (
+              {formData.role !== 'admin' && (
                 <div className="space-y-2">
-                  <Label>Assigned Departments</Label>
+                  <Label>Accessible Departments</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Controls which departments this user can see in Portfolio and Data Entry views.
+                  </p>
                   <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
                     {departments.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No departments available</p>
