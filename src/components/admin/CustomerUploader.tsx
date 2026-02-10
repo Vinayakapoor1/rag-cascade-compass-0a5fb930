@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, Download, Users } from 'lucide-react';
+import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, Download, Users, UserCheck } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -127,7 +127,7 @@ export function CustomerUploader({ onImportComplete }: CustomerUploaderProps) {
             Upload Customer Data
           </CardTitle>
           <CardDescription>
-            Upload an Excel file with customer information. Columns: Company Name, Contact Person, Email, Region, Tier, Industry, CSM, Features, Additional Features, Managed Services
+            Upload an Excel file with customer information. Columns: Company Name, Contact Person, Email, Region, Tier, Industry, CSM, Features, Additional Features, Managed Services, Deployment Type
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -250,12 +250,29 @@ export function CustomerUploader({ onImportComplete }: CustomerUploaderProps) {
               </div>
             )}
 
+            {/* CSM Mapping Summary */}
+            {Object.keys(preview.byCSM).length > 0 && (
+              <div className="border rounded-lg p-4 bg-primary/5">
+                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-primary" />
+                  CSM Assignments:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(preview.byCSM).map(([csm, count]) => (
+                    <Badge key={csm} variant="secondary">
+                      {csm}: {count} customer{count > 1 ? 's' : ''}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Unique Features */}
             {preview.uniqueFeatures.length > 0 && (
               <div className="border rounded-lg p-4 bg-primary/5">
                 <p className="text-sm font-medium mb-2 flex items-center gap-2">
                   <Check className="h-4 w-4 text-rag-green" />
-                  Unique Features ({preview.uniqueFeatures.length}):
+                  Unique Features ({preview.uniqueFeatures.length}) · Avg {preview.avgFeaturesPerCustomer} per customer:
                 </p>
                 <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                   {preview.uniqueFeatures.slice(0, 20).map((feature) => (
