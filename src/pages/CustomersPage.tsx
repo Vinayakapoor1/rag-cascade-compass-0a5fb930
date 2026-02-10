@@ -294,9 +294,9 @@ export default function CustomersPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {filterBreakdowns.map(breakdown => {
             const IconComponent = { globe: Globe, factory: Factory, usercheck: UserCheck, server: Server, tag: Tag, activity: Activity }[breakdown.icon] || Tag;
-            const maxShow = breakdown.maxVisible || breakdown.counts.length;
+            const maxShow = 5;
             const visible = breakdown.counts.slice(0, maxShow);
-            const remaining = breakdown.counts.length - maxShow;
+            const overflow = breakdown.counts.slice(maxShow);
             const isBadgeStyle = breakdown.icon === 'usercheck';
 
             return (
@@ -315,10 +315,23 @@ export default function CustomersPage() {
                         {name}: {count}
                       </Badge>
                     ))}
-                    {remaining > 0 && (
-                      <Badge variant="outline" className="text-[11px] px-2 py-0.5 font-normal text-muted-foreground">
-                        +{remaining} more
-                      </Badge>
+                    {overflow.length > 0 && (
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <Badge variant="outline" className="text-[11px] px-2 py-0.5 font-normal text-muted-foreground cursor-pointer hover:bg-muted/50">
+                            +{overflow.length} more
+                          </Badge>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-auto p-2" side="bottom" align="start">
+                          <div className="flex flex-wrap gap-1.5 max-w-[240px]">
+                            {overflow.map(({ name, count }) => (
+                              <Badge key={name} variant="secondary" className="text-[11px] px-2 py-0.5 font-normal">
+                                {name}: {count}
+                              </Badge>
+                            ))}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
                     )}
                   </div>
                 ) : (
@@ -329,8 +342,24 @@ export default function CustomersPage() {
                         <span className="font-semibold tabular-nums text-foreground ml-2">{count}</span>
                       </div>
                     ))}
-                    {remaining > 0 && (
-                      <div className="text-[11px] text-muted-foreground pt-0.5">+{remaining} more</div>
+                    {overflow.length > 0 && (
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <div className="text-[11px] text-muted-foreground pt-0.5 cursor-pointer hover:text-foreground transition-colors">
+                            +{overflow.length} more
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-auto p-3" side="bottom" align="start">
+                          <div className="space-y-1 min-w-[120px]">
+                            {overflow.map(({ name, count }) => (
+                              <div key={name} className="flex items-center justify-between text-xs">
+                                <span className={cn("truncate", name === 'Unassigned' ? 'text-warning' : 'text-foreground')}>{name}</span>
+                                <span className="font-semibold tabular-nums text-foreground ml-2">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
                     )}
                   </div>
                 )}
