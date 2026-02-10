@@ -26,19 +26,7 @@ const RAG_LINE_COLORS: Record<RAGStatus, string> = {
   'not-set': 'hsl(var(--muted-foreground))',
 };
 
-const MOCK_KPI_NAMES: Record<string, string> = {
-  kpi1: 'Adoption Rate',
-  kpi2: 'Satisfaction Score',
-  kpi3: 'Usage Frequency',
-};
-
-const MOCK_KPI_COLORS: Record<string, string> = {
-  kpi1: 'hsl(142, 71%, 45%)',
-  kpi2: 'hsl(38, 92%, 50%)',
-  kpi3: 'hsl(0, 72%, 50%)',
-};
-
-function SparklineTooltip({ active, payload, label, isMock }: any) {
+function SparklineTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-md border border-border/60 bg-popover px-3 py-2.5 text-popover-foreground shadow-xl text-xs space-y-1.5 min-w-[160px] backdrop-blur-sm">
@@ -50,70 +38,45 @@ function SparklineTooltip({ active, payload, label, isMock }: any) {
           <div key={entry.dataKey} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-              <span className="text-muted-foreground text-[11px]">
-                {isMock ? MOCK_KPI_NAMES[entry.dataKey] || entry.dataKey : 'Health Score'}
-              </span>
+              <span className="text-muted-foreground text-[11px]">Health Score</span>
             </div>
             <span className="font-semibold text-[11px] tabular-nums">{entry.value}%</span>
           </div>
         ))}
       </div>
-      {isMock && (
-        <p className="text-[9px] text-muted-foreground/50 pt-1 border-t border-border/30 italic">
-          Sample — will reflect linked KPIs
-        </p>
-      )}
     </div>
   );
 }
 
 function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragStatus: RAGStatus }) {
-  const MOCK_DATA = [
-    { period: '1', kpi1: 45, kpi2: 60, kpi3: 30 },
-    { period: '2', kpi1: 52, kpi2: 55, kpi3: 42 },
-    { period: '3', kpi1: 48, kpi2: 62, kpi3: 38 },
-    { period: '4', kpi1: 65, kpi2: 58, kpi3: 55 },
-    { period: '5', kpi1: 58, kpi2: 70, kpi3: 50 },
-    { period: '6', kpi1: 72, kpi2: 68, kpi3: 62 },
-    { period: '7', kpi1: 78, kpi2: 65, kpi3: 70 },
-    { period: '8', kpi1: 74, kpi2: 72, kpi3: 68 },
-  ];
+  if (data.length < 2) {
+    return (
+      <div className="flex-1 h-16 min-w-[200px] relative rounded-lg bg-muted/20 border border-border/40 px-2 py-1.5 flex items-center justify-center">
+        <span className="text-xs text-muted-foreground/60">No trend data yet</span>
+      </div>
+    );
+  }
 
-  const hasRealData = data.length >= 2;
-  const isMock = !hasRealData;
-
-  const chartData = hasRealData
-    ? data.map(d => ({ period: d.period, kpi1: d.score }))
-    : MOCK_DATA;
+  const chartData = data.map(d => ({ period: d.period, kpi1: d.score }));
 
   return (
     <div className="flex-1 h-16 min-w-[200px] relative rounded-lg bg-muted/20 border border-border/40 px-2 py-1.5 group hover:bg-muted/40 transition-colors">
-      {isMock && (
-        <span className="absolute -top-1.5 left-2 z-10 text-[7px] text-muted-foreground/30 font-medium uppercase tracking-widest leading-none bg-background px-1 rounded">Sample</span>
-      )}
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} horizontal vertical={false} />
           <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
           <RechartsTooltip
-            content={<SparklineTooltip isMock={isMock} />}
+            content={<SparklineTooltip />}
             cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '3 3' }}
           />
           <Line
             type="monotone"
             dataKey="kpi1"
-            stroke={isMock ? MOCK_KPI_COLORS.kpi1 : RAG_LINE_COLORS[ragStatus]}
+            stroke={RAG_LINE_COLORS[ragStatus]}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 3, strokeWidth: 1, stroke: 'hsl(var(--background))' }}
-            strokeDasharray={isMock ? '4 2' : undefined}
           />
-          {isMock && (
-            <>
-              <Line type="monotone" dataKey="kpi2" stroke={MOCK_KPI_COLORS.kpi2} strokeWidth={1.5} dot={false} activeDot={{ r: 3, strokeWidth: 1, stroke: 'hsl(var(--background))' }} strokeDasharray="4 2" />
-              <Line type="monotone" dataKey="kpi3" stroke={MOCK_KPI_COLORS.kpi3} strokeWidth={1.5} dot={false} activeDot={{ r: 3, strokeWidth: 1, stroke: 'hsl(var(--background))' }} strokeDasharray="4 2" />
-            </>
-          )}
         </LineChart>
       </ResponsiveContainer>
     </div>

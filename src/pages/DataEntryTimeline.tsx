@@ -92,15 +92,24 @@ export default function DataEntryTimeline() {
 
             if (error) throw error;
 
-            // Mock user data fetching since we might not have a public profiles table joined easily
-            // In a real app, join with profiles table
-            const logsWithUser = await Promise.all((data || []).map(async (log) => {
-                // Here we ideally verify if we have a table for users. 
-                // For now, we'll just format the ID or use metadata if available.
-                return {
-                    ...log,
-                    user: { email: 'Unknown User' } // Placeholder if no profile system
-                };
+            // Fetch user emails from profiles table
+            const uniqueUserIds = [...new Set((data || []).map(l => l.user_id).filter(Boolean))];
+            let profilesMap: Record<string, string> = {};
+            if (uniqueUserIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('user_id, email, full_name')
+                    .in('user_id', uniqueUserIds);
+                if (profiles) {
+                    profiles.forEach(p => {
+                        profilesMap[p.user_id] = p.full_name || p.email || p.user_id.slice(0, 8);
+                    });
+                }
+            }
+
+            const logsWithUser = (data || []).map((log) => ({
+                ...log,
+                user: { email: profilesMap[log.user_id || ''] || log.user_id?.slice(0, 8) || 'System' }
             }));
 
             setLogs(logsWithUser);
