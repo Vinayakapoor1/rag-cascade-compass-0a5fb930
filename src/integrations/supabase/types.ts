@@ -1046,6 +1046,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string | null
+          venture_id: string | null
         }
         Insert: {
           business_outcome?: string | null
@@ -1056,6 +1057,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string | null
+          venture_id?: string | null
         }
         Update: {
           business_outcome?: string | null
@@ -1066,8 +1068,17 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
+          venture_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "org_objectives_venture_id_fkey"
+            columns: ["venture_id"]
+            isOneToOne: false
+            referencedRelation: "ventures"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1268,6 +1279,33 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      ventures: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          name?: string
         }
         Relationships: []
       }
