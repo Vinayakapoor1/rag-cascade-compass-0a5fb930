@@ -1,26 +1,68 @@
 
 
-# Add Department Assignment for All Non-Admin Roles in Team Access
+# Indicator Derivation Breakdown Dialog (CSM Scores View)
 
-## Problem
-Currently, the "Assigned Departments" checkbox list in the Team Access edit dialog only appears when the role is set to "Department Head". CSM users (like Abhay Singh) cannot be assigned departments through the UI, which means they see an empty portfolio.
+## Overview
+When a user clicks on an indicator (KPI) in the Department Detail page's hierarchy tree, a dialog opens showing the full derivation: which customers and features contributed scores, their individual values, and how the final aggregate was calculated. This view is RBAC-controlled -- CSMs see only their assigned customers, Department Heads see their department's data, and Admins see everything.
 
-## Solution
-Show the department assignment section for **all non-admin roles** (Department Head, CSM, and Viewer), so admins can control which departments each user can see across the platform.
+## What Changes
 
-## Changes
+### 1. New Component: `IndicatorDerivationDialog`
+A new dialog component that, given an `indicator_id`, queries `csm_customer_feature_scores` and displays:
+- **Summary**: Indicator name, current aggregate value, target value, RAG status
+- **Customer Breakdown Table**: Each customer with their average score across features, individual feature scores, and the band label chosen
+- **Aggregation Visual**: Shows how customer averages roll up to the final KPI value (Customer AVG -> KPI Aggregate)
+- **Period Selector**: Dropdown to view scores from different periods (defaults to latest)
 
-### File: `src/components/admin/TeamAccessTab.tsx`
+### 2. RBAC Filtering
+- **Admin**: Sees all customer-feature scores for the indicator
+- **CSM**: Query is filtered to only show customers assigned to their CSM record (via `csms.id` -> `customer_csm_assignments` or the customer filter logic already in the matrix)
+- **Department Head**: Sees all scores within their accessible departments (the indicator itself is already scoped by department visibility)
+- Uses `useAuth` hook for `isAdmin`, `isCSM`, `csmId`
 
-1. **Expand the department checkbox visibility condition**
-   - Change `formData.role === 'department_head'` to `formData.role !== 'admin'` so the department assignment section appears for Department Heads, CSMs, and Viewers.
+### 3. Integration into Department Detail Page
+- The `IndicatorStatBlock` component in `DepartmentDetail.tsx` gets an `onClick` that opens the new `IndicatorDerivationDialog`
+- The existing card becomes clickable with a hover state and a small "view derivation" icon hint
 
-2. **Update the save logic**
-   - Currently, department access records are only inserted when the role is `department_head`. Update this condition to save department assignments for any non-admin role.
+### 4. Data Visualization
+- A simple bar chart (using Recharts, already installed) showing each customer's average score
+- Color-coded bars using RAG colors (green/amber/red based on score thresholds)
+- A summary row showing the aggregation formula: AVG of all customer averages = final KPI value
 
-3. **Update the label text**
-   - Change from "Assigned Departments" to a more generic label, with a helper description explaining that these departments control what the user can see in the portfolio and data entry pages.
+## Technical Details
 
-### No other files need changes
-The Portfolio filtering and CSM data entry scoping already read from `department_access`, so once departments are assigned via Team Access, everything else works automatically.
+### New File: `src/components/IndicatorDerivationDialog.tsx`
+- Props: `indicatorId`, `indicatorName`, `currentValue`, `targetValue`, `unit`, `open`, `onOpenChange`
+- Fetches from `csm_customer_feature_scores` joined with `customers(name)` and `features(name)`
+- Groups by customer, calculates per-customer average
+- Fetches `kpi_rag_bands` for the indicator to show band labels
+- RBAC: if `isCSM && csmId`, adds filter `.in('customer_id', assignedCustomerIds)` by first querying customers assigned to the CSM
+- Period selector queries distinct periods for this indicator
+
+### Modified File: `src/pages/DepartmentDetail.tsx`
+- Import `IndicatorDerivationDialog`
+- Add state for selected indicator in `DepartmentDetail` component
+- Update `IndicatorStatBlock` to accept an `onClick` callback
+- Wrap indicator card content with a clickable div that opens the derivation dialog
+- Pass RBAC context down
+
+### Data Query Pattern
+```text
+1. Fetch scores: csm_customer_feature_scores WHERE indicator_id = X AND period = Y
+   -> Join customers(name), features(name)
+2. If CSM: first fetch assigned customer IDs, then filter scores
+3. Group by customer -> calculate AVG per customer
+4. Calculate overall AVG of customer averages = indicator aggregate
+5. Fetch kpi_rag_bands for this indicator for band label display
+```
+
+### Recharts Bar Chart
+- X-axis: Customer names
+- Y-axis: Average score (0-100%)
+- Bars colored by RAG threshold (green >= 76, amber 51-75, red <= 50)
+- Horizontal reference line at target value
+- Tooltip showing exact values and contributing features
+
+### No Database Changes Required
+All data already exists in `csm_customer_feature_scores`, `customers`, `features`, and `kpi_rag_bands` tables. This is purely a read-only visualization feature.
 
