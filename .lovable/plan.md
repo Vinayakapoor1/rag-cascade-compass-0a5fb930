@@ -1,36 +1,54 @@
 
 
-# Fix: Clarify KPI Summary Stats on Customers Page
+# Fix Customer Edit Dialog: Missing Data, Scrolling, and Correct Dropdowns
 
-## What's Happening
+## Problems Found
 
-The current numbers are technically correct but misleading:
-- **"Linked to KPIs" shows 78** -- this counts customers that have at least 1 KPI linked (78 out of 80 customers)
-- **"Total KPI Links" shows 780** -- this is the sum of all customer-indicator pairs (78 customers x 10 KPIs = 780)
+1. **Tier values mismatch** -- The dropdown shows "Tier 1", "Tier 2", "Tier 3" but the database stores "Tier1", "Tier2" (no spaces), plus "Unassigned". So when editing, the saved value doesn't match any option and appears blank.
 
-You expected to see **10** because there are exactly 10 Customer Success KPIs that all customers link to through their features.
+2. **Deployment type incomplete** -- Dropdown only has Cloud/On Prem/Hybrid, but the database also allows "India Cloud", "UAE Cloud", "Private Cloud". These values exist in data but can't be selected or shown.
 
-## Fix
+3. **Region is free text** -- Should be a dropdown with the 3 known values: India, Middle East, Others.
 
-Replace the current stats with more meaningful metrics:
+4. **Industry is free text** -- Should be a dropdown with the 19 known industry values from the database.
 
-| Stat Card | Current (Confusing) | New (Clear) |
-|-----------|-------------------|-------------|
-| Card 1 | "Linked to KPIs: 78" | **"Customers with KPIs: 78"** -- how many customers have at least 1 KPI linked |
-| Card 2 | "Total KPI Links: 780" | **"Unique KPIs Linked: 10"** -- how many distinct indicators are linked across all customers |
+5. **CSM field broken** -- The form uses a free-text `csm` field, but the actual database column is `csm_id` (a UUID foreign key to the `csms` table). So the CSM is never loaded or saved correctly. Should be a dropdown populated from the `csms` table.
 
-## Technical Changes
+6. **Dialog not scrollable** -- The ScrollArea likely isn't working because the Radix ScrollArea viewport needs explicit height constraints.
 
-### File: `src/pages/CustomersPage.tsx`
+## Changes
 
-1. Update the `stats` memo to calculate the count of **unique indicators** across all filtered customers (instead of summing pairs)
-2. Rename labels: "Customers with KPIs" and "Unique KPIs Linked"
+### File: `src/components/CustomerFormDialog.tsx`
 
-### File: `src/hooks/useCustomerImpact.tsx`
+**1. Fix the Customer interface:**
+- Remove `csm?: string`, add `csm_id?: string`
+- Keep other fields
 
-3. Add a `linkedIndicatorIds: string[]` field to `CustomerWithImpact` so the page can compute unique KPIs across customers
+**2. Add CSM data fetching:**
+- Fetch all CSMs from `csms` table on dialog open
+- Store in state as `{ id, name }[]`
 
-| File | Change |
-|------|--------|
-| `src/hooks/useCustomerImpact.tsx` | Add `linkedIndicatorIds` array to each customer's returned data |
-| `src/pages/CustomersPage.tsx` | Compute unique KPI count from indicator IDs, update labels |
+**3. Replace free-text inputs with dropdowns:**
+
+| Field | Current | New |
+|-------|---------|-----|
+| Tier | Dropdown with "Tier 1/2/3" | Dropdown with "Tier1", "Tier2", "Unassigned" (matching DB values) |
+| Region | Free text Input | Select dropdown: India, Middle East, Others |
+| Industry | Free text Input | Select dropdown with all 19 industries from DB |
+| CSM | Free text Input | Select dropdown populated from `csms` table, saving `csm_id` |
+| Deployment Type | Cloud/On Prem/Hybrid | Add India Cloud, UAE Cloud, Private Cloud |
+
+**4. Fix form data initialization:**
+- When editing, load `csm_id` from the customer record
+- Map CSM name for display
+
+**5. Fix submit data:**
+- Send `csm_id` instead of `csm` field
+- Remove `csm` from submit payload
+
+**6. Fix ScrollArea scrolling:**
+- Add explicit `max-h-[calc(90vh-180px)]` to the ScrollArea so it has a bounded height and can scroll
+
+### No database changes needed
+All the correct columns and values already exist.
+
