@@ -279,12 +279,18 @@ export function transformToUIObjective(dbObj: DBOrgObjective): OrgObjective & {
   };
 }
 
-async function fetchOrgObjectives(): Promise<DBOrgObjective[]> {
-  // Fetch org objectives
-  const { data: orgObjectives, error: orgError } = await supabase
+async function fetchOrgObjectives(ventureId?: string): Promise<DBOrgObjective[]> {
+  // Fetch org objectives, optionally filtered by venture
+  let query = supabase
     .from('org_objectives')
     .select('*')
     .order('name');
+  
+  if (ventureId) {
+    query = query.eq('venture_id', ventureId);
+  }
+  
+  const { data: orgObjectives, error: orgError } = await query;
   
   if (orgError) throw orgError;
   if (!orgObjectives || orgObjectives.length === 0) return [];
@@ -447,12 +453,28 @@ async function fetchOrgObjectives(): Promise<DBOrgObjective[]> {
   });
 }
 
-export function useOrgObjectives() {
+export function useOrgObjectives(ventureId?: string) {
   return useQuery({
-    queryKey: ['org-objectives'],
-    queryFn: fetchOrgObjectives,
-    staleTime: 60000, // 1 minute - avoid refetching too frequently
-    refetchOnWindowFocus: false, // Don't refetch on tab focus
+    queryKey: ['org-objectives', ventureId],
+    queryFn: () => fetchOrgObjectives(ventureId),
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useVentures() {
+  return useQuery({
+    queryKey: ['ventures'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ventures')
+        .select('id, name, display_name, is_active')
+        .order('is_active', { ascending: false })
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 300000,
   });
 }
 

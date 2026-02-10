@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useOrgObjectives, DBOrgObjective } from '@/hooks/useOrgObjectives';
+import { useOrgObjectives, useVentures, DBOrgObjective } from '@/hooks/useOrgObjectives';
 import { BusinessOutcomeSection } from '@/components/BusinessOutcomeSection';
 import { RAGBadge } from '@/components/RAGBadge';
 import { OKRHierarchyLegend } from '@/components/OKRHierarchyLegend';
@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { RAGStatus, OrgObjectiveColor, OrgObjectiveClassification } from '@/types/venture';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { VentureSelector } from '@/components/VentureSelector';
 
 // Calculate percentage from indicators for an org objective
 function calculateOrgObjectivePercentage(objective: DBOrgObjective): number {
@@ -154,7 +155,18 @@ export default function Portfolio() {
   const [filterStatus, setFilterStatus] = useState<RAGStatus | null>(null);
   const [customerCount, setCustomerCount] = useState<number>(0);
   const [featureCount, setFeatureCount] = useState<number>(0);
-  const { data: orgObjectives, isLoading, refetch } = useOrgObjectives();
+  const { data: ventures } = useVentures();
+  const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
+
+  // Auto-select HumanFirewall on first load
+  useEffect(() => {
+    if (!selectedVentureId && ventures && ventures.length > 0) {
+      const hf = ventures.find(v => v.name === 'HumanFirewall');
+      setSelectedVentureId(hf?.id || ventures[0].id);
+    }
+  }, [ventures, selectedVentureId]);
+
+  const { data: orgObjectives, isLoading, refetch } = useOrgObjectives(selectedVentureId ?? undefined);
 
   // Fetch customer and feature counts
   useEffect(() => {
@@ -342,6 +354,10 @@ export default function Portfolio() {
     <div className="space-y-6">
       {/* 1. OKR Structure & RAG Legend - TOP */}
       <div className="flex items-end justify-end gap-3 flex-wrap">
+        <VentureSelector
+          selectedVentureId={selectedVentureId}
+          onSelect={setSelectedVentureId}
+        />
         <OKRHierarchyLegend />
         <RAGLegend />
       </div>
