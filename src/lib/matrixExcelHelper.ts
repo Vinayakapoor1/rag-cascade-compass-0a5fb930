@@ -8,51 +8,59 @@ interface CustomerSection {
   indicatorFeatureMap: Record<string, Set<string>>;
 }
 
-// ============= Vector Weight Constants =============
-const VECTOR_WEIGHTS: Record<string, number> = { green: 1, amber: 0.5, red: 0 };
-const WEIGHT_TO_BAND: Record<number, string> = { 1: 'Green', 0.5: 'Amber', 0: 'Red' };
-const BAND_TO_WEIGHT: Record<string, number> = { green: 1, amber: 0.5, red: 0 };
-
-function valueToBandLabel(val: number | null): string {
-  if (val === null || val === undefined) return '';
-  if (val >= 1) return 'Green';
-  if (val >= 0.5) return 'Amber';
-  return 'Red';
+interface KPIBand {
+  band_label: string;
+  rag_color: string;
+  rag_numeric: number;
+  sort_order: number;
 }
 
-function parseBandValue(cellVal: any): number | null {
+type BandMap = Record<string, KPIBand[]>;
+
+// Default bands when no KPI-specific bands exist
+const DEFAULT_BANDS: KPIBand[] = [
+  { band_label: 'Green', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+  { band_label: 'Amber', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+  { band_label: 'Red', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+];
+
+function valueToBandLabel(val: number | null, bands: KPIBand[]): string {
+  if (val === null || val === undefined) return '';
+  const band = bands.find(b => b.rag_numeric === val);
+  return band?.band_label || '';
+}
+
+function parseBandValue(cellVal: any, bands: KPIBand[]): number | null {
   if (cellVal === null || cellVal === undefined || cellVal === '' || cellVal === '—') return null;
-  // Try as band label
+  // Try matching by band label (case-insensitive)
   if (typeof cellVal === 'string') {
     const lower = cellVal.trim().toLowerCase();
-    if (lower in BAND_TO_WEIGHT) return BAND_TO_WEIGHT[lower];
+    const match = bands.find(b => b.band_label.toLowerCase() === lower);
+    if (match) return match.rag_numeric;
+    // Fallback: generic labels
+    if (lower === 'green') return 1;
+    if (lower === 'amber') return 0.5;
+    if (lower === 'red') return 0;
   }
   // Try as numeric weight
   const num = typeof cellVal === 'number' ? cellVal : parseFloat(String(cellVal));
   if (isNaN(num)) return null;
-  // Accept 0, 0.5, 1 directly as weights
   if (num === 0 || num === 0.5 || num === 1) return num;
-  // Legacy: if someone enters a percentage, convert it
-  if (num > 1 && num <= 100) {
-    if (num >= 76) return 1;
-    if (num >= 51) return 0.5;
-    return 0;
-  }
   return null;
 }
 
 /**
  * Generate an Excel template for the customer-feature matrix.
- * Cells contain band labels (Green/Amber/Red) instead of raw numbers.
+ * Cells contain KPI-specific band labels.
  */
 export async function generateMatrixTemplate(
   customerSections: CustomerSection[],
   period: string,
   scores: Record<string, number | null>,
+  kpiBands: BandMap = {},
 ) {
   const wb = new ExcelJS.Workbook();
 
-  // Collect all unique indicators across all customers
   const allIndicators = new Map<string, { id: string; name: string }>();
   for (const section of customerSections) {
     for (const ind of section.indicators) {
@@ -64,13 +72,12 @@ export async function generateMatrixTemplate(
 
   const ws = wb.addWorksheet('Scores');
 
-  // Hidden ID row (row 1) for parsing
+  // Hidden ID row
   const idRow = ws.addRow(['__IDS__', ...indicatorList.map(i => i.id)]);
   idRow.font = { color: { argb: 'FF999999' }, size: 8 };
   idRow.hidden = true;
 
   for (const section of customerSections) {
-    // Customer header row
     const custHeaderRow = ws.addRow([section.name]);
     custHeaderRow.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
     custHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } };
@@ -78,12 +85,10 @@ export async function generateMatrixTemplate(
     ws.mergeCells(custHeaderRow.number, 1, custHeaderRow.number, totalCols);
     custHeaderRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
 
-    // Column headers
     const colHeaderRow = ws.addRow(['Feature', ...indicatorList.map(i => i.name)]);
     colHeaderRow.font = { bold: true, size: 10 };
     colHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
 
-    // Feature rows with band labels
     for (const feat of section.features) {
       const rowData: (string | null)[] = [feat.name];
       for (const ind of indicatorList) {
@@ -92,12 +97,12 @@ export async function generateMatrixTemplate(
           rowData.push(null);
         } else {
           const key = `${ind.id}::${section.id}::${feat.id}`;
-          rowData.push(valueToBandLabel(scores[key] ?? null));
+          const bands = kpiBands[ind.id] || DEFAULT_BANDS;
+          rowData.push(valueToBandLabel(scores[key] ?? null, bands));
         }
       }
       const dataRow = ws.addRow(rowData);
 
-      // Style cells
       for (let colIdx = 0; colIdx < indicatorList.length; colIdx++) {
         const ind = indicatorList[colIdx];
         const canEdit = section.indicatorFeatureMap[ind.id]?.has(feat.id) ?? false;
@@ -106,25 +111,21 @@ export async function generateMatrixTemplate(
           cell.value = '—';
           cell.font = { color: { argb: 'FFAAAAAA' } };
         } else {
-          // Color-code the band labels
+          const bands = kpiBands[ind.id] || DEFAULT_BANDS;
           const label = String(cell.value || '').toLowerCase();
-          if (label === 'green') {
-            cell.font = { color: { argb: 'FF16A34A' }, bold: true };
-          } else if (label === 'amber') {
-            cell.font = { color: { argb: 'FFD97706' }, bold: true };
-          } else if (label === 'red') {
-            cell.font = { color: { argb: 'FFDC2626' }, bold: true };
+          const band = bands.find(b => b.band_label.toLowerCase() === label);
+          if (band) {
+            const colorMap: Record<string, string> = { green: 'FF16A34A', amber: 'FFD97706', red: 'FFDC2626' };
+            cell.font = { color: { argb: colorMap[band.rag_color] || 'FF000000' }, bold: true };
           }
         }
         cell.alignment = { horizontal: 'center' };
       }
     }
 
-    // Separator row
     ws.addRow([]);
   }
 
-  // Auto-width columns
   ws.columns.forEach(col => {
     let maxLen = 10;
     col.eachCell?.({ includeEmpty: true }, cell => {
@@ -134,7 +135,7 @@ export async function generateMatrixTemplate(
     col.width = Math.min(maxLen + 4, 30);
   });
 
-  // Hidden lookup sheet for IDs
+  // Lookup sheet
   const lookupWs = wb.addWorksheet('_Lookup');
   lookupWs.state = 'hidden';
   lookupWs.addRow(['CustomerName', 'CustomerId', 'FeatureName', 'FeatureId']);
@@ -144,20 +145,23 @@ export async function generateMatrixTemplate(
     }
   }
 
-  // Legend sheet
+  // Legend sheet with per-KPI bands
   const legendWs = wb.addWorksheet('Legend');
-  legendWs.addRow(['Band', 'Weight', 'Description']);
-  legendWs.addRow(['Green', 1, 'On Track — fully meeting expectations']);
-  legendWs.addRow(['Amber', 0.5, 'At Risk — partially meeting expectations']);
-  legendWs.addRow(['Red', 0, 'Critical — not meeting expectations']);
-  legendWs.addRow([]);
-  legendWs.addRow(['How to fill in:', '', 'Type Green, Amber, or Red in each cell']);
-  legendWs.addRow(['Aggregation:', '', 'AVG of weights × 100 = percentage']);
-  legendWs.addRow(['Example:', '', '3 Green + 2 Amber = (1+1+1+0.5+0.5)/5 = 0.8 = 80%']);
-  legendWs.getColumn(1).width = 15;
-  legendWs.getColumn(2).width = 10;
-  legendWs.getColumn(3).width = 50;
+  legendWs.addRow(['KPI', 'Band Label', 'RAG Color', 'Weight']);
   legendWs.getRow(1).font = { bold: true };
+  for (const ind of indicatorList) {
+    const bands = kpiBands[ind.id] || DEFAULT_BANDS;
+    for (const b of bands) {
+      legendWs.addRow([ind.name, b.band_label, b.rag_color, b.rag_numeric]);
+    }
+  }
+  legendWs.addRow([]);
+  legendWs.addRow(['Aggregation:', '', '', 'AVG of weights × 100 = percentage']);
+  legendWs.addRow(['Example:', '', '', '3 Green + 2 Amber = (1+1+1+0.5+0.5)/5 = 0.8 = 80%']);
+  legendWs.getColumn(1).width = 30;
+  legendWs.getColumn(2).width = 25;
+  legendWs.getColumn(3).width = 12;
+  legendWs.getColumn(4).width = 50;
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -175,6 +179,7 @@ export async function generateMatrixTemplate(
 export async function parseMatrixExcel(
   file: File,
   customerSections: CustomerSection[],
+  kpiBands: BandMap = {},
 ): Promise<{ scores: Record<string, number | null>; count: number } | null> {
   try {
     const wb = new ExcelJS.Workbook();
@@ -186,7 +191,6 @@ export async function parseMatrixExcel(
       throw new Error('Missing "Scores" sheet in uploaded file');
     }
 
-    // Read the lookup sheet for name -> ID mapping
     const lookupSheet = wb.getWorksheet('_Lookup');
     const custNameToId = new Map<string, string>();
     const featLookup = new Map<string, string>();
@@ -209,7 +213,6 @@ export async function parseMatrixExcel(
       }
     }
 
-    // Read indicator IDs from hidden row 1
     const idRow = scoresSheet.getRow(1);
     const indicatorIds: string[] = [];
     for (let col = 2; col <= scoresSheet.columnCount; col++) {
@@ -220,7 +223,6 @@ export async function parseMatrixExcel(
     let count = 0;
     let currentCustomerId: string | null = null;
 
-    // Build indicator name -> id map as fallback
     const indNameToId = new Map<string, string>();
     for (const s of customerSections) {
       for (const ind of s.indicators) {
@@ -259,7 +261,8 @@ export async function parseMatrixExcel(
         const indId = indicatorIds[col - 2];
         if (!indId) continue;
         const cellVal = row.getCell(col).value;
-        const weight = parseBandValue(cellVal);
+        const bands = kpiBands[indId] || DEFAULT_BANDS;
+        const weight = parseBandValue(cellVal, bands);
         if (weight === null) continue;
         parsedScores[`${indId}::${currentCustomerId}::${featId}`] = weight;
         count++;

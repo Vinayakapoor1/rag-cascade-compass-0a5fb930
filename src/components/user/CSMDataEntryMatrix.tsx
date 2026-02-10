@@ -26,22 +26,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-// ============= Vector Weight Constants =============
-const VECTOR_WEIGHTS = { green: 1, amber: 0.5, red: 0 } as const;
-type BandKey = keyof typeof VECTOR_WEIGHTS;
-
-const BAND_OPTIONS: { value: BandKey; label: string; dotClass: string }[] = [
-  { value: 'green', label: 'Green', dotClass: 'bg-rag-green' },
-  { value: 'amber', label: 'Amber', dotClass: 'bg-rag-amber' },
-  { value: 'red', label: 'Red', dotClass: 'bg-rag-red' },
-];
-
-function vectorToBand(val: number | null): BandKey | undefined {
-  if (val === null || val === undefined) return undefined;
-  if (val >= 1) return 'green';
-  if (val >= 0.5) return 'amber';
-  return 'red';
-}
+// ============= Types =============
 
 interface CSMDataEntryMatrixProps {
   departmentId: string;
@@ -57,6 +42,13 @@ interface IndicatorInfo {
   fo_name: string;
 }
 
+interface KPIBand {
+  band_label: string;
+  rag_color: string;
+  rag_numeric: number;
+  sort_order: number;
+}
+
 interface CustomerSection {
   id: string;
   name: string;
@@ -65,6 +57,21 @@ interface CustomerSection {
   indicatorFeatureMap: Record<string, Set<string>>;
 }
 
+// ============= Constants & Helpers =============
+
+// Fallback bands when KPI has no specific bands defined
+const DEFAULT_BANDS: KPIBand[] = [
+  { band_label: 'Green', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+  { band_label: 'Amber', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+  { band_label: 'Red', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+];
+
+const RAG_DOT_CLASS: Record<string, string> = {
+  green: 'bg-rag-green',
+  amber: 'bg-rag-amber',
+  red: 'bg-rag-red',
+};
+
 function cellKey(indicatorId: string, customerId: string, featureId: string) {
   return `${indicatorId}::${customerId}::${featureId}`;
 }
@@ -72,6 +79,12 @@ function cellKey(indicatorId: string, customerId: string, featureId: string) {
 function percentToRAG(pct: number): 'green' | 'amber' | 'red' {
   if (pct >= 76) return 'green';
   if (pct >= 51) return 'amber';
+  return 'red';
+}
+
+function weightToRAGColor(val: number): string {
+  if (val >= 1) return 'green';
+  if (val >= 0.5) return 'amber';
   return 'red';
 }
 
@@ -89,6 +102,7 @@ const RAG_BADGE_STYLES: Record<string, string> = {
 };
 
 type ScoreMap = Record<string, number | null>;
+type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
 export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixProps) {
   const { user, isAdmin } = useAuth();
@@ -103,6 +117,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   const [originalScores, setOriginalScores] = useState<ScoreMap>({});
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const [kpiBands, setKpiBands] = useState<BandMap>({});
 
   const fetchData = useCallback(async () => {
     if (!departmentId || !user) return;
@@ -154,6 +169,25 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         };
       });
       setAllIndicators(indicatorInfos);
+
+      // Fetch KPI-specific bands
+      const { data: bandsData } = await supabase
+        .from('kpi_rag_bands')
+        .select('indicator_id, band_label, rag_color, rag_numeric, sort_order')
+        .in('indicator_id', indIds)
+        .order('sort_order');
+
+      const bandsMap: BandMap = {};
+      (bandsData || []).forEach((b: any) => {
+        if (!bandsMap[b.indicator_id]) bandsMap[b.indicator_id] = [];
+        bandsMap[b.indicator_id].push({
+          band_label: b.band_label,
+          rag_color: b.rag_color,
+          rag_numeric: Number(b.rag_numeric),
+          sort_order: b.sort_order,
+        });
+      });
+      setKpiBands(bandsMap);
 
       const { data: featureLinks } = await supabase
         .from('indicator_feature_links')
@@ -246,14 +280,15 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleCellChange = (indicatorId: string, customerId: string, featureId: string, band: string) => {
+  const handleCellChange = (indicatorId: string, customerId: string, featureId: string, bandValue: string) => {
     const key = cellKey(indicatorId, customerId, featureId);
-    if (band === '' || band === 'unset') {
+    if (bandValue === '' || bandValue === 'unset') {
       setScores(prev => ({ ...prev, [key]: null }));
       return;
     }
-    const weight = VECTOR_WEIGHTS[band as BandKey];
-    if (weight !== undefined) {
+    // bandValue is the rag_numeric as string
+    const weight = parseFloat(bandValue);
+    if (!isNaN(weight)) {
       setScores(prev => ({ ...prev, [key]: weight }));
     }
   };
@@ -282,6 +317,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     });
   };
 
+  // Averages: AVG of vector weights × 100
   const getCustomerOverallAvg = (section: CustomerSection): number | null => {
     const allVals: number[] = [];
     for (const ind of section.indicators) {
@@ -352,6 +388,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         }
       }
 
+      // Aggregate: AVG of vector weights × 100 = percentage
       const indicatorAggregates = new Map<string, number[]>();
       for (const section of customerSections) {
         for (const ind of section.indicators) {
@@ -371,7 +408,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         const vals = indicatorAggregates.get(ind.id);
         if (!vals?.length) continue;
         const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-        const aggPercentage = Math.round(avg * 100 * 100) / 100; // vector avg * 100
+        const aggPercentage = Math.round(avg * 100 * 100) / 100;
         const ragStatus = percentToRAG(aggPercentage);
 
         await supabase
@@ -419,7 +456,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
   const handleDownloadTemplate = async () => {
     try {
-      await generateMatrixTemplate(customerSections, period, scores);
+      await generateMatrixTemplate(customerSections, period, scores, kpiBands);
       toast.success('Template downloaded');
     } catch (err) {
       console.error(err);
@@ -431,7 +468,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const result = await parseMatrixExcel(file, customerSections);
+      const result = await parseMatrixExcel(file, customerSections, kpiBands);
       if (!result || result.count === 0) {
         toast.warning('No valid scores found in uploaded file');
         return;
@@ -505,15 +542,6 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Band legend */}
-          <div className="flex items-center gap-3 mr-2 text-xs text-muted-foreground">
-            {BAND_OPTIONS.map(b => (
-              <span key={b.value} className="flex items-center gap-1">
-                <span className={cn('h-2 w-2 rounded-full', b.dotClass)} />
-                {b.label} = {VECTOR_WEIGHTS[b.value]}
-              </span>
-            ))}
-          </div>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -558,6 +586,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           isOpen={openSections.has(section.id)}
           onToggle={() => toggleSection(section.id)}
           scores={scores}
+          kpiBands={kpiBands}
           onCellChange={handleCellChange}
           applyToRow={applyToRow}
           applyToColumn={applyToColumn}
@@ -569,28 +598,38 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   );
 }
 
+// ============= Band Dropdown Cell Component =============
+
 function BandDropdown({
   value,
+  bands,
   onChange,
   compact = false,
 }: {
   value: number | null;
-  onChange: (band: string) => void;
+  bands: KPIBand[];
+  onChange: (weight: string) => void;
   compact?: boolean;
 }) {
-  const band = vectorToBand(value);
+  // Find the matching band for the current value
+  const currentBand = value !== null && value !== undefined
+    ? bands.find(b => b.rag_numeric === value)
+    : undefined;
 
   return (
-    <Select value={band || 'unset'} onValueChange={onChange}>
+    <Select
+      value={currentBand ? String(currentBand.rag_numeric) : 'unset'}
+      onValueChange={onChange}
+    >
       <SelectTrigger className={cn(
         'border-0 bg-transparent shadow-none focus:ring-1 text-xs mx-auto',
-        compact ? 'h-6 w-[80px] px-1' : 'h-7 w-[90px] px-1.5',
+        compact ? 'h-6 w-full max-w-[120px] px-1' : 'h-7 w-full max-w-[140px] px-1.5',
       )}>
         <SelectValue placeholder="—">
-          {band ? (
+          {currentBand ? (
             <span className="flex items-center gap-1.5">
-              <span className={cn('h-2 w-2 rounded-full shrink-0', BAND_OPTIONS.find(b => b.value === band)?.dotClass)} />
-              <span>{BAND_OPTIONS.find(b => b.value === band)?.label}</span>
+              <span className={cn('h-2 w-2 rounded-full shrink-0', RAG_DOT_CLASS[currentBand.rag_color] || 'bg-muted')} />
+              <span className="truncate">{currentBand.band_label}</span>
             </span>
           ) : (
             <span className="text-muted-foreground">—</span>
@@ -601,11 +640,11 @@ function BandDropdown({
         <SelectItem value="unset">
           <span className="text-muted-foreground">Clear</span>
         </SelectItem>
-        {BAND_OPTIONS.map(b => (
-          <SelectItem key={b.value} value={b.value}>
+        {bands.map(b => (
+          <SelectItem key={`${b.rag_color}-${b.sort_order}`} value={String(b.rag_numeric)}>
             <span className="flex items-center gap-1.5">
-              <span className={cn('h-2 w-2 rounded-full', b.dotClass)} />
-              {b.label}
+              <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color] || 'bg-muted')} />
+              {b.band_label}
             </span>
           </SelectItem>
         ))}
@@ -614,11 +653,14 @@ function BandDropdown({
   );
 }
 
+// ============= Customer Section Card =============
+
 interface CustomerSectionCardProps {
   section: CustomerSection;
   isOpen: boolean;
   onToggle: () => void;
   scores: ScoreMap;
+  kpiBands: BandMap;
   onCellChange: (indicatorId: string, customerId: string, featureId: string, value: string) => void;
   applyToRow: (custId: string, featureId: string, value: number, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => void;
   applyToColumn: (custId: string, indId: string, value: number, features: { id: string }[], indFeatMap: Record<string, Set<string>>) => void;
@@ -627,14 +669,18 @@ interface CustomerSectionCardProps {
 }
 
 function CustomerSectionCard({
-  section, isOpen, onToggle, scores, onCellChange,
+  section, isOpen, onToggle, scores, kpiBands, onCellChange,
   applyToRow, applyToColumn, getFeatureRowAvg, getCustomerOverallAvg,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
 
-  const [applyRowBand, setApplyRowBand] = useState<Record<string, BandKey | ''>>({});
-  const [applyColBand, setApplyColBand] = useState<Record<string, BandKey | ''>>({});
+  const [applyRowBand, setApplyRowBand] = useState<Record<string, string>>({});
+  const [applyColBand, setApplyColBand] = useState<Record<string, string>>({});
+
+  const getBandsForIndicator = (indId: string): KPIBand[] => {
+    return kpiBands[indId] || DEFAULT_BANDS;
+  };
 
   return (
     <Card>
@@ -674,14 +720,14 @@ function CustomerSectionCard({
                       Feature
                     </th>
                     {section.indicators.map(ind => (
-                      <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[110px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
+                      <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
                         <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
                       </th>
                     ))}
                     <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
                       Avg
                     </th>
-                    <th className="px-2 py-2 text-center font-medium min-w-[120px] bg-muted/30 border-l">
+                    <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l">
                       <span className="text-xs text-muted-foreground">Apply to Row</span>
                     </th>
                   </tr>
@@ -689,44 +735,47 @@ function CustomerSectionCard({
                     <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r">
                       Apply to Column ↓
                     </td>
-                    {section.indicators.map(ind => (
-                      <td key={ind.id} className="px-1 py-1 text-center border-r">
-                        <div className="flex items-center gap-0.5 justify-center">
-                          <Select
-                            value={applyColBand[ind.id] || 'unset'}
-                            onValueChange={(val) => setApplyColBand(prev => ({ ...prev, [ind.id]: val === 'unset' ? '' : val as BandKey }))}
-                          >
-                            <SelectTrigger className="h-6 w-[70px] px-1 text-xs border-muted">
-                              <SelectValue placeholder="—" />
-                            </SelectTrigger>
-                            <SelectContent className="z-50 bg-popover">
-                              <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                              {BAND_OPTIONS.map(b => (
-                                <SelectItem key={b.value} value={b.value}>
-                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', b.dotClass)} />{b.label}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0"
-                            disabled={!applyColBand[ind.id]}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const band = applyColBand[ind.id] as BandKey;
-                              if (!band) return;
-                              const weight = VECTOR_WEIGHTS[band];
-                              applyToColumn(section.id, ind.id, weight, section.features, section.indicatorFeatureMap);
-                              toast.success(`Applied ${band} to all ${ind.name} cells`);
-                            }}
-                          >
-                            <CopyCheck className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </td>
-                    ))}
+                    {section.indicators.map(ind => {
+                      const bands = getBandsForIndicator(ind.id);
+                      return (
+                        <td key={ind.id} className="px-1 py-1 text-center border-r">
+                          <div className="flex items-center gap-0.5 justify-center">
+                            <Select
+                              value={applyColBand[ind.id] || 'unset'}
+                              onValueChange={(val) => setApplyColBand(prev => ({ ...prev, [ind.id]: val === 'unset' ? '' : val }))}
+                            >
+                              <SelectTrigger className="h-6 w-full max-w-[100px] px-1 text-xs border-muted">
+                                <SelectValue placeholder="—" />
+                              </SelectTrigger>
+                              <SelectContent className="z-50 bg-popover">
+                                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                                {bands.map(b => (
+                                  <SelectItem key={`${b.rag_color}-${b.sort_order}`} value={String(b.rag_numeric)}>
+                                    <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color] || 'bg-muted')} />{b.band_label}</span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0"
+                              disabled={!applyColBand[ind.id]}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const weight = parseFloat(applyColBand[ind.id]);
+                                if (isNaN(weight)) return;
+                                applyToColumn(section.id, ind.id, weight, section.features, section.indicatorFeatureMap);
+                                const band = bands.find(b => b.rag_numeric === weight);
+                                toast.success(`Applied "${band?.band_label || weight}" to all ${ind.name} cells`);
+                              }}
+                            >
+                              <CopyCheck className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      );
+                    })}
                     <td className="bg-muted/10" />
                     <td className="bg-muted/10 border-l" />
                   </tr>
@@ -754,13 +803,14 @@ function CustomerSectionCard({
                             );
                           }
 
-                          const band = vectorToBand(val);
-                          const ragColor = band ? RAG_CELL_BG[band] : '';
+                          const ragColor = val != null ? weightToRAGColor(val) : '';
+                          const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
 
                           return (
-                            <td key={ind.id} className={cn('px-1 py-1 text-center border-r', ragColor)}>
+                            <td key={ind.id} className={cn('px-1 py-1 text-center border-r', cellBg)}>
                               <BandDropdown
                                 value={val ?? null}
+                                bands={getBandsForIndicator(ind.id)}
                                 onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
                               />
                             </td>
@@ -777,20 +827,26 @@ function CustomerSectionCard({
                         </td>
                         <td className="px-1 py-1 text-center border-l">
                           <div className="flex items-center gap-0.5 justify-center">
+                            {/* Apply to Row uses the first indicator's bands as representative */}
                             <Select
                               value={applyRowBand[feat.id] || 'unset'}
-                              onValueChange={(val) => setApplyRowBand(prev => ({ ...prev, [feat.id]: val === 'unset' ? '' : val as BandKey }))}
+                              onValueChange={(val) => setApplyRowBand(prev => ({ ...prev, [feat.id]: val === 'unset' ? '' : val }))}
                             >
-                              <SelectTrigger className="h-6 w-[70px] px-1 text-xs border-muted">
+                              <SelectTrigger className="h-6 w-full max-w-[100px] px-1 text-xs border-muted">
                                 <SelectValue placeholder="—" />
                               </SelectTrigger>
                               <SelectContent className="z-50 bg-popover">
                                 <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                                {BAND_OPTIONS.map(b => (
-                                  <SelectItem key={b.value} value={b.value}>
-                                    <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', b.dotClass)} />{b.label}</span>
-                                  </SelectItem>
-                                ))}
+                                {/* Generic weight options for row apply since KPIs may differ */}
+                                <SelectItem value="1">
+                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.green)} />Green (1)</span>
+                                </SelectItem>
+                                <SelectItem value="0.5">
+                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.amber)} />Amber (0.5)</span>
+                                </SelectItem>
+                                <SelectItem value="0">
+                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.red)} />Red (0)</span>
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                             <Button
@@ -799,11 +855,11 @@ function CustomerSectionCard({
                               className="h-6 w-6 shrink-0"
                               disabled={!applyRowBand[feat.id]}
                               onClick={() => {
-                                const band = applyRowBand[feat.id] as BandKey;
-                                if (!band) return;
-                                const weight = VECTOR_WEIGHTS[band];
+                                const weight = parseFloat(applyRowBand[feat.id]);
+                                if (isNaN(weight)) return;
                                 applyToRow(section.id, feat.id, weight, section.indicators, section.indicatorFeatureMap);
-                                toast.success(`Applied ${band} to all KPIs for ${feat.name}`);
+                                const label = weight === 1 ? 'Green' : weight === 0.5 ? 'Amber' : 'Red';
+                                toast.success(`Applied ${label} to all KPIs for ${feat.name}`);
                               }}
                             >
                               <CopyCheck className="h-3 w-3" />
