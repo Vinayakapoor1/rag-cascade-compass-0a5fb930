@@ -1,79 +1,32 @@
 
+# Remove Mock Data
 
-# Unified Customer Bulk Importer + Improved Matrix Template
+Two locations contain mock/placeholder data that should be cleaned up:
 
-## Problem 1: Confusing Matrix Template
-The current scores template lists each customer name repeatedly (once per feature), making it hard to read. We will restructure it so **customer names appear once** as merged section headers, with features listed beneath.
+## 1. Customers Page Sparkline (`src/pages/CustomersPage.tsx`)
 
-## Problem 2: No Single-Sheet Customer Setup
-Currently, CSM-to-customer mapping requires manual steps. The existing customer importer already supports a "CSM" column but there is no clear single-sheet path that also maps features. We will enhance the customer importer to handle everything in one sheet.
+Currently, when a customer has fewer than 2 trend data points, a fake "Sample" sparkline is shown with three dashed colored lines and mock KPI names. This will be replaced with a simple empty state (e.g., a muted "No trend data" label or a flat line placeholder).
 
----
+**What gets removed:**
+- `MOCK_KPI_NAMES` constant (lines ~29-33)
+- `MOCK_KPI_COLORS` constant (lines ~35-39)
+- `MOCK_DATA` array inside `CustomerSparkline` (lines ~71-80)
+- All `isMock` conditional branches (the "Sample" badge, dashed lines, extra kpi2/kpi3 Line elements, tooltip mock label)
 
-## Changes
+**What replaces it:**
+- When `data.length < 2`, render a small muted text like "No trend data yet" inside the sparkline container instead of fake lines.
 
-### 1. Enhance Customer Excel Importer (`src/lib/customerExcelImporter.ts`)
+## 2. Data Entry Timeline (`src/pages/DataEntryTimeline.tsx`)
 
-The existing importer already supports these columns: Company Name, Contact Person, Email, Region, Tier, Industry, CSM, Features, Additional Features, Managed Services.
+The comment says "Mock user data" but the actual issue is that `user.email` is hardcoded to `'Unknown User'` instead of being fetched. This is a placeholder, not mock data per se.
 
-- **CSM mapping already works**: The importer creates CSM records and links them via `csm_id`.
-- **Feature linking already works**: Comma-separated features in the "Features" column are parsed, created if missing, and linked via `customer_features`.
-- **No schema changes needed** -- the existing database already has `customers.csm_id` referencing `csms.id`, and `customer_features` linking customers to features.
-
-What we will improve:
-- Update the **template** to include clearer sample data showing multiple CSMs and realistic feature lists.
-- Add a **"Deployment Type"** column mapping (the DB already has this field).
-- Show a **CSM mapping summary** in the import preview (e.g., "Sahil Kapoor: 5 customers, Pooja Singh: 8 customers").
-- Show a **features-per-customer count** in the preview so users can verify mappings before importing.
-
-### 2. Update the Customer Template (`generateCustomerTemplate`)
-
-New sample data will include:
-- Multiple customers with different CSMs
-- Comma-separated feature lists matching existing features
-- All relevant columns filled out realistically
-
-### 3. Fix Matrix Excel Template (`src/lib/matrixExcelHelper.ts`)
-
-Restructure the "Scores" sheet so each customer appears as a **section header row** (merged across all columns, highlighted), with feature rows beneath. This eliminates the repeated customer name on every row.
-
-```
-Before:
-  Customer    | Feature         | Adoption | NPS | ...
-  VOIS        | Phishing Email  | 85       | 72  | ...
-  VOIS        | LMS             | 60       |     | ...
-  VOIS        | Gamification    |          | 45  | ...
-  DHA         | Phishing Email  | 90       | 80  | ...
-
-After:
-  VOIS  (merged header row, highlighted blue)
-  Feature         | Adoption | NPS | ...
-  Phishing Email  | 85       | 72  | ...
-  LMS             | 60       |     | ...
-  Gamification    |          | 45  | ...
-  (blank separator row)
-  DHA   (merged header row, highlighted blue)
-  Feature         | Adoption | NPS | ...
-  Phishing Email  | 90       | 80  | ...
-```
-
-Update `parseMatrixExcel` to handle the new section-header format when re-importing.
-
-### 4. Update CustomerUploader Preview (`src/components/admin/CustomerUploader.tsx`)
-
-Add to the import preview:
-- CSM assignment summary (CSM name -> customer count)
-- Features per customer average
-
----
+**What changes:**
+- Remove the misleading "Mock user data" comments (lines ~95-96, 98-99)
+- Attempt to fetch the actual user email from `activity_log.user_id` via a profiles lookup, or fall back to displaying a truncated user ID instead of the generic "Unknown User" string.
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/lib/customerExcelImporter.ts` | Add deployment_type mapping, improve template sample data, add CSM summary to preview |
-| `src/lib/matrixExcelHelper.ts` | Restructure template with customer section headers; update parser for new format |
-| `src/components/admin/CustomerUploader.tsx` | Show CSM mapping summary in preview |
-
-## No Database Changes Required
-All needed columns and relationships already exist.
+| `src/pages/CustomersPage.tsx` | Remove all mock sparkline data and replace with empty state |
+| `src/pages/DataEntryTimeline.tsx` | Remove misleading mock comments, show real user ID as fallback |
