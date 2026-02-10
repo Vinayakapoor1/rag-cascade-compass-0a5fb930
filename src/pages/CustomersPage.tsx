@@ -394,12 +394,21 @@ export default function CustomersPage() {
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <Link to={`/customers/${customer.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                      {/* Status Badge - Prominent */}
+                      {/* Status Badge - Clickable Toggle */}
                       <Badge
                         className={cn(
-                          "text-xs font-bold px-3 py-1 shrink-0",
+                          "text-xs font-bold px-3 py-1 shrink-0 cursor-pointer hover:opacity-80 transition-opacity",
                           getStatusBadgeClasses(customer.status)
                         )}
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const newStatus = customer.status === 'Active' ? 'Inactive' : 'Active';
+                          await supabase.from('customers').update({ status: newStatus }).eq('id', customer.id);
+                          toast.success(`${customer.name} set to ${newStatus}`);
+                          refetch();
+                        }}
+                        title="Click to toggle status"
                       >
                         {customer.status}
                       </Badge>
