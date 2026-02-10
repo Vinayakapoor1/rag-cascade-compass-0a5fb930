@@ -32,15 +32,80 @@ export default function CSMDataEntry() {
   const fetchDepartments = async () => {
     setLoading(true);
     try {
-      // Get all departments that have indicators linked to features
-      const { data: depts } = await supabase
-        .from('departments')
-        .select('id, name')
-        .order('name');
+      if (isCSM && !isAdmin && csmId) {
+        // Trace: CSM -> customers -> customer_features -> indicator_feature_links -> indicators -> key_results -> functional_objectives -> departments
+        const { data: customers } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('csm_id', csmId);
+        
+        if (!customers?.length) { setLoading(false); return; }
+        const customerIds = customers.map(c => c.id);
 
-      if (depts && depts.length > 0) {
-        setDepartments(depts);
-        setDepartmentId(depts[0].id);
+        const { data: custFeatures } = await supabase
+          .from('customer_features')
+          .select('feature_id')
+          .in('customer_id', customerIds);
+        
+        if (!custFeatures?.length) { setLoading(false); return; }
+        const featureIds = [...new Set(custFeatures.map(cf => cf.feature_id))];
+
+        const { data: featureLinks } = await supabase
+          .from('indicator_feature_links')
+          .select('indicator_id')
+          .in('feature_id', featureIds);
+        
+        if (!featureLinks?.length) { setLoading(false); return; }
+        const indicatorIds = [...new Set(featureLinks.map(fl => fl.indicator_id))];
+
+        const { data: indicators } = await supabase
+          .from('indicators')
+          .select('key_result_id')
+          .in('id', indicatorIds)
+          .not('key_result_id', 'is', null);
+        
+        if (!indicators?.length) { setLoading(false); return; }
+        const krIds = [...new Set(indicators.map(i => i.key_result_id!))];
+
+        const { data: keyResults } = await supabase
+          .from('key_results')
+          .select('functional_objective_id')
+          .in('id', krIds)
+          .not('functional_objective_id', 'is', null);
+        
+        if (!keyResults?.length) { setLoading(false); return; }
+        const foIds = [...new Set(keyResults.map(kr => kr.functional_objective_id!))];
+
+        const { data: funcObjs } = await supabase
+          .from('functional_objectives')
+          .select('department_id')
+          .in('id', foIds)
+          .not('department_id', 'is', null);
+        
+        if (!funcObjs?.length) { setLoading(false); return; }
+        const deptIds = [...new Set(funcObjs.map(fo => fo.department_id!))];
+
+        const { data: depts } = await supabase
+          .from('departments')
+          .select('id, name')
+          .in('id', deptIds)
+          .order('name');
+
+        if (depts?.length) {
+          setDepartments(depts);
+          setDepartmentId(depts[0].id);
+        }
+      } else {
+        // Admin: show all departments
+        const { data: depts } = await supabase
+          .from('departments')
+          .select('id, name')
+          .order('name');
+
+        if (depts?.length) {
+          setDepartments(depts);
+          setDepartmentId(depts[0].id);
+        }
       }
     } catch (err) {
       console.error('Error fetching departments:', err);
