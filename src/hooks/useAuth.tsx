@@ -7,6 +7,8 @@ interface AuthContextType {
   session: Session | null;
   isAdmin: boolean;
   isDepartmentHead: boolean;
+  isCSM: boolean;
+  csmId: string | null;
   accessibleDepartments: string[];
   loading: boolean;
   signOut: () => Promise<void>;
@@ -19,6 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDepartmentHead, setIsDepartmentHead] = useState(false);
+  const [isCSM, setIsCSM] = useState(false);
+  const [csmId, setCsmId] = useState<string | null>(null);
   const [accessibleDepartments, setAccessibleDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,6 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setIsAdmin(false);
         setIsDepartmentHead(false);
+        setIsCSM(false);
+        setCsmId(null);
         setAccessibleDepartments([]);
       }
       setLoading(false);
@@ -72,6 +78,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     setIsDepartmentHead(!!deptHeadData);
 
+    // Check CSM role
+    const { data: csmRoleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'csm' as any)
+      .maybeSingle();
+    
+    setIsCSM(!!csmRoleData);
+
+    // If CSM, fetch the linked CSM record ID
+    if (csmRoleData) {
+      const { data: csmRecord } = await supabase
+        .from('csms')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      setCsmId(csmRecord?.id || null);
+    } else {
+      setCsmId(null);
+    }
+
     // Get accessible departments
     const { data: accessData } = await supabase
       .from('department_access')
@@ -87,11 +115,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setIsAdmin(false);
     setIsDepartmentHead(false);
+    setIsCSM(false);
+    setCsmId(null);
     setAccessibleDepartments([]);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, isDepartmentHead, accessibleDepartments, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, isDepartmentHead, isCSM, csmId, accessibleDepartments, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

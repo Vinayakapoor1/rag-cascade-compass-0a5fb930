@@ -9,19 +9,27 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Loader2, RefreshCw, Pencil, Shield, Building } from 'lucide-react';
+import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck } from 'lucide-react';
 
 interface UserWithRole {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'department_head' | 'viewer' | null;
+  role: 'admin' | 'department_head' | 'viewer' | 'csm' | null;
   departments: { id: string; name: string }[];
+  linkedCsmId?: string | null;
+  linkedCsmName?: string | null;
 }
 
 interface Department {
   id: string;
   name: string;
+}
+
+interface CSMRecord {
+  id: string;
+  name: string;
+  user_id: string | null;
 }
 
 interface TeamAccessTabProps {
@@ -31,6 +39,7 @@ interface TeamAccessTabProps {
 export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [csmRecords, setCsmRecords] = useState<CSMRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,8 +47,9 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
 
   // Form state
   const [formData, setFormData] = useState({
-    role: 'viewer' as 'admin' | 'department_head' | 'viewer',
-    departmentIds: [] as string[]
+    role: 'viewer' as 'admin' | 'department_head' | 'viewer' | 'csm',
+    departmentIds: [] as string[],
+    linkedCsmId: '' as string,
   });
 
   useEffect(() => {
@@ -71,24 +81,32 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
       .select('id, name')
       .order('name');
 
-    if (depts) {
-      setDepartments(depts);
-    }
+    // Fetch all CSM records
+    const { data: csms } = await supabase
+      .from('csms')
+      .select('id, name, user_id')
+      .order('name');
+
+    if (depts) setDepartments(depts);
+    if (csms) setCsmRecords(csms);
 
     if (profiles) {
       const usersWithRoles: UserWithRole[] = profiles.map((p) => {
         const userRole = roles?.find((r) => r.user_id === p.user_id);
         const userAccess = access?.filter((a) => a.user_id === p.user_id) || [];
+        const linkedCsm = csms?.find((c) => c.user_id === p.user_id);
         
         return {
           id: p.user_id,
           email: p.email || '',
           full_name: p.full_name,
-          role: userRole?.role as 'admin' | 'department_head' | 'viewer' | null,
+          role: userRole?.role as 'admin' | 'department_head' | 'viewer' | 'csm' | null,
           departments: userAccess.map((a: any) => ({
             id: a.departments?.id || a.department_id,
             name: a.departments?.name || 'Unknown'
-          }))
+          })),
+          linkedCsmId: linkedCsm?.id || null,
+          linkedCsmName: linkedCsm?.name || null,
         };
       });
 
@@ -102,7 +120,8 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     setSelectedUser(user);
     setFormData({
       role: user.role || 'viewer',
-      departmentIds: user.departments.map(d => d.id)
+      departmentIds: user.departments.map(d => d.id),
+      linkedCsmId: user.linkedCsmId || '',
     });
     setDialogOpen(true);
   };
@@ -147,6 +166,27 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           );
       }
 
+      // If CSM role, link the user to the CSM record
+      if (formData.role === 'csm' && formData.linkedCsmId) {
+        // First, unlink any previous user from this CSM record
+        await supabase
+          .from('csms')
+          .update({ user_id: null, email: null })
+          .eq('user_id', selectedUser.id);
+
+        // Link the selected CSM record to this user
+        await supabase
+          .from('csms')
+          .update({ user_id: selectedUser.id, email: selectedUser.email })
+          .eq('id', formData.linkedCsmId);
+      } else if (formData.role !== 'csm') {
+        // If role changed away from CSM, unlink
+        await supabase
+          .from('csms')
+          .update({ user_id: null, email: null })
+          .eq('user_id', selectedUser.id);
+      }
+
       toast.success('User access updated');
       setDialogOpen(false);
       fetchData();
@@ -166,12 +206,14 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     }));
   };
 
-  const getRoleBadge = (role: string | null) => {
+  const getRoleBadge = (role: string | null, linkedCsmName?: string | null) => {
     switch (role) {
       case 'admin':
         return <Badge className="bg-primary/10 text-primary"><Shield className="h-3 w-3 mr-1" />Admin</Badge>;
       case 'department_head':
         return <Badge className="bg-rag-amber/10 text-rag-amber"><Building className="h-3 w-3 mr-1" />Dept Head</Badge>;
+      case 'csm':
+        return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400"><UserCheck className="h-3 w-3 mr-1" />CSM{linkedCsmName ? ` (${linkedCsmName})` : ''}</Badge>;
       default:
         return <Badge variant="outline">Viewer</Badge>;
     }
@@ -227,7 +269,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    <TableCell>{getRoleBadge(user.role, user.linkedCsmName)}</TableCell>
                     <TableCell>
                       {user.role === 'admin' ? (
                         <span className="text-sm text-muted-foreground">All (auto)</span>
@@ -287,11 +329,39 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="csm">CSM</SelectItem>
                     <SelectItem value="department_head">Department Head</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+
+              {formData.role === 'csm' && (
+                <div className="space-y-2">
+                  <Label>Link to CSM Record</Label>
+                  <Select
+                    value={formData.linkedCsmId}
+                    onValueChange={(v) => setFormData({ ...formData, linkedCsmId: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select CSM record..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {csmRecords
+                        .filter(c => !c.user_id || c.user_id === selectedUser?.id)
+                        .map((csm) => (
+                          <SelectItem key={csm.id} value={csm.id}>
+                            {csm.name} {csm.user_id === selectedUser?.id ? '(currently linked)' : ''}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Only unlinked CSM records are shown. The CSM will see only their assigned customers.
+                  </p>
+                </div>
+              )}
 
               {formData.role === 'department_head' && (
                 <div className="space-y-2">

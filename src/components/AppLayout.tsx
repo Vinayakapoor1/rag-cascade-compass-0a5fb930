@@ -18,7 +18,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
-  const { user, isAdmin, isDepartmentHead, signOut, loading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isCSM, signOut, loading } = useAuth();
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -68,8 +68,18 @@ export function AppLayout({ children }: AppLayoutProps) {
               <>
                 {user ? (
                   <div className="flex items-center gap-2">
+                    {/* CSM: Enter Data Button */}
+                    {isCSM && !isAdmin && (
+                      <Link to="/csm/data-entry">
+                        <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
+                          <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
+                          <span className="hidden sm:inline">Enter Data</span>
+                        </Button>
+                      </Link>
+                    )}
+
                     {/* Department Head: Enter Data Button */}
-                    {isDepartmentHead && !isAdmin && (
+                    {isDepartmentHead && !isAdmin && !isCSM && (
                       <Link to="/data">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
