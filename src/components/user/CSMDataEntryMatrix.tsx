@@ -526,8 +526,8 @@ function CustomerSectionCard({
                       Feature
                     </th>
                     {section.indicators.map(ind => (
-                      <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[90px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
-                        <span className="truncate block max-w-[80px] mx-auto text-xs">{ind.name}</span>
+                      <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[110px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
+                        <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
                       </th>
                     ))}
                     <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
