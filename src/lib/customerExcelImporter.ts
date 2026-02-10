@@ -13,6 +13,7 @@ export interface CustomerRow {
   additionalFeatures: string | null;
   managedServices: boolean;
   deploymentType: string | null;
+  createdAt: string | null;
 }
 
 export interface CustomerImportPreview {
@@ -54,6 +55,9 @@ const COLUMN_MAP: Record<string, keyof CustomerRow> = {
   'managed services': 'managedServices',
   'deployment type': 'deploymentType',
   'deployment': 'deploymentType',
+  'contact persons': 'contactPerson',
+  'contact emails': 'email',
+  'created at': 'createdAt',
 };
 
 function normalizeHeader(header: string): string {
@@ -72,6 +76,7 @@ function parseBoolean(value: any): boolean {
 function normalizeTier(tier: string | null): string {
   if (!tier) return 'Tier1';
   const normalized = tier.replace(/\s+/g, '').toLowerCase();
+  if (normalized === 'unassigned') return 'Unassigned';
   if (normalized.includes('1') || normalized.includes('one')) return 'Tier1';
   if (normalized.includes('2') || normalized.includes('two')) return 'Tier2';
   if (normalized.includes('3') || normalized.includes('three')) return 'Tier3';
@@ -115,6 +120,7 @@ export async function getCustomerImportPreview(file: File): Promise<CustomerImpo
       tier: 'Tier1',
       managedServices: false,
       deploymentType: null,
+      createdAt: null,
     };
 
     Object.entries(row).forEach(([header, value]) => {
@@ -300,7 +306,7 @@ export async function importCustomersToDatabase(
     try {
       const existingId = existingByName.get(customer.companyName.toLowerCase());
 
-      const customerData = {
+      const customerData: Record<string, any> = {
         name: customer.companyName,
         contact_person: customer.contactPerson,
         email: customer.email,
@@ -328,12 +334,18 @@ export async function importCustomersToDatabase(
         } else {
           updated++;
           customerId = existingId;
+          // Clean stale feature links before re-linking
+          await supabase.from('customer_features').delete().eq('customer_id', existingId);
         }
       } else {
+        // Include created_at for new customers if available
+        if (customer.createdAt) {
+          customerData.created_at = customer.createdAt;
+        }
         // Insert new
         const { data: newCustomer, error } = await supabase
           .from('customers')
-          .insert(customerData)
+          .insert(customerData as any)
           .select('id')
           .single();
 
@@ -379,8 +391,8 @@ export function generateCustomerTemplate(): void {
 
   const headers = [
     'Company Name',
-    'Contact Person',
-    'Email',
+    'Contact Persons',
+    'Contact Emails',
     'Region',
     'Tier',
     'Industry',
