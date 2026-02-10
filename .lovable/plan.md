@@ -1,104 +1,93 @@
 
-# Fix Customer Edit Dialog: Status Toggle, Scrolling, and Full Data
 
-## Problems Identified
+# CSM Registration and Data Entry Flow
 
-1. **No quick Active/Inactive toggle** -- Users must open the full edit dialog just to change status.
-2. **Edit dialog on CustomerDetailPage passes incomplete data** -- Missing `contact_person`, `email`, `csm_id`, `managed_services`, `logo_url`, and `deployment_type`. These fields appear blank when editing from the detail page.
-3. **Edit dialog on CustomersPage also passes incomplete data** -- The `CustomerWithImpact` type lacks `contact_person`, `email`, `csm_id`, `managed_services`. The form receives partial data.
-4. **Dialog scrolling** -- The dialog already has `ScrollArea` and `max-h-[90vh]`, but may not work well on smaller screens.
+## Current State
 
-## Solution
+Right now, the system has a gap: **11 CSMs exist in the database as names only** (Abhay Singh, Kanika Singhal, etc.), with no email addresses and no linked user accounts. This means there is no way for a CSM to log in and enter data for their assigned customers.
 
-### 1. Fix CustomerFormDialog to fetch full customer data from the database
+The existing roles are:
+- **Admin** (4 users) -- full access to everything
+- **Department Head** (2 users) -- can enter data for assigned departments
+- **Viewer** -- read-only
 
-Instead of relying on the parent to pass complete customer data, the dialog should fetch the full customer record from the database when a customer `id` is provided. This guarantees all fields are populated regardless of which page opens the dialog.
+There is no "CSM" role, and no self-service way for CSMs to register and get linked to their CSM record.
 
-**Changes to `src/components/CustomerFormDialog.tsx`:**
-- In the `useEffect` that runs when `open` changes, if `customer?.id` exists, fetch the full customer record from the database using `supabase.from('customers').select('*').eq('id', customer.id).single()`
-- Populate `formData` from the fetched database record instead of the partial prop data
-- This eliminates the need for every parent to pass all fields
+## Proposed Flow
 
-### 2. Add a quick Status toggle on the Customers list page
-
-**Changes to `src/pages/CustomersPage.tsx`:**
-- Make the prominent status badge clickable (on the customer card)
-- On click, toggle between Active/Inactive directly via a database update (no dialog needed)
-- Show a loading state briefly during the toggle
-- Call `refetch()` after the update
-
-### 3. Ensure dialog scrolling works properly
-
-**Changes to `src/components/CustomerFormDialog.tsx`:**
-- Adjust `max-h-[calc(90vh-180px)]` to a more generous `max-h-[calc(85vh-140px)]` to account for header/footer
-- Add `overflow-y-auto` as a fallback
-
-### 4. Add Managed Services checkbox (currently in the form data but not rendered)
-
-**Changes to `src/components/CustomerFormDialog.tsx`:**
-- Add a checkbox field for "Managed Services" in the form so it can be viewed and edited
-
-## Files to Modify
-
-1. **`src/components/CustomerFormDialog.tsx`** -- Fetch full customer data from DB on open; fix scroll height; add managed services field
-2. **`src/pages/CustomersPage.tsx`** -- Add quick status toggle on the status badge
-3. **`src/pages/CustomerDetailPage.tsx`** -- Simplify the customer prop passed to the form (only `id` is needed now since the dialog fetches its own data)
-
-## Technical Details
-
-### CustomerFormDialog.tsx - Database fetch on open
-```typescript
-useEffect(() => {
-  if (open) {
-    fetchFeatures();
-    fetchCsms();
-    if (customer?.id) {
-      // Fetch full customer data from database
-      fetchFullCustomer(customer.id);
-      fetchCustomerFeatures(customer.id);
-    } else {
-      resetForm();
-    }
-  }
-}, [open, customer]);
-
-const fetchFullCustomer = async (id: string) => {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('id', id)
-    .single();
-  if (!error && data) {
-    setFormData({
-      name: data.name,
-      contact_person: data.contact_person || '',
-      email: data.email || '',
-      region: data.region || '',
-      tier: data.tier,
-      industry: data.industry || '',
-      csm_id: data.csm_id || '',
-      status: data.status,
-      managed_services: data.managed_services || false,
-      logo_url: data.logo_url || '',
-      deployment_type: data.deployment_type || '',
-    });
-    setLogoPreview(data.logo_url || null);
-  }
-};
+```text
++------------------+     +------------------+     +-------------------+
+|  CSM signs up    | --> | Admin assigns    | --> | CSM logs in and   |
+|  at /auth page   |     | "csm" role +     |     | sees only their   |
+|  (email/password)|     | links to CSM     |     | customers in the  |
+|                  |     | record           |     | Feature Matrix    |
++------------------+     +------------------+     +-------------------+
 ```
 
-### CustomersPage.tsx - Quick status toggle
-```typescript
-const toggleCustomerStatus = async (e, customer) => {
-  e.preventDefault();
-  e.stopPropagation();
-  const newStatus = customer.status === 'Active' ? 'Inactive' : 'Active';
-  await supabase.from('customers')
-    .update({ status: newStatus })
-    .eq('id', customer.id);
-  toast.success(`${customer.name} set to ${newStatus}`);
-  refetch();
-};
+### Step-by-step:
+
+1. **CSM creates an account** at the existing `/auth` page using their email.
+2. **Admin goes to Team Access** tab in the Admin Dashboard and assigns:
+   - Role: "CSM" (new role option)
+   - Links the user to their CSM record (dropdown of existing CSM names)
+3. **CSM logs in** and sees a "Enter Data" button in the header (like department heads do).
+4. **CSM clicks "Enter Data"** and is taken to a dedicated CSM data entry page showing only their assigned customers in the Feature Matrix.
+
+## Technical Changes
+
+### 1. Database Changes
+
+**Add "csm" to the app_role enum:**
+```sql
+ALTER TYPE public.app_role ADD VALUE 'csm';
 ```
 
-The status badge becomes a clickable button that toggles between Active and Inactive with a single click.
+**Add email addresses to the CSMs table** (already has `email` and `user_id` columns, they just need to be populated when linking).
+
+### 2. Update Team Access Tab (`src/components/admin/TeamAccessTab.tsx`)
+
+- Add "CSM" as a role option in the role dropdown (alongside Viewer, Department Head, Admin).
+- When "CSM" role is selected, show a dropdown of CSM records (from the `csms` table) to link the user to.
+- On save, update the `csms` table to set `user_id` and `email` for the selected CSM record.
+
+### 3. Update Auth Hook (`src/hooks/useAuth.tsx`)
+
+- Add `isCSM: boolean` to the auth context.
+- Add `csmId: string | null` to the context (the linked CSM record ID).
+- Check for `csm` role the same way `isDepartmentHead` is checked.
+- Fetch the CSM record's ID by matching `user_id`.
+
+### 4. Update App Layout (`src/components/AppLayout.tsx`)
+
+- Show an "Enter Data" button for CSM users (similar to department heads).
+- The button navigates to a new CSM-specific data entry page.
+
+### 5. Create CSM Data Entry Page
+
+- New page at route `/csm/data-entry`.
+- Fetches the department(s) that the CSM's customers belong to (via customer -> features -> indicators -> department chain).
+- Renders the existing `CSMDataEntryMatrix` component, which already filters by `user_id` in the `csms` table.
+- Includes period selector (same as department data entry).
+
+### 6. Update Routing (`src/App.tsx`)
+
+- Add route: `/csm/data-entry` pointing to the new CSM data entry page.
+
+## Files to Create/Modify
+
+1. **New migration SQL** -- Add 'csm' value to `app_role` enum
+2. **`src/components/admin/TeamAccessTab.tsx`** -- Add CSM role option and CSM record linking dropdown
+3. **`src/hooks/useAuth.tsx`** -- Add `isCSM` and `csmId` to auth context
+4. **`src/components/AppLayout.tsx`** -- Show "Enter Data" button for CSMs
+5. **`src/pages/CSMDataEntry.tsx`** (new) -- Dedicated CSM data entry page with period selector and the Feature Matrix
+6. **`src/App.tsx`** -- Add CSM data entry route
+
+## Access Control Summary
+
+| Role | Can See | Can Edit |
+|------|---------|----------|
+| Admin | Everything | Everything |
+| Department Head | Assigned departments | Indicators for assigned departments |
+| CSM | Own assigned customers only | Feature scores for own customers only |
+| Viewer | Portfolio overview | Nothing |
+
