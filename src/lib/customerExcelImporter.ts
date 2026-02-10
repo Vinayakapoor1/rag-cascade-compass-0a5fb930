@@ -12,6 +12,7 @@ export interface CustomerRow {
   features: string | null;
   additionalFeatures: string | null;
   managedServices: boolean;
+  deploymentType: string | null;
 }
 
 export interface CustomerImportPreview {
@@ -20,7 +21,9 @@ export interface CustomerImportPreview {
   byTier: Record<string, number>;
   byRegion: Record<string, number>;
   byIndustry: Record<string, number>;
+  byCSM: Record<string, number>;
   uniqueFeatures: string[];
+  avgFeaturesPerCustomer: number;
   warnings: string[];
 }
 
@@ -45,9 +48,12 @@ const COLUMN_MAP: Record<string, keyof CustomerRow> = {
   'tier': 'tier',
   'industry': 'industry',
   'csm': 'csm',
+  'customer success manager': 'csm',
   'features': 'features',
   'additional features': 'additionalFeatures',
   'managed services': 'managedServices',
+  'deployment type': 'deploymentType',
+  'deployment': 'deploymentType',
 };
 
 function normalizeHeader(header: string): string {
@@ -85,7 +91,9 @@ export async function getCustomerImportPreview(file: File): Promise<CustomerImpo
   const byTier: Record<string, number> = {};
   const byRegion: Record<string, number> = {};
   const byIndustry: Record<string, number> = {};
+  const byCSM: Record<string, number> = {};
   const allFeatures = new Set<string>();
+  let totalFeatureCount = 0;
 
   // Get header mapping
   const headers = Object.keys(rows[0] || {});
@@ -106,6 +114,7 @@ export async function getCustomerImportPreview(file: File): Promise<CustomerImpo
     const customer: Partial<CustomerRow> = {
       tier: 'Tier1',
       managedServices: false,
+      deploymentType: null,
     };
 
     Object.entries(row).forEach(([header, value]) => {
@@ -129,19 +138,26 @@ export async function getCustomerImportPreview(file: File): Promise<CustomerImpo
     const tier = customer.tier || 'Tier1';
     const region = customer.region || 'Unknown';
     const industry = customer.industry || 'Unknown';
+    const csm = customer.csm || 'Unassigned';
 
     byTier[tier] = (byTier[tier] || 0) + 1;
     byRegion[region] = (byRegion[region] || 0) + 1;
     byIndustry[industry] = (byIndustry[industry] || 0) + 1;
+    byCSM[csm] = (byCSM[csm] || 0) + 1;
 
     // Collect unique features
     if (customer.features) {
       const features = parseFeatures(customer.features);
       features.forEach(f => allFeatures.add(f));
+      totalFeatureCount += features.length;
     }
 
     customers.push(customer as CustomerRow);
   });
+
+  const avgFeaturesPerCustomer = customers.length > 0
+    ? Math.round((totalFeatureCount / customers.length) * 10) / 10
+    : 0;
 
   return {
     customers,
@@ -149,7 +165,9 @@ export async function getCustomerImportPreview(file: File): Promise<CustomerImpo
     byTier,
     byRegion,
     byIndustry,
+    byCSM,
     uniqueFeatures: Array.from(allFeatures).sort(),
+    avgFeaturesPerCustomer,
     warnings,
   };
 }
@@ -292,6 +310,7 @@ export async function importCustomersToDatabase(
         csm_id: customer.csm ? csmMap.get(customer.csm) || null : null,
         additional_features: customer.additionalFeatures,
         managed_services: customer.managedServices,
+        deployment_type: customer.deploymentType,
         metadata: customer.features ? { features: customer.features } : null,
       };
 
@@ -369,17 +388,33 @@ export function generateCustomerTemplate(): void {
     'Features',
     'Additional Features',
     'Managed Services',
+    'Deployment Type',
   ];
 
   const sampleData = [
-    ['Acme Corp', 'John Doe', 'john@acme.com', 'North America', 'Tier 1', 'Technology', 'Jane Smith', 'Core, Analytics', 'Custom Dashboard', 'Yes'],
-    ['Beta Inc', 'Alice Brown', 'alice@beta.com', 'Europe', 'Tier 2', 'Finance', 'Bob Wilson', 'Core', '', 'No'],
+    ['Acme Corp', 'John Doe', 'john@acme.com', 'North America', 'Tier 1', 'Technology', 'Sahil Kapoor', 'Phishing Email, LMS, Gamification', 'Custom Dashboard', 'Yes', 'Cloud'],
+    ['Beta Finance', 'Alice Brown', 'alice@beta.com', 'Europe', 'Tier 2', 'Finance', 'Pooja Singh', 'Phishing Email, Smishing', 'API Access', 'No', 'On-Premise'],
+    ['Global Health Ltd', 'Raj Patel', 'raj@globalhealth.com', 'APAC', 'Tier 1', 'Healthcare', 'Sahil Kapoor', 'LMS, Gamification, Phishing Email, Smishing', '', 'Yes', 'Hybrid'],
+    ['Delta Manufacturing', 'Maria Garcia', 'maria@delta.com', 'Latin America', 'Tier 3', 'Manufacturing', 'Pooja Singh', 'Phishing Email', '', 'No', 'Cloud'],
+    ['Omega Retail', 'Chen Wei', 'chen@omega.com', 'APAC', 'Tier 2', 'Retail', 'Amit Sharma', 'LMS, Gamification', 'White Label', 'Yes', 'Cloud'],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
 
   // Set column widths
-  ws['!cols'] = headers.map(() => ({ wch: 18 }));
+  ws['!cols'] = [
+    { wch: 22 }, // Company Name
+    { wch: 16 }, // Contact Person
+    { wch: 24 }, // Email
+    { wch: 16 }, // Region
+    { wch: 10 }, // Tier
+    { wch: 16 }, // Industry
+    { wch: 16 }, // CSM
+    { wch: 36 }, // Features (wider for comma-separated lists)
+    { wch: 20 }, // Additional Features
+    { wch: 16 }, // Managed Services
+    { wch: 16 }, // Deployment Type
+  ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Customers');
   XLSX.writeFile(wb, 'customer_import_template.xlsx');

@@ -10,7 +10,7 @@ interface CustomerSection {
 
 /**
  * Generate an Excel template for the customer-feature matrix.
- * One sheet per customer, features as rows, KPIs as columns.
+ * Customers appear as section headers, features as rows beneath.
  */
 export async function generateMatrixTemplate(
   customerSections: CustomerSection[],
@@ -19,7 +19,7 @@ export async function generateMatrixTemplate(
 ) {
   const wb = new ExcelJS.Workbook();
 
-  // Collect all unique indicators across all customers (for a unified column order)
+  // Collect all unique indicators across all customers
   const allIndicators = new Map<string, { id: string; name: string }>();
   for (const section of customerSections) {
     for (const ind of section.indicators) {
@@ -27,50 +27,58 @@ export async function generateMatrixTemplate(
     }
   }
   const indicatorList = Array.from(allIndicators.values());
+  const totalCols = 1 + indicatorList.length; // Feature + KPIs
 
-  // Single sheet with all customers
   const ws = wb.addWorksheet('Scores');
 
-  // Header row: Customer | Feature | KPI1 | KPI2 | ...
-  const headerRow = ['Customer', 'Feature', ...indicatorList.map(i => i.name)];
-  const header = ws.addRow(headerRow);
-  header.font = { bold: true, size: 11 };
-  header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-
-  // Hidden ID row for parsing
-  const idRow = ws.addRow(['__IDS__', '__IDS__', ...indicatorList.map(i => i.id)]);
+  // Hidden ID row (row 1) for parsing — maps column index to indicator ID
+  const idRow = ws.addRow(['__IDS__', ...indicatorList.map(i => i.id)]);
   idRow.font = { color: { argb: 'FF999999' }, size: 8 };
   idRow.hidden = true;
 
   for (const section of customerSections) {
+    // Customer header row (merged across all columns)
+    const custHeaderRow = ws.addRow([section.name]);
+    custHeaderRow.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    custHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } };
+    custHeaderRow.height = 28;
+    ws.mergeCells(custHeaderRow.number, 1, custHeaderRow.number, totalCols);
+    custHeaderRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+    // Column headers for this section: Feature | KPI1 | KPI2 | ...
+    const colHeaderRow = ws.addRow(['Feature', ...indicatorList.map(i => i.name)]);
+    colHeaderRow.font = { bold: true, size: 10 };
+    colHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+
+    // Feature rows
     for (const feat of section.features) {
-      const row: (string | number | null)[] = [section.name, feat.name];
+      const rowData: (string | number | null)[] = [feat.name];
       for (const ind of indicatorList) {
         const canEdit = section.indicatorFeatureMap[ind.id]?.has(feat.id) ?? false;
         if (!canEdit) {
-          row.push(null); // N/A cell
+          rowData.push(null);
         } else {
           const key = `${ind.id}::${section.id}::${feat.id}`;
-          row.push(scores[key] ?? null);
+          rowData.push(scores[key] ?? null);
         }
       }
-      const dataRow = ws.addRow(row);
+      const dataRow = ws.addRow(rowData);
 
-      // Style N/A cells with gray
-      for (let colIdx = 2; colIdx < 2 + indicatorList.length; colIdx++) {
-        const ind = indicatorList[colIdx - 2];
+      // Style cells
+      for (let colIdx = 0; colIdx < indicatorList.length; colIdx++) {
+        const ind = indicatorList[colIdx];
         const canEdit = section.indicatorFeatureMap[ind.id]?.has(feat.id) ?? false;
+        const cell = dataRow.getCell(colIdx + 2);
         if (!canEdit) {
-          const cell = dataRow.getCell(colIdx + 1);
           cell.value = '—';
           cell.font = { color: { argb: 'FFAAAAAA' } };
-          cell.alignment = { horizontal: 'center' };
-        } else {
-          const cell = dataRow.getCell(colIdx + 1);
-          cell.alignment = { horizontal: 'center' };
         }
+        cell.alignment = { horizontal: 'center' };
       }
     }
+
+    // Separator row
+    ws.addRow([]);
   }
 
   // Auto-width columns
@@ -83,7 +91,7 @@ export async function generateMatrixTemplate(
     col.width = Math.min(maxLen + 4, 30);
   });
 
-  // Add a lookup sheet with customer/feature IDs (hidden)
+  // Hidden lookup sheet for IDs
   const lookupWs = wb.addWorksheet('_Lookup');
   lookupWs.state = 'hidden';
   lookupWs.addRow(['CustomerName', 'CustomerId', 'FeatureName', 'FeatureId']);
@@ -104,8 +112,7 @@ export async function generateMatrixTemplate(
 }
 
 /**
- * Parse an uploaded Excel file back into a scores map.
- * Returns a map of cellKey -> value.
+ * Parse an uploaded Excel file with section-header format back into a scores map.
  */
 export async function parseMatrixExcel(
   file: File,
@@ -124,7 +131,7 @@ export async function parseMatrixExcel(
     // Read the lookup sheet for name -> ID mapping
     const lookupSheet = wb.getWorksheet('_Lookup');
     const custNameToId = new Map<string, string>();
-    const featLookup = new Map<string, string>(); // "custName::featName" -> featId
+    const featLookup = new Map<string, string>();
     if (lookupSheet) {
       lookupSheet.eachRow((row, rowNum) => {
         if (rowNum === 1) return;
@@ -136,7 +143,6 @@ export async function parseMatrixExcel(
         if (featId) featLookup.set(`${custName}::${featName}`, featId);
       });
     } else {
-      // Fall back: build lookup from customerSections
       for (const s of customerSections) {
         custNameToId.set(s.name, s.id);
         for (const f of s.features) {
@@ -145,49 +151,76 @@ export async function parseMatrixExcel(
       }
     }
 
-    // Read indicator IDs from hidden row 2
-    const idRow = scoresSheet.getRow(2);
+    // Read indicator IDs from hidden row 1
+    const idRow = scoresSheet.getRow(1);
     const indicatorIds: string[] = [];
-    for (let col = 3; col <= scoresSheet.columnCount; col++) {
+    for (let col = 2; col <= scoresSheet.columnCount; col++) {
       indicatorIds.push(String(idRow.getCell(col).value || '').trim());
     }
 
-    // If IDs are missing, try matching by name from header row
-    const headerRow = scoresSheet.getRow(1);
+    // If IDs are missing, build name->id map from sections
     if (!indicatorIds[0] || indicatorIds[0] === '') {
-      // Build name -> id map from customerSections
       const indNameToId = new Map<string, string>();
       for (const s of customerSections) {
         for (const ind of s.indicators) {
           indNameToId.set(ind.name, ind.id);
         }
       }
-      for (let col = 3; col <= scoresSheet.columnCount; col++) {
-        const name = String(headerRow.getCell(col).value || '').trim();
-        indicatorIds[col - 3] = indNameToId.get(name) || '';
-      }
+      // We'll resolve names from column headers per-section as we parse
     }
 
     const parsedScores: Record<string, number | null> = {};
     let count = 0;
+    let currentCustomerId: string | null = null;
+
+    // Build indicator name -> id map as fallback
+    const indNameToId = new Map<string, string>();
+    for (const s of customerSections) {
+      for (const ind of s.indicators) {
+        indNameToId.set(ind.name, ind.id);
+      }
+    }
 
     scoresSheet.eachRow((row, rowNum) => {
-      if (rowNum <= 2) return; // skip header + ID row
-      const custName = String(row.getCell(1).value || '').trim();
-      const featName = String(row.getCell(2).value || '').trim();
-      const custId = custNameToId.get(custName);
-      const featId = featLookup.get(`${custName}::${featName}`);
-      if (!custId || !featId) return;
+      if (rowNum === 1) return; // skip hidden ID row
 
-      for (let col = 3; col <= 2 + indicatorIds.length; col++) {
-        const indId = indicatorIds[col - 3];
+      const firstCell = String(row.getCell(1).value || '').trim();
+      if (!firstCell) return; // skip blank separator rows
+
+      // Check if this is a customer header row (exists in lookup)
+      if (custNameToId.has(firstCell) && !row.getCell(2).value) {
+        currentCustomerId = custNameToId.get(firstCell) || null;
+        return;
+      }
+
+      // Check if this is a column header row (starts with "Feature")
+      if (firstCell.toLowerCase() === 'feature') {
+        // If IDs were missing, resolve from these column headers
+        if (!indicatorIds[0] || indicatorIds[0] === '' || indicatorIds[0] === '__IDS__') {
+          indicatorIds.length = 0;
+          for (let col = 2; col <= scoresSheet.columnCount; col++) {
+            const name = String(row.getCell(col).value || '').trim();
+            indicatorIds.push(indNameToId.get(name) || '');
+          }
+        }
+        return;
+      }
+
+      // This is a data row (feature name + scores)
+      if (!currentCustomerId) return;
+      const featName = firstCell;
+      const featId = featLookup.get(`${[...custNameToId.entries()].find(([, id]) => id === currentCustomerId)?.[0] || ''}::${featName}`);
+      if (!featId) return;
+
+      for (let col = 2; col <= 1 + indicatorIds.length; col++) {
+        const indId = indicatorIds[col - 2];
         if (!indId) continue;
         const cellVal = row.getCell(col).value;
         if (cellVal === null || cellVal === undefined || cellVal === '' || cellVal === '—') continue;
         const num = typeof cellVal === 'number' ? cellVal : parseFloat(String(cellVal));
         if (isNaN(num)) continue;
         const clamped = Math.min(100, Math.max(0, num));
-        parsedScores[`${indId}::${custId}::${featId}`] = clamped;
+        parsedScores[`${indId}::${currentCustomerId}::${featId}`] = clamped;
         count++;
       }
     });
