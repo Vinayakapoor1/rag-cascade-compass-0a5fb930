@@ -18,7 +18,7 @@ interface Customer {
     region?: string;
     tier: string;
     industry?: string;
-    csm?: string;
+    csm_id?: string;
     status: string;
     managed_services?: boolean;
     logo_url?: string;
@@ -30,6 +30,11 @@ interface Feature {
     name: string;
 }
 
+interface CSM {
+    id: string;
+    name: string;
+}
+
 interface CustomerFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -37,9 +42,22 @@ interface CustomerFormDialogProps {
     onSuccess?: () => void;
 }
 
+const TIER_OPTIONS = ['Tier1', 'Tier2', 'Unassigned'];
+const REGION_OPTIONS = ['India', 'Middle East', 'Others'];
+const DEPLOYMENT_OPTIONS = ['Cloud', 'On Prem', 'Hybrid', 'India Cloud', 'UAE Cloud', 'Private Cloud'];
+const INDUSTRY_OPTIONS = [
+    'Aviation', 'BPO/KPO', 'Chemical', 'Education', 'Energy', 'Finance',
+    'Food Services', 'Government Administration', 'Healthcare', 'Hospitality',
+    'Human Resources Services and Workforce Development industry',
+    'Manufacturing', 'Media and Broadcasting', 'Pension Fund',
+    'Public administration/government', 'Retail', 'Technology',
+    'Telecommunications', 'Travel'
+];
+
 export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: CustomerFormDialogProps) {
     const [loading, setLoading] = useState(false);
     const [features, setFeatures] = useState<Feature[]>([]);
+    const [csms, setCsms] = useState<CSM[]>([]);
     const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -48,9 +66,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
         contact_person: '',
         email: '',
         region: '',
-        tier: 'Tier 1',
+        tier: 'Tier1',
         industry: '',
-        csm: '',
+        csm_id: '',
         status: 'Active',
         managed_services: false,
         logo_url: '',
@@ -60,24 +78,25 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
     useEffect(() => {
         if (open) {
             fetchFeatures();
+            fetchCsms();
             if (customer) {
                 setFormData({
                     ...customer,
+                    csm_id: customer.csm_id || '',
                     logo_url: customer.logo_url || '',
                     deployment_type: customer.deployment_type || ''
                 });
                 fetchCustomerFeatures(customer.id!);
                 setLogoPreview(customer.logo_url || null);
             } else {
-                // Reset form for new customer
                 setFormData({
                     name: '',
                     contact_person: '',
                     email: '',
                     region: '',
-                    tier: 'Tier 1',
+                    tier: 'Tier1',
                     industry: '',
-                    csm: '',
+                    csm_id: '',
                     status: 'Active',
                     managed_services: false,
                     logo_url: '',
@@ -95,10 +114,15 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
             .from('features')
             .select('id, name')
             .order('name');
+        if (!error && data) setFeatures(data);
+    };
 
-        if (!error && data) {
-            setFeatures(data);
-        }
+    const fetchCsms = async () => {
+        const { data, error } = await supabase
+            .from('csms')
+            .select('id, name')
+            .order('name');
+        if (!error && data) setCsms(data);
     };
 
     const fetchCustomerFeatures = async (customerId: string) => {
@@ -106,10 +130,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
             .from('customer_features')
             .select('feature_id')
             .eq('customer_id', customerId);
-
-        if (!error && data) {
-            setSelectedFeatures(data.map(cf => cf.feature_id));
-        }
+        if (!error && data) setSelectedFeatures(data.map(cf => cf.feature_id));
     };
 
     const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,52 +138,41 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
         if (file) {
             setLogoFile(file);
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setLogoPreview(reader.result as string);
-            };
+            reader.onloadend = () => setLogoPreview(reader.result as string);
             reader.readAsDataURL(file);
         }
     };
 
     const uploadLogo = async (customerId: string): Promise<string | null> => {
         if (!logoFile) return formData.logo_url || null;
-
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `${customerId}-logo.${fileExt}`;
         const filePath = `customer-logos/${fileName}`;
-
-        // Upload to storage
         const { error: uploadError } = await supabase.storage
             .from('evidence-files')
             .upload(filePath, logoFile, { upsert: true });
-
         if (uploadError) {
             console.error('Error uploading logo:', uploadError);
             toast.error('Failed to upload logo');
             return formData.logo_url || null;
         }
-
-        // Get public URL
-        const { data } = supabase.storage
-            .from('evidence-files')
-            .getPublicUrl(filePath);
-
+        const { data } = supabase.storage.from('evidence-files').getPublicUrl(filePath);
         return data.publicUrl;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-
         try {
             let customerId: string;
             const submitData = {
                 name: formData.name,
                 contact_person: formData.contact_person,
                 email: formData.email,
-                region: formData.region,
+                region: formData.region || null,
                 tier: formData.tier,
-                industry: formData.industry,
+                industry: formData.industry || null,
+                csm_id: formData.csm_id || null,
                 status: formData.status,
                 managed_services: formData.managed_services,
                 logo_url: formData.logo_url || null,
@@ -170,55 +180,37 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
             };
 
             if (customer?.id) {
-                // Update existing customer
                 const { error } = await supabase
                     .from('customers')
                     .update(submitData)
                     .eq('id', customer.id);
-
                 if (error) throw error;
                 customerId = customer.id;
-
-                // Upload logo if changed
                 if (logoFile) {
                     const logoUrl = await uploadLogo(customerId);
                     if (logoUrl) {
-                        await supabase
-                            .from('customers')
-                            .update({ logo_url: logoUrl })
-                            .eq('id', customerId);
+                        await supabase.from('customers').update({ logo_url: logoUrl }).eq('id', customerId);
                     }
                 }
-
                 toast.success('Customer updated successfully');
             } else {
-                // Create new customer
                 const { data, error } = await supabase
                     .from('customers')
                     .insert([submitData])
                     .select('id')
                     .single();
-
                 if (error) throw error;
                 customerId = data.id;
-
-                // Upload logo if provided
                 if (logoFile) {
                     const logoUrl = await uploadLogo(customerId);
                     if (logoUrl) {
-                        await supabase
-                            .from('customers')
-                            .update({ logo_url: logoUrl })
-                            .eq('id', customerId);
+                        await supabase.from('customers').update({ logo_url: logoUrl }).eq('id', customerId);
                     }
                 }
-
                 toast.success('Customer created successfully');
             }
 
-            // Update feature mappings
             await updateFeatureMappings(customerId);
-
             onSuccess?.();
             onOpenChange(false);
         } catch (error: any) {
@@ -230,23 +222,13 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
     };
 
     const updateFeatureMappings = async (customerId: string) => {
-        // Delete existing mappings
-        await supabase
-            .from('customer_features')
-            .delete()
-            .eq('customer_id', customerId);
-
-        // Insert new mappings
+        await supabase.from('customer_features').delete().eq('customer_id', customerId);
         if (selectedFeatures.length > 0) {
             const mappings = selectedFeatures.map(featureId => ({
                 customer_id: customerId,
                 feature_id: featureId
             }));
-
-            const { error } = await supabase
-                .from('customer_features')
-                .insert(mappings);
-
+            const { error } = await supabase.from('customer_features').insert(mappings);
             if (error) {
                 console.error('Error updating feature mappings:', error);
                 toast.error('Failed to update feature mappings');
@@ -273,7 +255,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    <ScrollArea className="flex-1 pr-4">
+                    <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] pr-4">
                         <div className="space-y-4 pb-4">
                             {/* Logo Upload */}
                             <div className="space-y-2">
@@ -281,21 +263,11 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                                 <div className="flex items-center gap-4">
                                     {logoPreview ? (
                                         <div className="relative">
-                                            <img
-                                                src={logoPreview}
-                                                alt="Logo preview"
-                                                className="h-16 w-16 rounded-lg object-cover border"
-                                            />
+                                            <img src={logoPreview} alt="Logo preview" className="h-16 w-16 rounded-lg object-cover border" />
                                             <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
+                                                type="button" variant="ghost" size="icon"
                                                 className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground"
-                                                onClick={() => {
-                                                    setLogoFile(null);
-                                                    setLogoPreview(null);
-                                                    setFormData({ ...formData, logo_url: '' });
-                                                }}
+                                                onClick={() => { setLogoFile(null); setLogoPreview(null); setFormData({ ...formData, logo_url: '' }); }}
                                             >
                                                 <X className="h-3 w-3" />
                                             </Button>
@@ -306,20 +278,11 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                                         </div>
                                     )}
                                     <div>
-                                        <Label
-                                            htmlFor="logo-upload"
-                                            className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted transition-colors"
-                                        >
+                                        <Label htmlFor="logo-upload" className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted transition-colors">
                                             <Upload className="h-4 w-4" />
                                             {logoPreview ? 'Change Logo' : 'Upload Logo'}
                                         </Label>
-                                        <input
-                                            id="logo-upload"
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleLogoChange}
-                                            className="hidden"
-                                        />
+                                        <input id="logo-upload" type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
                                         <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 2MB</p>
                                     </div>
                                 </div>
@@ -328,76 +291,60 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                             {/* Name */}
                             <div className="space-y-2">
                                 <Label htmlFor="name">Company Name *</Label>
-                                <Input
-                                    id="name"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    required
-                                />
+                                <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
                             </div>
 
                             {/* Contact Person & Email */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="contact_person">Contact Person</Label>
-                                    <Input
-                                        id="contact_person"
-                                        value={formData.contact_person}
-                                        onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                                    />
+                                    <Input id="contact_person" value={formData.contact_person} onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="email">Email</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    />
+                                    <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                                 </div>
                             </div>
 
                             {/* Region & Industry */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="region">Region</Label>
-                                    <Input
-                                        id="region"
-                                        value={formData.region}
-                                        onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                                    />
+                                    <Label>Region</Label>
+                                    <Select value={formData.region || 'none'} onValueChange={(value) => setFormData({ ...formData, region: value === 'none' ? '' : value })}>
+                                        <SelectTrigger><SelectValue placeholder="Select region" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Not specified</SelectItem>
+                                            {REGION_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="industry">Industry</Label>
-                                    <Input
-                                        id="industry"
-                                        value={formData.industry}
-                                        onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                                    />
+                                    <Label>Industry</Label>
+                                    <Select value={formData.industry || 'none'} onValueChange={(value) => setFormData({ ...formData, industry: value === 'none' ? '' : value })}>
+                                        <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Not specified</SelectItem>
+                                            {INDUSTRY_OPTIONS.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
 
                             {/* Tier & Status */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="tier">Tier *</Label>
+                                    <Label>Tier *</Label>
                                     <Select value={formData.tier} onValueChange={(value) => setFormData({ ...formData, tier: value })}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="Tier 1">Tier 1</SelectItem>
-                                            <SelectItem value="Tier 2">Tier 2</SelectItem>
-                                            <SelectItem value="Tier 3">Tier 3</SelectItem>
+                                            {TIER_OPTIONS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="status">Status *</Label>
+                                    <Label>Status *</Label>
                                     <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="Active">Active</SelectItem>
                                             <SelectItem value="Inactive">Inactive</SelectItem>
@@ -409,31 +356,26 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
 
                             {/* Deployment Type */}
                             <div className="space-y-2">
-                                <Label htmlFor="deployment_type">Deployment Type</Label>
-                                <Select 
-                                    value={formData.deployment_type || 'none'} 
-                                    onValueChange={(value) => setFormData({ ...formData, deployment_type: value === 'none' ? '' : value })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select deployment type" />
-                                    </SelectTrigger>
+                                <Label>Deployment Type</Label>
+                                <Select value={formData.deployment_type || 'none'} onValueChange={(value) => setFormData({ ...formData, deployment_type: value === 'none' ? '' : value })}>
+                                    <SelectTrigger><SelectValue placeholder="Select deployment type" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">Not specified</SelectItem>
-                                        <SelectItem value="Cloud">Cloud</SelectItem>
-                                        <SelectItem value="On Prem">On Prem</SelectItem>
-                                        <SelectItem value="Hybrid">Hybrid</SelectItem>
+                                        {DEPLOYMENT_OPTIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
 
                             {/* CSM */}
                             <div className="space-y-2">
-                                <Label htmlFor="csm">Customer Success Manager</Label>
-                                <Input
-                                    id="csm"
-                                    value={formData.csm}
-                                    onChange={(e) => setFormData({ ...formData, csm: e.target.value })}
-                                />
+                                <Label>Customer Success Manager</Label>
+                                <Select value={formData.csm_id || 'none'} onValueChange={(value) => setFormData({ ...formData, csm_id: value === 'none' ? '' : value })}>
+                                    <SelectTrigger><SelectValue placeholder="Select CSM" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Not assigned</SelectItem>
+                                        {csms.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             {/* Features */}
@@ -452,9 +394,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                                                     onClick={() => toggleFeature(feature.id)}
                                                 >
                                                     {feature.name}
-                                                    {selectedFeatures.includes(feature.id) && (
-                                                        <X className="h-3 w-3 ml-1" />
-                                                    )}
+                                                    {selectedFeatures.includes(feature.id) && <X className="h-3 w-3 ml-1" />}
                                                 </Badge>
                                             ))}
                                         </div>
@@ -466,9 +406,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                     </ScrollArea>
 
                     <DialogFooter className="mt-4">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-                            Cancel
-                        </Button>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
                         <Button type="submit" disabled={loading}>
                             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                             {customer ? 'Update Customer' : 'Create Customer'}
