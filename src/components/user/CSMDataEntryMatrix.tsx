@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useActivityLog } from '@/hooks/useActivityLog';
@@ -8,9 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface CSMDataEntryMatrixProps {
   departmentId: string;
@@ -31,7 +38,6 @@ interface CustomerSection {
   name: string;
   features: { id: string; name: string }[];
   indicators: IndicatorInfo[];
-  /** Which features are linked to which indicator */
   indicatorFeatureMap: Record<string, Set<string>>;
 }
 
@@ -63,6 +69,7 @@ type ScoreMap = Record<string, number | null>;
 export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixProps) {
   const { user, isAdmin } = useAuth();
   const { logActivity } = useActivityLog();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -78,7 +85,6 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     setLoading(true);
 
     try {
-      // 0. CSM filter
       let csmId: string | null = null;
       if (!isAdmin) {
         const { data: csmRow } = await supabase
@@ -89,21 +95,18 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         if (csmRow) csmId = csmRow.id;
       }
 
-      // 1. FOs for dept
       const { data: fos } = await supabase
         .from('functional_objectives')
         .select('id, name')
         .eq('department_id', departmentId);
       if (!fos?.length) { setCustomerSections([]); setLoading(false); return; }
 
-      // 2. KRs
       const { data: krs } = await supabase
         .from('key_results')
         .select('id, name, functional_objective_id')
         .in('functional_objective_id', fos.map(f => f.id));
       if (!krs?.length) { setCustomerSections([]); setLoading(false); return; }
 
-      // 3. Indicators
       const { data: indicators } = await supabase
         .from('indicators')
         .select('id, name, current_value, target_value, key_result_id')
@@ -128,13 +131,11 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
       });
       setAllIndicators(indicatorInfos);
 
-      // 4. Feature links per indicator
       const { data: featureLinks } = await supabase
         .from('indicator_feature_links')
         .select('indicator_id, feature_id, features(id, name)')
         .in('indicator_id', indIds);
 
-      // indicator -> Set<featureId>, and feature id->name map
       const indFeatureMap: Record<string, Set<string>> = {};
       const featureNameMap = new Map<string, string>();
       (featureLinks || []).forEach((fl: any) => {
@@ -148,13 +149,11 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
       Object.values(indFeatureMap).forEach(s => s.forEach(id => allLinkedFeatureIds.add(id)));
       if (allLinkedFeatureIds.size === 0) { setCustomerSections([]); setLoading(false); return; }
 
-      // 5. Customer-feature mappings
       const { data: customerFeatures } = await supabase
         .from('customer_features')
         .select('customer_id, feature_id, customers(id, name, csm_id)')
         .in('feature_id', Array.from(allLinkedFeatureIds));
 
-      // Build customer -> features
       const custFeatureMap = new Map<string, Set<string>>();
       const custNameMap = new Map<string, string>();
       (customerFeatures || []).forEach((cf: any) => {
@@ -165,17 +164,14 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         custFeatureMap.get(cf.customer_id)!.add(cf.feature_id);
       });
 
-      // 6. Existing scores
       const { data: existingScores } = await supabase
         .from('csm_customer_feature_scores' as any)
         .select('*')
         .in('indicator_id', indIds)
         .eq('period', period);
 
-      // 7. Build customer sections
       const sections: CustomerSection[] = [];
       for (const [custId, custFeatures] of custFeatureMap) {
-        // Only features that are also linked to at least one indicator
         const relevantFeatureIds = [...custFeatures].filter(fid => allLinkedFeatureIds.has(fid));
         if (relevantFeatureIds.length === 0) continue;
 
@@ -183,7 +179,6 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           .map(fid => ({ id: fid, name: featureNameMap.get(fid) || 'Unknown' }))
           .sort((a, b) => a.name.localeCompare(b.name));
 
-        // Which indicators are relevant (linked to at least one of this customer's features)
         const relevantIndicators: IndicatorInfo[] = [];
         const indicatorFeatureMapForCust: Record<string, Set<string>> = {};
         for (const ind of indicatorInfos) {
@@ -209,9 +204,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
       sections.sort((a, b) => a.name.localeCompare(b.name));
       setCustomerSections(sections);
-      setOpenSections(new Set()); // all collapsed by default
+      setOpenSections(new Set());
 
-      // Build scores map
       const scoreMap: ScoreMap = {};
       (existingScores || []).forEach((s: any) => {
         scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
@@ -240,17 +234,30 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     setScores(prev => ({ ...prev, [key]: clamped }));
   };
 
-  /** Average of all feature scores for a customer across a specific indicator */
-  const getCustomerIndicatorAvg = (custId: string, indId: string, featureIds: Set<string>): number | null => {
-    const values: number[] = [];
-    for (const fid of featureIds) {
-      const v = scores[cellKey(indId, custId, fid)];
-      if (v != null) values.push(v);
-    }
-    return values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
+  const applyToRow = (custId: string, featureId: string, value: number, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => {
+    setScores(prev => {
+      const next = { ...prev };
+      for (const ind of indicators) {
+        if (indFeatMap[ind.id]?.has(featureId)) {
+          next[cellKey(ind.id, custId, featureId)] = value;
+        }
+      }
+      return next;
+    });
   };
 
-  /** Overall customer average across all their indicator-feature scores */
+  const applyToColumn = (custId: string, indId: string, value: number, features: { id: string }[], indFeatMap: Record<string, Set<string>>) => {
+    setScores(prev => {
+      const next = { ...prev };
+      for (const feat of features) {
+        if (indFeatMap[indId]?.has(feat.id)) {
+          next[cellKey(indId, custId, feat.id)] = value;
+        }
+      }
+      return next;
+    });
+  };
+
   const getCustomerOverallAvg = (section: CustomerSection): number | null => {
     const allVals: number[] = [];
     for (const ind of section.indicators) {
@@ -264,12 +271,10 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     return allVals.length === 0 ? null : allVals.reduce((a, b) => a + b, 0) / allVals.length;
   };
 
-  /** Feature row average across all KPI columns */
   const getFeatureRowAvg = (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>): number | null => {
     const values: number[] = [];
     for (const ind of indicators) {
-      const feats = indFeatMap[ind.id];
-      if (!feats?.has(featureId)) continue;
+      if (!indFeatMap[ind.id]?.has(featureId)) continue;
       const v = scores[cellKey(ind.id, custId, featureId)];
       if (v != null) values.push(v);
     }
@@ -289,7 +294,6 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     setSaving(true);
 
     try {
-      // Collect all cells with values
       const upserts: any[] = [];
       for (const section of customerSections) {
         for (const feat of section.features) {
@@ -322,7 +326,6 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         }
       }
 
-      // Update each indicator's current_value with aggregate across ALL customers
       const indicatorAggregates = new Map<string, number[]>();
       for (const section of customerSections) {
         for (const ind of section.indicators) {
@@ -388,6 +391,34 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      await generateMatrixTemplate(customerSections, period, scores);
+      toast.success('Template downloaded');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate template');
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const result = await parseMatrixExcel(file, customerSections);
+      if (!result || result.count === 0) {
+        toast.warning('No valid scores found in uploaded file');
+        return;
+      }
+      setScores(prev => ({ ...prev, ...result.scores }));
+      toast.success(`Imported ${result.count} score(s) from Excel`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to parse uploaded file');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const toggleSection = (id: string) => {
     setOpenSections(prev => {
       const next = new Set(prev);
@@ -447,10 +478,41 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
             </div>
           )}
         </div>
-        <Button onClick={handleSaveAll} disabled={saving || !hasChanges} className="gap-2">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save All
-        </Button>
+        <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Template
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Download Excel template with current data</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Upload filled Excel to populate scores</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button onClick={handleSaveAll} disabled={saving || !hasChanges} className="gap-2">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save All
+          </Button>
+        </div>
       </div>
 
       {/* Customer sections */}
@@ -462,6 +524,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           onToggle={() => toggleSection(section.id)}
           scores={scores}
           onCellChange={handleCellChange}
+          applyToRow={applyToRow}
+          applyToColumn={applyToColumn}
           getFeatureRowAvg={getFeatureRowAvg}
           getCustomerOverallAvg={getCustomerOverallAvg}
         />
@@ -470,23 +534,27 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   );
 }
 
-// --- Customer Section Card ---
 interface CustomerSectionCardProps {
   section: CustomerSection;
   isOpen: boolean;
   onToggle: () => void;
   scores: ScoreMap;
   onCellChange: (indicatorId: string, customerId: string, featureId: string, value: string) => void;
+  applyToRow: (custId: string, featureId: string, value: number, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => void;
+  applyToColumn: (custId: string, indId: string, value: number, features: { id: string }[], indFeatMap: Record<string, Set<string>>) => void;
   getFeatureRowAvg: (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => number | null;
   getCustomerOverallAvg: (section: CustomerSection) => number | null;
 }
 
 function CustomerSectionCard({
   section, isOpen, onToggle, scores, onCellChange,
-  getFeatureRowAvg, getCustomerOverallAvg,
+  applyToRow, applyToColumn, getFeatureRowAvg, getCustomerOverallAvg,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
+
+  const [applyRowValue, setApplyRowValue] = useState<Record<string, string>>({});
+  const [applyColValue, setApplyColValue] = useState<Record<string, string>>({});
 
   return (
     <Card>
@@ -533,6 +601,47 @@ function CustomerSectionCard({
                     <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
                       Avg
                     </th>
+                    <th className="px-2 py-2 text-center font-medium min-w-[120px] bg-muted/30 border-l">
+                      <span className="text-xs text-muted-foreground">Apply to Row</span>
+                    </th>
+                  </tr>
+                  <tr className="bg-muted/20 border-t">
+                    <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r">
+                      Apply to Column ↓
+                    </td>
+                    {section.indicators.map(ind => (
+                      <td key={ind.id} className="px-1 py-1 text-center border-r">
+                        <div className="flex items-center gap-0.5 justify-center">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={applyColValue[ind.id] || ''}
+                            onChange={e => setApplyColValue(prev => ({ ...prev, [ind.id]: e.target.value }))}
+                            className="h-6 w-12 text-center text-xs border-muted [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="—"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            disabled={!applyColValue[ind.id]}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const val = parseFloat(applyColValue[ind.id]);
+                              if (isNaN(val)) return;
+                              const clamped = Math.min(100, Math.max(0, val));
+                              applyToColumn(section.id, ind.id, clamped, section.features, section.indicatorFeatureMap);
+                              toast.success(`Applied ${clamped}% to all ${ind.name} cells`);
+                            }}
+                          >
+                            <CopyCheck className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </td>
+                    ))}
+                    <td className="bg-muted/10" />
+                    <td className="bg-muted/10 border-l" />
                   </tr>
                 </thead>
                 <tbody>
@@ -582,6 +691,34 @@ function CustomerSectionCard({
                           ) : (
                             <span className="text-muted-foreground/40 text-xs">—</span>
                           )}
+                        </td>
+                        <td className="px-1 py-1 text-center border-l">
+                          <div className="flex items-center gap-0.5 justify-center">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={applyRowValue[feat.id] || ''}
+                              onChange={e => setApplyRowValue(prev => ({ ...prev, [feat.id]: e.target.value }))}
+                              className="h-6 w-12 text-center text-xs border-muted [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="—"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0"
+                              disabled={!applyRowValue[feat.id]}
+                              onClick={() => {
+                                const val = parseFloat(applyRowValue[feat.id]);
+                                if (isNaN(val)) return;
+                                const clamped = Math.min(100, Math.max(0, val));
+                                applyToRow(section.id, feat.id, clamped, section.indicators, section.indicatorFeatureMap);
+                                toast.success(`Applied ${clamped}% to all KPIs for ${feat.name}`);
+                              }}
+                            >
+                              <CopyCheck className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
