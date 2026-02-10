@@ -1,70 +1,39 @@
 
-# Venture Selector Button
 
-## Overview
-Add a **Venture Selector** dropdown button to the top-right of the Portfolio page (alongside the OKR Structure and RAG Legend buttons). This selector acts as a data lens/filter -- selecting a venture scopes all displayed data to that product. Currently, all data maps to **HumanFirewall**. Future ventures include EmailRemediator, CyberForceHQ, SecurityRating, etc.
+# Update Customer Importer for Your Excel Format
 
-## What This Involves
+## Problem
+Your exported Excel file uses slightly different column headers ("Contact Persons", "Contact Emails", "Created At") that the current importer doesn't recognize, causing those fields to be silently dropped. The tier value "Unassigned" also incorrectly defaults to "Tier1".
 
-### 1. Database: Create a `ventures` table
-A new table to store available ventures/products:
+## Changes (Single File: `src/lib/customerExcelImporter.ts`)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | Auto-generated |
-| name | text | e.g. "HumanFirewall" |
-| display_name | text | e.g. "Human Firewall" |
-| description | text | Optional |
-| is_active | boolean | Default true |
-| created_at | timestamptz | Auto |
+### 1. Add Missing Column Aliases (line 40-57)
+Add these entries to `COLUMN_MAP`:
+- `'contact persons'` -> `contactPerson`
+- `'contact emails'` -> `email`
+- `'created at'` -> new `createdAt` field
 
-Seed it with:
-- **HumanFirewall** (active, default)
-- **EmailRemediator** (inactive placeholder)
-- **CyberForceHQ** (inactive placeholder)
-- **SecurityRating** (inactive placeholder)
+### 2. Add `createdAt` to `CustomerRow` Interface (line 4-16)
+Add an optional `createdAt: string | null` field so the original creation timestamp from your export is preserved during re-imports.
 
-Also add a `venture_id` column to `org_objectives` so each objective can be associated with a venture. All existing objectives will default to the HumanFirewall venture.
+### 3. Fix `normalizeTier()` to Handle "Unassigned" (line 72-79)
+Currently any unrecognized tier falls through to "Tier1". Add a check:
+- If tier is `'unassigned'`, return `'Unassigned'` instead of defaulting to Tier1.
 
-### 2. UI: Venture Selector Component
-A new `VentureSelector` component -- a dropdown button styled consistently with the existing OKR Structure and RAG Legend buttons. It will:
-- Show the currently selected venture name (defaults to "HumanFirewall")
-- List all active ventures in a dropdown
-- Inactive ventures shown greyed out with a "Coming Soon" badge
-- Store the selection in React state (passed down via the Portfolio page)
+### 4. Clean Stale Feature Links on Update (line 319-331)
+When updating an existing customer, **delete old `customer_features` rows** before re-linking. This ensures the feature list exactly matches the latest upload rather than accumulating stale links.
 
-### 3. Data Filtering
-The `useOrgObjectives` hook will accept an optional `ventureId` parameter. When provided, the query filters `org_objectives` by that venture. Since all current data belongs to HumanFirewall, selecting it shows everything as-is. Selecting a future venture would show an empty state until data is imported for it.
-
-## Files to Create/Modify
-
-| File | Change |
-|------|--------|
-| **Migration SQL** | Create `ventures` table, seed 4 ventures, add `venture_id` to `org_objectives`, backfill existing rows |
-| `src/components/VentureSelector.tsx` | **New** -- dropdown button component |
-| `src/pages/Portfolio.tsx` | Add VentureSelector to the top-right button row, pass selected venture to data hook |
-| `src/hooks/useOrgObjectives.tsx` | Accept optional `ventureId` filter parameter |
-
-## Visual Layout
-
-The top-right area of Portfolio will look like:
-
-```text
-[HumanFirewall v]  [OKR Structure]  [RAG Legend]
+Add before the feature linking step:
+```
+await supabase.from('customer_features').delete().eq('customer_id', existingId);
 ```
 
-The dropdown when clicked:
+### 5. Pass `created_at` During Import (line 303-315)
+Include `created_at` in the `customerData` object when inserting new customers (not on updates, to preserve original dates).
 
-```text
-+---------------------------+
-| HumanFirewall        (check) |
-| EmailRemediator   Coming Soon |
-| CyberForceHQ      Coming Soon |
-| SecurityRating    Coming Soon |
-+---------------------------+
-```
+### 6. Update Template to Match Export Format (line 380-420)
+Update `generateCustomerTemplate()` headers and sample data to match the actual export column names ("Contact Persons", "Contact Emails") so the template and importer stay in sync.
 
-## Technical Notes
-- The `ventures` table gets RLS policies allowing all authenticated users to read ventures
-- The `venture_id` foreign key on `org_objectives` is nullable initially for backward compatibility, then backfilled to HumanFirewall's ID
-- Selected venture is stored in component state (no persistence needed yet -- defaults to HumanFirewall on page load)
+## No Database Changes Required
+The `customers` table already has all needed columns.
+
