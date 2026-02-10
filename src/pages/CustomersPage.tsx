@@ -413,9 +413,9 @@ export default function CustomersPage() {
                           </Badge>
                           {customer.deploymentType && (
                             <Badge variant="outline" className="gap-1">
-                              {customer.deploymentType === 'Cloud' ? (
+                              {customer.deploymentType?.toLowerCase().includes('cloud') ? (
                                 <Cloud className="h-3 w-3" />
-                              ) : customer.deploymentType === 'On Prem' ? (
+                              ) : customer.deploymentType === 'On Prem' || customer.deploymentType === 'Hybrid' ? (
                                 <Server className="h-3 w-3" />
                               ) : null}
                               {customer.deploymentType}
