@@ -1,42 +1,54 @@
 
 
-# Fix: 2 Missing Customers (CCED and Viresec)
+# Link Customers to KPIs via Features and Make Them Clickable
 
-## Root Cause
+## Problem
+The "Linked to KPIs" and "Total KPI Links" on the Customers page show 0 because they read from the `indicator_customer_links` table which is empty. However, the real relationships exist indirectly:
+- **496** customer-feature links (`customer_features`)
+- **170** feature-indicator links (`indicator_feature_links`)
+- = **780** indirect customer-to-indicator connections
 
-The database has two CHECK constraints that reject values from your Excel file:
+## Solution
 
-1. **`customers_tier_check`** -- only allows `Tier1`, `Tier2`, `Tier3`. Your file has "Unassigned" (CCED's tier), which the importer now correctly preserves but the database rejects.
+### 1. Update `useCustomerImpact.tsx` -- Derive KPI Links via Features
 
-2. **`customers_deployment_type_check`** -- only allows `On Prem`, `Cloud`, `Hybrid`. Your file has `India Cloud`, `UAE Cloud`, `Private Cloud`, etc. These silently fail, causing the column to be NULL for existing records (updated via prior imports), but for brand-new customers like CCED and Viresec, the entire INSERT is rejected.
+Replace the current query against `indicator_customer_links` with an indirect join through features:
 
-This is why 80 of 82 customers exist: the other 80 were likely imported before these constraints existed, or their updates partially succeeded. CCED and Viresec are new and fail on insert.
+```
+customer_features (customer -> feature)
+  + indicator_feature_links (feature -> indicator)
+  = customer -> indicator relationship
+```
 
-## Fix
+**Steps in `fetchCustomersWithImpact()`:**
+- Fetch `customer_features` (customer_id, feature_id)
+- Fetch `indicator_feature_links` (feature_id, indicator_id)
+- Build a map: for each customer, find all indicators reachable through their features
+- Use this derived link set for `linkedIndicatorCount`, RAG calculation, and trend data (instead of the empty `indicator_customer_links`)
 
-### 1. Database Migration -- Relax CHECK Constraints
+Also update `fetchCustomerImpact()` (single customer detail) to use the same indirect path so the detail page stays consistent.
 
-Update both constraints to allow real-world values:
+### 2. Update `CustomersPage.tsx` -- Make KPI Count Clickable
 
-| Constraint | Current Values | New Values |
-|---|---|---|
-| `customers_tier_check` | Tier1, Tier2, Tier3 | Tier1, Tier2, Tier3, **Unassigned** |
-| `customers_deployment_type_check` | On Prem, Cloud, Hybrid | On Prem, Cloud, Hybrid, **India Cloud**, **UAE Cloud**, **Private Cloud** |
+- Wrap the KPI count number on each customer card in a `Link` to `/customers/{id}` (the detail page already shows the full indicator hierarchy)
+- Make the "Linked to KPIs" and "Total KPI Links" summary stat cards clickable/interactive -- clicking scrolls to the customer list below
 
-### 2. Code Change -- Normalize Deployment Type in Importer
+### 3. Add More Filters to Customers Page
 
-Update `src/lib/customerExcelImporter.ts` to pass through all deployment type values as-is (they're already clean strings from the Excel). No normalization needed since we're expanding the constraint.
+Add these new filter dropdowns alongside existing ones:
+- **Region** -- distinct regions from customer data
+- **Industry** -- distinct industries from customer data
+- **CSM** -- CSM names from customer data
+- **RAG Status** -- Green, Amber, Red, Not Set
 
-### 3. Backfill Deployment Types
-
-Run an update to set the correct `deployment_type` for existing customers that had it silently nulled out. This will happen automatically on the next re-import of the same Excel file.
+Update the search to also match CSM names.
 
 ## Files Modified
 
 | File | Change |
-|---|---|
-| **Database migration** | Drop and recreate both CHECK constraints with expanded allowed values |
-| `src/lib/customerExcelImporter.ts` | No code change needed -- deployment_type is already passed through as-is |
+|------|--------|
+| `src/hooks/useCustomerImpact.tsx` | Derive indicator links via `customer_features` + `indicator_feature_links` instead of empty `indicator_customer_links` (both list and detail functions) |
+| `src/pages/CustomersPage.tsx` | Make KPI counts clickable (link to customer detail), add Region/Industry/CSM/RAG filters |
 
-After this migration, re-importing the same Excel file will successfully import all 82 customers including CCED and Viresec, and backfill deployment types for existing records.
-
+## No Database Changes Required
+All the data already exists in `customer_features` and `indicator_feature_links`.
