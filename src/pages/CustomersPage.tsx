@@ -127,19 +127,39 @@ export default function CustomersPage() {
     }
   };
 
-  // Get unique tiers, statuses, and deployment types for filters
-  const { tiers, statuses, deploymentTypes, regions, industries, csmNames } = useMemo(() => {
-    if (!customers) return { tiers: [], statuses: [], deploymentTypes: [], regions: [], industries: [], csmNames: [] };
-    const deployments = [...new Set(customers.map(c => c.deploymentType).filter(Boolean))].filter(d => d !== 'Cloud').sort();
+  // Helper: filter customers by all filters EXCEPT the excluded one
+  const filterExcluding = (exclude: string) => {
+    if (!customers) return [];
+    return customers.filter(c => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = c.name.toLowerCase().includes(q) ||
+        (c.region?.toLowerCase().includes(q)) ||
+        (c.industry?.toLowerCase().includes(q)) ||
+        (c.csmName?.toLowerCase().includes(q));
+      const matchesTier = exclude === 'tier' || tierFilter === 'all' || c.tier === tierFilter;
+      const matchesStatus = exclude === 'status' || statusFilter === 'all' || c.status === statusFilter;
+      const matchesDeployment = exclude === 'deployment' || deploymentFilter === 'all' || c.deploymentType === deploymentFilter;
+      const matchesRegion = exclude === 'region' || regionFilter === 'all' || c.region === regionFilter;
+      const matchesIndustry = exclude === 'industry' || industryFilter === 'all' || c.industry === industryFilter;
+      const matchesCsm = exclude === 'csm' || csmFilter === 'all' || c.csmName === csmFilter;
+      const matchesRag = exclude === 'rag' || ragFilter === 'all' || c.ragStatus === ragFilter;
+      return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag;
+    });
+  };
+
+  // Dynamic filter options - each computed from data filtered by all OTHER active filters
+  const { tiers, statuses, deploymentTypes, regions, industries, csmNames, ragOptions } = useMemo(() => {
+    if (!customers) return { tiers: [], statuses: [], deploymentTypes: [], regions: [], industries: [], csmNames: [], ragOptions: [] };
     return {
-      tiers: [...new Set(customers.map(c => c.tier))].sort(),
-      statuses: [...new Set(customers.map(c => c.status))].sort(),
-      deploymentTypes: deployments as string[],
-      regions: [...new Set(customers.map(c => c.region).filter(Boolean))].sort() as string[],
-      industries: [...new Set(customers.map(c => c.industry).filter(Boolean))].sort() as string[],
-      csmNames: [...new Set(customers.map(c => c.csmName).filter(Boolean))].sort() as string[],
+      tiers: [...new Set(filterExcluding('tier').map(c => c.tier))].sort(),
+      statuses: [...new Set(filterExcluding('status').map(c => c.status))].sort(),
+      deploymentTypes: [...new Set(filterExcluding('deployment').map(c => c.deploymentType).filter(Boolean))].filter(d => d !== 'Cloud').sort() as string[],
+      regions: [...new Set(filterExcluding('region').map(c => c.region).filter(Boolean))].sort() as string[],
+      industries: [...new Set(filterExcluding('industry').map(c => c.industry).filter(Boolean))].sort() as string[],
+      csmNames: [...new Set(filterExcluding('csm').map(c => c.csmName).filter(Boolean))].sort() as string[],
+      ragOptions: [...new Set(filterExcluding('rag').map(c => c.ragStatus))].sort() as string[],
     };
-  }, [customers]);
+  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter]);
 
   // Filter customers
   const filteredCustomers = useMemo(() => {
@@ -474,10 +494,10 @@ export default function CustomersPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">RAG</SelectItem>
-            <SelectItem value="green">Green</SelectItem>
-            <SelectItem value="amber">Amber</SelectItem>
-            <SelectItem value="red">Red</SelectItem>
-            <SelectItem value="not-set">Not Set</SelectItem>
+            {ragOptions.map(rag => {
+              const label: Record<string, string> = { green: 'Green', amber: 'Amber', red: 'Red', 'not-set': 'Not Set' };
+              return <SelectItem key={rag} value={rag}>{label[rag] || rag}</SelectItem>;
+            })}
           </SelectContent>
         </Select>
       </div>
