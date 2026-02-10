@@ -360,6 +360,9 @@ export default function CustomersPage() {
                           {customer.industry && (
                             <span className="text-xs text-muted-foreground">• {customer.industry}</span>
                           )}
+                          {customer.csmName && (
+                            <span className="text-xs text-muted-foreground">• CSM: {customer.csmName}</span>
+                          )}
                         </div>
                         {features.length > 0 && (
                           <div className="flex items-center gap-1.5 mt-2 flex-wrap">

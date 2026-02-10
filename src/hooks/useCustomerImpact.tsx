@@ -362,17 +362,26 @@ export interface CustomerWithImpact {
   logoUrl: string | null;
   deploymentType: string | null;
   trendData: TrendDataPoint[];
+  csmName: string | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
-  // Fetch all customers including new columns
-  const { data: customers, error: custError } = await supabase
-    .from('customers')
-    .select('id, name, tier, region, industry, status, logo_url, deployment_type')
-    .order('name');
+  // Fetch all customers and CSMs in parallel
+  const [customersResult, csmsResult] = await Promise.all([
+    supabase
+      .from('customers')
+      .select('id, name, tier, region, industry, status, logo_url, deployment_type, csm_id')
+      .order('name'),
+    supabase
+      .from('csms')
+      .select('id, name'),
+  ]);
   
-  if (custError) throw custError;
-  if (!customers) return [];
+  if (customersResult.error) throw customersResult.error;
+  if (!customersResult.data) return [];
+  
+  const customers = customersResult.data;
+  const csmMap = new Map((csmsResult.data || []).map(c => [c.id, c.name]));
 
   // Fetch all indicator links with indicator data for RAG calculation
   const { data: links, error: linksError } = await supabase
@@ -480,6 +489,7 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       logoUrl: c.logo_url,
       deploymentType: c.deployment_type,
       trendData: customerTrendData.get(c.id) || [],
+      csmName: c.csm_id ? (csmMap.get(c.csm_id) || null) : null,
     };
   });
 }
