@@ -1,54 +1,58 @@
 
 
-# Fix Customer Edit Dialog: Missing Data, Scrolling, and Correct Dropdowns
+# Fix Customer Data Gaps: Missing Links, Deployment Types, and Icons
 
-## Problems Found
+## Issues
 
-1. **Tier values mismatch** -- The dropdown shows "Tier 1", "Tier 2", "Tier 3" but the database stores "Tier1", "Tier2" (no spaces), plus "Unassigned". So when editing, the saved value doesn't match any option and appears blank.
-
-2. **Deployment type incomplete** -- Dropdown only has Cloud/On Prem/Hybrid, but the database also allows "India Cloud", "UAE Cloud", "Private Cloud". These values exist in data but can't be selected or shown.
-
-3. **Region is free text** -- Should be a dropdown with the 3 known values: India, Middle East, Others.
-
-4. **Industry is free text** -- Should be a dropdown with the 19 known industry values from the database.
-
-5. **CSM field broken** -- The form uses a free-text `csm` field, but the actual database column is `csm_id` (a UUID foreign key to the `csms` table). So the CSM is never loaded or saved correctly. Should be a dropdown populated from the `csms` table.
-
-6. **Dialog not scrollable** -- The ScrollArea likely isn't working because the Radix ScrollArea viewport needs explicit height constraints.
+1. **2 customers have no feature links** -- "E7 GROUP" and "DIFC" are not linked to any features, so they show 0 KPIs. All other 78 customers are linked to all 17 features. These 2 need the same links.
+2. **61 customers have NULL deployment_type** -- Only 19 customers have "On Prem" set. The remaining 61 have no deployment type at all.
+3. **Deployment badge icons incomplete** -- Only "Cloud" and "On Prem" get icons. Other deployment types (India Cloud, UAE Cloud, Private Cloud, Hybrid) render with no icon.
 
 ## Changes
 
-### File: `src/components/CustomerFormDialog.tsx`
+### 1. Database Migration: Link the 2 missing customers to all features
 
-**1. Fix the Customer interface:**
-- Remove `csm?: string`, add `csm_id?: string`
-- Keep other fields
+Insert `customer_features` rows for E7 GROUP and DIFC, linking them to all 17 features -- matching what the other 78 customers have.
 
-**2. Add CSM data fetching:**
-- Fetch all CSMs from `csms` table on dialog open
-- Store in state as `{ id, name }[]`
+```sql
+INSERT INTO customer_features (customer_id, feature_id)
+SELECT c.id, f.id
+FROM customers c
+CROSS JOIN features f
+WHERE c.id IN (
+  '32ef17cd-cd56-4f22-8fa0-347a4aa53158',
+  '4f85cc8c-9dea-4a11-a9a6-1fcbc3b355c7'
+)
+ON CONFLICT DO NOTHING;
+```
 
-**3. Replace free-text inputs with dropdowns:**
+### 2. Database Migration: Set default deployment_type for NULLs
 
-| Field | Current | New |
-|-------|---------|-----|
-| Tier | Dropdown with "Tier 1/2/3" | Dropdown with "Tier1", "Tier2", "Unassigned" (matching DB values) |
-| Region | Free text Input | Select dropdown: India, Middle East, Others |
-| Industry | Free text Input | Select dropdown with all 19 industries from DB |
-| CSM | Free text Input | Select dropdown populated from `csms` table, saving `csm_id` |
-| Deployment Type | Cloud/On Prem/Hybrid | Add India Cloud, UAE Cloud, Private Cloud |
+Update the 61 customers with NULL deployment_type to "Cloud" (most common default).
 
-**4. Fix form data initialization:**
-- When editing, load `csm_id` from the customer record
-- Map CSM name for display
+```sql
+UPDATE customers SET deployment_type = 'Cloud' WHERE deployment_type IS NULL;
+```
 
-**5. Fix submit data:**
-- Send `csm_id` instead of `csm` field
-- Remove `csm` from submit payload
+### 3. File: `src/pages/CustomersPage.tsx` -- Fix deployment icons
 
-**6. Fix ScrollArea scrolling:**
-- Add explicit `max-h-[calc(90vh-180px)]` to the ScrollArea so it has a bounded height and can scroll
+Update the deployment badge icon logic to handle all 6 types:
 
-### No database changes needed
-All the correct columns and values already exist.
+| Deployment Type | Icon |
+|----------------|------|
+| Cloud | Cloud |
+| India Cloud | Cloud |
+| UAE Cloud | Cloud |
+| Private Cloud | Cloud |
+| On Prem | Server |
+| Hybrid | Server + Cloud (or Server) |
+
+Replace the current if/else with a check: if the type includes "Cloud", show Cloud icon; if "On Prem", show Server icon; if "Hybrid", show Server icon.
+
+## Expected Results After Fix
+
+- "Customers with KPIs" changes from 78 to **80** (all customers)
+- "Unique KPIs Linked" stays at **10**
+- All customer cards show a deployment type badge with an appropriate icon
+- No more blank deployment badges
 
