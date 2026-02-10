@@ -170,6 +170,33 @@ export default function CustomersPage() {
     return { total: filteredCustomers.length, linked, uniqueKpis: allIndicatorIds.size };
   }, [filteredCustomers]);
 
+  // Filter breakdown counts
+  const filterBreakdowns = useMemo(() => {
+    if (!filteredCustomers.length) return [];
+
+    const countBy = (key: (c: typeof filteredCustomers[0]) => string | null | undefined, label: string) => {
+      const counts: Record<string, number> = {};
+      filteredCustomers.forEach(c => {
+        const val = key(c) || 'Unknown';
+        counts[val] = (counts[val] || 0) + 1;
+      });
+      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      return entries.length > 0 ? { label, counts: entries.map(([name, count]) => ({ name, count })) } : null;
+    };
+
+    const ragLabel: Record<string, string> = { green: 'Green', amber: 'Amber', red: 'Red', 'not-set': 'Not Set' };
+
+    return [
+      countBy(c => c.tier, 'Tier'),
+      countBy(c => c.status, 'Status'),
+      countBy(c => c.deploymentType, 'Deployment'),
+      countBy(c => c.region, 'Region'),
+      countBy(c => c.industry, 'Industry'),
+      countBy(c => c.csmName, 'CSM'),
+      countBy(c => ragLabel[c.ragStatus] || c.ragStatus, 'RAG'),
+    ].filter(Boolean) as { label: string; counts: { name: string; count: number }[] }[];
+  }, [filteredCustomers]);
+
   // Get status badge styling
   const getStatusBadgeClasses = (status: string) => {
     switch (status) {
@@ -262,6 +289,24 @@ export default function CustomersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Filter Breakdown Stat Cards */}
+      {filterBreakdowns.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          {filterBreakdowns.map(breakdown => (
+            <Card key={breakdown.label} className="p-3">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">{breakdown.label}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {breakdown.counts.map(({ name, count }) => (
+                  <Badge key={name} variant="secondary" className="text-[11px] px-2 py-0.5 font-medium">
+                    {name}: {count}
+                  </Badge>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4 p-4 bg-muted/30 rounded-lg">
