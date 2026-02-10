@@ -1,39 +1,35 @@
 
 
-# Update Customer Importer for Your Excel Format
+# Show CSM Names and Ensure Dynamic KPI Data on Customers Page
 
-## Problem
-Your exported Excel file uses slightly different column headers ("Contact Persons", "Contact Emails", "Created At") that the current importer doesn't recognize, causing those fields to be silently dropped. The tier value "Unassigned" also incorrectly defaults to "Tier1".
+## What Changes
 
-## Changes (Single File: `src/lib/customerExcelImporter.ts`)
+### 1. Show CSM Name on Each Customer Card
+Each customer has a `csm_id` foreign key linking to the `csms` table. Currently the Customers page doesn't fetch or display the CSM name. We'll add it as a small label on each customer card (e.g., "CSM: John Doe" next to region/industry).
 
-### 1. Add Missing Column Aliases (line 40-57)
-Add these entries to `COLUMN_MAP`:
-- `'contact persons'` -> `contactPerson`
-- `'contact emails'` -> `email`
-- `'created at'` -> new `createdAt` field
+### 2. Confirm KPI Counts Are Dynamic
+The "Linked to KPIs" and "Total KPI Links" summary stats are already dynamically calculated from the `indicator_customer_links` table -- no mock data. The per-customer KPI count shown on the right side of each card is also live. No changes needed here, but we'll make sure the summary cards reflect filtered results (they already do).
 
-### 2. Add `createdAt` to `CustomerRow` Interface (line 4-16)
-Add an optional `createdAt: string | null` field so the original creation timestamp from your export is preserved during re-imports.
+## Technical Changes
 
-### 3. Fix `normalizeTier()` to Handle "Unassigned" (line 72-79)
-Currently any unrecognized tier falls through to "Tier1". Add a check:
-- If tier is `'unassigned'`, return `'Unassigned'` instead of defaulting to Tier1.
+### File: `src/hooks/useCustomerImpact.tsx`
 
-### 4. Clean Stale Feature Links on Update (line 319-331)
-When updating an existing customer, **delete old `customer_features` rows** before re-linking. This ensures the feature list exactly matches the latest upload rather than accumulating stale links.
+**Add `csmName` to the `CustomerWithImpact` interface and fetch it:**
+- Update the customer query to also fetch `csm_id`
+- Fetch all CSMs from the `csms` table in parallel
+- Map `csm_id` to CSM name for each customer
+- Add `csmName: string | null` to the returned data
 
-Add before the feature linking step:
-```
-await supabase.from('customer_features').delete().eq('customer_id', existingId);
-```
+### File: `src/pages/CustomersPage.tsx`
 
-### 5. Pass `created_at` During Import (line 303-315)
-Include `created_at` in the `customerData` object when inserting new customers (not on updates, to preserve original dates).
+**Display CSM name on each customer card:**
+- Show a small "CSM: [Name]" label in the metadata row (next to region and industry)
+- If no CSM is assigned, skip the label
 
-### 6. Update Template to Match Export Format (line 380-420)
-Update `generateCustomerTemplate()` headers and sample data to match the actual export column names ("Contact Persons", "Contact Emails") so the template and importer stay in sync.
+## Files Modified
 
-## No Database Changes Required
-The `customers` table already has all needed columns.
+| File | Change |
+|------|--------|
+| `src/hooks/useCustomerImpact.tsx` | Add `csmName` field, fetch CSMs, join by `csm_id` |
+| `src/pages/CustomersPage.tsx` | Display `customer.csmName` on each card |
 
