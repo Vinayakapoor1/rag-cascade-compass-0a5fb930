@@ -375,14 +375,7 @@ export default function CustomerDetailPage() {
       <CustomerFormDialog
         open={customerFormOpen}
         onOpenChange={setCustomerFormOpen}
-        customer={{
-          id: customerId,
-          name: impact.customerName,
-          tier: impact.customerTier,
-          status: impact.customerStatus,
-          region: impact.customerRegion,
-          industry: impact.customerIndustry
-        }}
+        customer={{ id: customerId, name: impact.customerName, tier: impact.customerTier, status: impact.customerStatus }}
         onSuccess={() => {
           refetch();
           fetchCustomerFeatures();

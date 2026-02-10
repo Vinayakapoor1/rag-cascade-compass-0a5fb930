@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, X, Upload, Image } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Customer {
     id?: string;
@@ -79,15 +80,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
         if (open) {
             fetchFeatures();
             fetchCsms();
-            if (customer) {
-                setFormData({
-                    ...customer,
-                    csm_id: customer.csm_id || '',
-                    logo_url: customer.logo_url || '',
-                    deployment_type: customer.deployment_type || ''
-                });
-                fetchCustomerFeatures(customer.id!);
-                setLogoPreview(customer.logo_url || null);
+            if (customer?.id) {
+                fetchFullCustomer(customer.id);
+                fetchCustomerFeatures(customer.id);
             } else {
                 setFormData({
                     name: '',
@@ -108,6 +103,30 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
             }
         }
     }, [open, customer]);
+
+    const fetchFullCustomer = async (id: string) => {
+        const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (!error && data) {
+            setFormData({
+                name: data.name,
+                contact_person: data.contact_person || '',
+                email: data.email || '',
+                region: data.region || '',
+                tier: data.tier,
+                industry: data.industry || '',
+                csm_id: data.csm_id || '',
+                status: data.status,
+                managed_services: data.managed_services || false,
+                logo_url: data.logo_url || '',
+                deployment_type: data.deployment_type || '',
+            });
+            setLogoPreview(data.logo_url || null);
+        }
+    };
 
     const fetchFeatures = async () => {
         const { data, error } = await supabase
@@ -255,7 +274,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] pr-4">
+                    <ScrollArea className="flex-1 max-h-[calc(85vh-140px)] pr-4">
                         <div className="space-y-4 pb-4">
                             {/* Logo Upload */}
                             <div className="space-y-2">
@@ -376,6 +395,16 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                                         {csms.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
+                            </div>
+
+                            {/* Managed Services */}
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id="managed_services"
+                                    checked={formData.managed_services || false}
+                                    onCheckedChange={(checked) => setFormData({ ...formData, managed_services: !!checked })}
+                                />
+                                <Label htmlFor="managed_services" className="cursor-pointer">Managed Services</Label>
                             </div>
 
                             {/* Features */}
