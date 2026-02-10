@@ -55,7 +55,7 @@ const RAG_BADGE_STYLES: Record<string, string> = {
 type ScoreMap = Record<string, number | null>;
 
 export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixProps) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { logActivity } = useActivityLog();
 
   const [loading, setLoading] = useState(true);
@@ -71,6 +71,17 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     setLoading(true);
 
     try {
+      // 0. Determine if current user is a CSM — filter customers accordingly
+      let csmId: string | null = null;
+      if (!isAdmin) {
+        const { data: csmRow } = await supabase
+          .from('csms')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (csmRow) csmId = csmRow.id;
+      }
+
       // 1. Get FOs for dept
       const { data: fos } = await supabase
         .from('functional_objectives')
@@ -111,11 +122,17 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
       if (allLinkedFeatureIds.size === 0) { setKpiSections([]); setLoading(false); return; }
 
-      // 6. Get customer_features for those features
-      const { data: customerFeatures } = await supabase
+      // 6. Get customer_features for those features, filtered by CSM if applicable
+      let customerFeaturesQuery = supabase
         .from('customer_features')
-        .select('customer_id, feature_id, customers(id, name)')
+        .select('customer_id, feature_id, customers(id, name, csm_id)')
         .in('feature_id', Array.from(allLinkedFeatureIds));
+
+      if (csmId) {
+        // We'll filter after fetching since we need to join through customers
+      }
+
+      const { data: customerFeatures } = await customerFeaturesQuery;
 
       // 7. Load existing scores
       const { data: existingScores } = await supabase
@@ -136,11 +153,13 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         featuresByInd[fl.indicator_id].push({ id: fl.features.id, name: fl.features.name });
       });
 
-      // Customer -> features mapping
+      // Customer -> features mapping (filtered by CSM if applicable)
       const customerFeatureMap = new Map<string, Set<string>>();
       const customerNameMap = new Map<string, string>();
       (customerFeatures || []).forEach((cf: any) => {
         if (!cf.customers) return;
+        // Filter by CSM: skip customers not assigned to the logged-in CSM
+        if (csmId && cf.customers.csm_id !== csmId) return;
         customerNameMap.set(cf.customer_id, cf.customers.name);
         if (!customerFeatureMap.has(cf.customer_id)) customerFeatureMap.set(cf.customer_id, new Set());
         customerFeatureMap.get(cf.customer_id)!.add(cf.feature_id);
@@ -201,7 +220,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     } finally {
       setLoading(false);
     }
-  }, [departmentId, period, user]);
+  }, [departmentId, period, user, isAdmin]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
