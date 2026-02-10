@@ -89,6 +89,10 @@ export default function CustomersPage() {
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deploymentFilter, setDeploymentFilter] = useState<string>('all');
+  const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [industryFilter, setIndustryFilter] = useState<string>('all');
+  const [csmFilter, setCsmFilter] = useState<string>('all');
+  const [ragFilter, setRagFilter] = useState<string>('all');
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
@@ -124,13 +128,16 @@ export default function CustomersPage() {
   };
 
   // Get unique tiers, statuses, and deployment types for filters
-  const { tiers, statuses, deploymentTypes } = useMemo(() => {
-    if (!customers) return { tiers: [], statuses: [], deploymentTypes: [] };
+  const { tiers, statuses, deploymentTypes, regions, industries, csmNames } = useMemo(() => {
+    if (!customers) return { tiers: [], statuses: [], deploymentTypes: [], regions: [], industries: [], csmNames: [] };
     const deployments = [...new Set(customers.map(c => c.deploymentType).filter(Boolean))].sort();
     return {
       tiers: [...new Set(customers.map(c => c.tier))].sort(),
       statuses: [...new Set(customers.map(c => c.status))].sort(),
       deploymentTypes: deployments as string[],
+      regions: [...new Set(customers.map(c => c.region).filter(Boolean))].sort() as string[],
+      industries: [...new Set(customers.map(c => c.industry).filter(Boolean))].sort() as string[],
+      csmNames: [...new Set(customers.map(c => c.csmName).filter(Boolean))].sort() as string[],
     };
   }, [customers]);
 
@@ -138,15 +145,21 @@ export default function CustomersPage() {
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
     return customers.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.region?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (c.industry?.toLowerCase().includes(searchQuery.toLowerCase()));
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = c.name.toLowerCase().includes(q) ||
+        (c.region?.toLowerCase().includes(q)) ||
+        (c.industry?.toLowerCase().includes(q)) ||
+        (c.csmName?.toLowerCase().includes(q));
       const matchesTier = tierFilter === 'all' || c.tier === tierFilter;
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
       const matchesDeployment = deploymentFilter === 'all' || c.deploymentType === deploymentFilter;
-      return matchesSearch && matchesTier && matchesStatus && matchesDeployment;
+      const matchesRegion = regionFilter === 'all' || c.region === regionFilter;
+      const matchesIndustry = industryFilter === 'all' || c.industry === industryFilter;
+      const matchesCsm = csmFilter === 'all' || c.csmName === csmFilter;
+      const matchesRag = ragFilter === 'all' || c.ragStatus === ragFilter;
+      return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag;
     });
-  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter]);
+  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter]);
 
   // Summary stats - now based on filtered customers
   const stats = useMemo(() => {
@@ -305,6 +318,59 @@ export default function CustomersPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Region Filter */}
+        <Select value={regionFilter} onValueChange={setRegionFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="All Regions" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Regions</SelectItem>
+            {regions.map(r => (
+              <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Industry Filter */}
+        <Select value={industryFilter} onValueChange={setIndustryFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Industries" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Industries</SelectItem>
+            {industries.map(i => (
+              <SelectItem key={i} value={i}>{i}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* CSM Filter */}
+        <Select value={csmFilter} onValueChange={setCsmFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All CSMs" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All CSMs</SelectItem>
+            {csmNames.map(name => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* RAG Status Filter */}
+        <Select value={ragFilter} onValueChange={setRagFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="All RAG" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All RAG Status</SelectItem>
+            <SelectItem value="green">Green</SelectItem>
+            <SelectItem value="amber">Amber</SelectItem>
+            <SelectItem value="red">Red</SelectItem>
+            <SelectItem value="not-set">Not Set</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Customer List */}
@@ -314,7 +380,7 @@ export default function CustomersPage() {
             <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No customers found</h3>
             <p className="text-muted-foreground">
-              {searchQuery || tierFilter !== 'all' || statusFilter !== 'all' || deploymentFilter !== 'all'
+            {searchQuery || tierFilter !== 'all' || statusFilter !== 'all' || deploymentFilter !== 'all' || regionFilter !== 'all' || industryFilter !== 'all' || csmFilter !== 'all' || ragFilter !== 'all'
                 ? 'Try adjusting your filters.'
                 : 'No customers have been added yet.'}
             </p>
@@ -408,15 +474,19 @@ export default function CustomersPage() {
                         <RAGBadge status={customer.ragStatus} size="md" />
                         <span className="text-[10px] text-muted-foreground mt-1">Health</span>
                       </div>
-                      <div className="text-right">
+                      <Link
+                        to={`/customers/${customer.id}`}
+                        className="text-right hover:opacity-80 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <p className={cn(
                           "text-2xl font-bold",
-                          customer.linkedIndicatorCount > 0 ? "text-primary" : "text-muted-foreground"
+                          customer.linkedIndicatorCount > 0 ? "text-primary underline decoration-dotted underline-offset-4" : "text-muted-foreground"
                         )}>
                           {customer.linkedIndicatorCount}
                         </p>
                         <p className="text-xs text-muted-foreground">KPIs</p>
-                      </div>
+                      </Link>
                       <div className="flex flex-col gap-1">
                         <Button
                           variant="ghost"
