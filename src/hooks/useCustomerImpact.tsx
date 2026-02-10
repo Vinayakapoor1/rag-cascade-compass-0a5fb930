@@ -358,6 +358,7 @@ export interface CustomerWithImpact {
   industry: string | null;
   status: string;
   linkedIndicatorCount: number;
+  linkedIndicatorIds: string[];
   ragStatus: RAGStatus;
   logoUrl: string | null;
   deploymentType: string | null;
@@ -519,6 +520,7 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       industry: c.industry,
       status: c.status,
       linkedIndicatorCount: linkedCount,
+      linkedIndicatorIds: data ? [...customerIndicatorMap.get(c.id) || []] : [],
       ragStatus,
       logoUrl: c.logo_url,
       deploymentType: c.deployment_type,

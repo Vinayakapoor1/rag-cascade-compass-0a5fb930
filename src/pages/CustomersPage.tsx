@@ -163,10 +163,11 @@ export default function CustomersPage() {
 
   // Summary stats - now based on filtered customers
   const stats = useMemo(() => {
-    if (!filteredCustomers) return { total: 0, linked: 0, totalLinks: 0 };
+    if (!filteredCustomers) return { total: 0, linked: 0, uniqueKpis: 0 };
     const linked = filteredCustomers.filter(c => c.linkedIndicatorCount > 0).length;
-    const totalLinks = filteredCustomers.reduce((sum, c) => sum + c.linkedIndicatorCount, 0);
-    return { total: filteredCustomers.length, linked, totalLinks };
+    const allIndicatorIds = new Set<string>();
+    filteredCustomers.forEach(c => c.linkedIndicatorIds?.forEach(id => allIndicatorIds.add(id)));
+    return { total: filteredCustomers.length, linked, uniqueKpis: allIndicatorIds.size };
   }, [filteredCustomers]);
 
   // Get status badge styling
@@ -244,7 +245,7 @@ export default function CustomersPage() {
               <Building2 className="h-8 w-8 text-muted-foreground" />
               <div>
                 <p className="text-3xl font-bold">{stats.linked}</p>
-                <p className="text-sm text-muted-foreground">Linked to KPIs</p>
+                <p className="text-sm text-muted-foreground">Customers with KPIs</p>
               </div>
             </div>
           </CardContent>
@@ -254,8 +255,8 @@ export default function CustomersPage() {
             <div className="flex items-center gap-3">
               <Activity className="h-8 w-8 text-muted-foreground" />
               <div>
-                <p className="text-3xl font-bold">{stats.totalLinks}</p>
-                <p className="text-sm text-muted-foreground">Total KPI Links</p>
+                <p className="text-3xl font-bold">{stats.uniqueKpis}</p>
+                <p className="text-sm text-muted-foreground">Unique KPIs Linked</p>
               </div>
             </div>
           </CardContent>
