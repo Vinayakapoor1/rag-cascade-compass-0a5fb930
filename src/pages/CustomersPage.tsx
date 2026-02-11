@@ -138,7 +138,7 @@ export default function CustomersPage() {
         (c.csmName?.toLowerCase().includes(q));
       const matchesTier = exclude === 'tier' || tierFilter === 'all' || c.tier === tierFilter;
       const matchesStatus = exclude === 'status' || statusFilter === 'all' || c.status === statusFilter;
-      const matchesDeployment = exclude === 'deployment' || deploymentFilter === 'all' || c.deploymentType === deploymentFilter;
+      const matchesDeployment = exclude === 'deployment' || deploymentFilter === 'all' || (deploymentFilter === 'Unassigned' ? !c.deploymentType : c.deploymentType === deploymentFilter);
       const matchesRegion = exclude === 'region' || regionFilter === 'all' || c.region === regionFilter;
       const matchesIndustry = exclude === 'industry' || industryFilter === 'all' || c.industry === industryFilter;
       const matchesCsm = exclude === 'csm' || csmFilter === 'all' || c.csmName === csmFilter;
@@ -153,7 +153,7 @@ export default function CustomersPage() {
     return {
       tiers: [...new Set(filterExcluding('tier').map(c => c.tier))].sort(),
       statuses: [...new Set(filterExcluding('status').map(c => c.status))].sort(),
-      deploymentTypes: [...new Set(filterExcluding('deployment').map(c => c.deploymentType).filter(Boolean))].filter(d => d !== 'Cloud').sort() as string[],
+      deploymentTypes: [...new Set(filterExcluding('deployment').map(c => c.deploymentType || 'Unassigned'))].filter(d => d !== 'Cloud').sort() as string[],
       regions: [...new Set(filterExcluding('region').map(c => c.region).filter(Boolean))].sort() as string[],
       industries: [...new Set(filterExcluding('industry').map(c => c.industry).filter(Boolean))].sort() as string[],
       csmNames: [...new Set(filterExcluding('csm').map(c => c.csmName).filter(Boolean))].sort() as string[],
@@ -172,7 +172,7 @@ export default function CustomersPage() {
         (c.csmName?.toLowerCase().includes(q));
       const matchesTier = tierFilter === 'all' || c.tier === tierFilter;
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-      const matchesDeployment = deploymentFilter === 'all' || c.deploymentType === deploymentFilter;
+      const matchesDeployment = deploymentFilter === 'all' || (deploymentFilter === 'Unassigned' ? !c.deploymentType : c.deploymentType === deploymentFilter);
       const matchesRegion = regionFilter === 'all' || c.region === regionFilter;
       const matchesIndustry = industryFilter === 'all' || c.industry === industryFilter;
       const matchesCsm = csmFilter === 'all' || c.csmName === csmFilter;
