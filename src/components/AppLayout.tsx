@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsPopover } from '@/components/NotificationsPopover';
+import { BellNotifications } from '@/components/BellNotifications';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -62,6 +63,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           {/* Theme Toggle + Auth Controls */}
           <div className="flex items-center gap-3">
+            {user && <BellNotifications />}
             {user && <NotificationsPopover />}
             <ThemeToggle />
             {!loading && (
