@@ -154,8 +154,6 @@ interface AggregatedDepartment {
 
 export default function Portfolio() {
   const [filterStatus, setFilterStatus] = useState<RAGStatus | null>(null);
-  const [customerCount, setCustomerCount] = useState<number>(0);
-  const [featureCount, setFeatureCount] = useState<number>(0);
   const { data: ventures } = useVentures();
   const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
   const { user, isAdmin, accessibleDepartments } = useAuth();
@@ -188,18 +186,25 @@ export default function Portfolio() {
       .filter(obj => obj.departments.length > 0);
   }, [rawOrgObjectives, isAdmin, isDepartmentHead, user, accessibleDepartments]);
 
-  // Fetch customer and feature counts
-  useEffect(() => {
-    const fetchCounts = async () => {
-      const [customerResult, featureResult] = await Promise.all([
-        supabase.from('customers').select('*', { count: 'exact', head: true }),
-        supabase.from('features').select('*', { count: 'exact', head: true }),
-      ]);
-      setCustomerCount(customerResult.count || 0);
-      setFeatureCount(featureResult.count || 0);
-    };
-    fetchCounts();
-  }, []);
+  // Derive customer and feature counts from the scoped orgObjectives hierarchy
+  const scopedCounts = useMemo(() => {
+    if (!orgObjectives) return { customers: 0, features: 0 };
+    const customerIds = new Set<string>();
+    const featureIds = new Set<string>();
+    orgObjectives.forEach(org => {
+      org.departments.forEach(dept => {
+        dept.functional_objectives.forEach(fo => {
+          fo.key_results.forEach(kr => {
+            kr.indicators.forEach(ind => {
+              ind.linkedCustomerIds?.forEach(id => customerIds.add(id));
+              ind.linkedFeatureIds?.forEach(id => featureIds.add(id));
+            });
+          });
+        });
+      });
+    });
+    return { customers: customerIds.size, features: featureIds.size };
+  }, [orgObjectives]);
 
   // Calculate portfolio-level stats from ALL indicators across all org objectives
   const portfolioStats = orgObjectives?.reduce((stats, org) => {
@@ -499,7 +504,7 @@ export default function Portfolio() {
                   <Users className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{customerCount}</p>
+                  <p className="text-2xl font-bold">{scopedCounts.customers}</p>
                   <p className="text-xs text-muted-foreground">Customers</p>
                 </div>
               </div>
@@ -515,7 +520,7 @@ export default function Portfolio() {
                   <Puzzle className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{featureCount}</p>
+                  <p className="text-2xl font-bold">{scopedCounts.features}</p>
                   <p className="text-xs text-muted-foreground">Features</p>
                 </div>
               </div>
