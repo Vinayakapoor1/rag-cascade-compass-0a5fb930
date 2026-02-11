@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 export function BellNotifications() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -120,6 +122,14 @@ export function BellNotifications() {
                   )}
                   onClick={() => {
                     if (!notification.is_read) markAsRead.mutate(notification.id);
+                    const t = notification.title;
+                    if (t.includes('Compliance') || t.includes('Check-in') || t.includes('📋') || t.includes('⚠️')) {
+                      setOpen(false);
+                      navigate('/compliance-report');
+                    } else if (notification.link) {
+                      setOpen(false);
+                      navigate(notification.link);
+                    }
                   }}
                 >
                   <div className="mt-0.5">{getIcon(notification.title)}</div>
