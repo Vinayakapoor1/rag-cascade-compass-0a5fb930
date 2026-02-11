@@ -6,12 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { RAGBadge } from '@/components/RAGBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from 'recharts';
 import { progressToRAG } from '@/lib/formulaCalculations';
 import { RAGStatus } from '@/types/venture';
+import { X } from 'lucide-react';
 
 interface IndicatorDerivationDialogProps {
   indicatorId: string;
@@ -54,6 +56,13 @@ function getBarColor(value: number): string {
   return RAG_COLORS['not-set'];
 }
 
+function getRAGFromPct(pct: number): RAGStatus {
+  if (pct >= 76) return 'green';
+  if (pct >= 51) return 'amber';
+  if (pct > 0) return 'red';
+  return 'not-set';
+}
+
 export function IndicatorDerivationDialog({
   indicatorId,
   indicatorName,
@@ -65,6 +74,9 @@ export function IndicatorDerivationDialog({
 }: IndicatorDerivationDialogProps) {
   const { isAdmin, isCSM, csmId } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('');
+  const [customerFilter, setCustomerFilter] = useState<string>('all');
+  const [featureFilter, setFeatureFilter] = useState<string>('all');
+  const [ragFilter, setRagFilter] = useState<RAGStatus | null>(null);
 
   // Fetch distinct periods for this indicator
   const { data: periods = [] } = useQuery({
@@ -140,7 +152,7 @@ export function IndicatorDerivationDialog({
     enabled: open,
   });
 
-  // Group scores by customer
+  // Group scores by customer (unfiltered — for aggregate calculation)
   const breakdown = useMemo((): CustomerBreakdown[] => {
     const grouped = new Map<string, { customerName: string; features: Map<string, number | null> }>();
 
@@ -168,39 +180,87 @@ export function IndicatorDerivationDialog({
         customerId,
         customerName: data.customerName,
         featureScores,
-        average, // This is a vector weight average (0-1 scale)
+        average, // vector weight average (0-1 scale)
       };
     }).sort((a, b) => a.customerName.localeCompare(b.customerName));
   }, [scores]);
 
-  // All unique feature names across customers
-  const featureNames = useMemo(() => {
+  // All unique feature names and customer names for filter dropdowns
+  const allFeatureNames = useMemo(() => {
     const names = new Set<string>();
     breakdown.forEach(c => c.featureScores.forEach(f => names.add(f.featureName)));
     return Array.from(names).sort();
   }, [breakdown]);
 
-  // Overall KPI aggregate
-  // Overall KPI aggregate: average of customer vector-weight averages, then × 100 for percentage
+  const allCustomerNames = useMemo(() => {
+    return breakdown.map(c => ({ id: c.customerId, name: c.customerName }));
+  }, [breakdown]);
+
+  // Filtered breakdown based on customer, feature, and RAG filters
+  const filteredBreakdown = useMemo(() => {
+    let filtered = breakdown;
+
+    // Filter by customer
+    if (customerFilter !== 'all') {
+      filtered = filtered.filter(c => c.customerId === customerFilter);
+    }
+
+    // Filter by RAG status (based on customer average percentage)
+    if (ragFilter) {
+      filtered = filtered.filter(c => {
+        const avgPct = Math.round(c.average * 100);
+        return getRAGFromPct(avgPct) === ragFilter;
+      });
+    }
+
+    return filtered;
+  }, [breakdown, customerFilter, ragFilter]);
+
+  // Feature names to show (filtered)
+  const visibleFeatureNames = useMemo(() => {
+    if (featureFilter !== 'all') return [featureFilter];
+    const names = new Set<string>();
+    filteredBreakdown.forEach(c => c.featureScores.forEach(f => names.add(f.featureName)));
+    return Array.from(names).sort();
+  }, [filteredBreakdown, featureFilter]);
+
+  // Overall KPI aggregate (always from unfiltered data)
   const kpiAggregate = useMemo(() => {
     if (breakdown.length === 0) return 0;
     const total = breakdown.reduce((sum, c) => sum + c.average, 0);
     const rawAvg = total / breakdown.length;
-    return rawAvg * 100; // Convert vector weight (0-1) to percentage (0-100)
+    return rawAvg * 100;
   }, [breakdown]);
 
   const kpiStatus = progressToRAG(kpiAggregate);
 
-  // Chart data - customer averages converted to percentage
-  const chartData = breakdown.map(c => ({
+  // Chart data from filtered breakdown
+  const chartData = filteredBreakdown.map(c => ({
     name: c.customerName.length > 15 ? c.customerName.slice(0, 14) + '…' : c.customerName,
     fullName: c.customerName,
-    average: Math.round(c.average * 100 * 10) / 10, // vector weight → percentage
+    average: Math.round(c.average * 100 * 10) / 10,
   }));
 
-  const percentage = currentValue !== null && targetValue !== null && targetValue > 0
-    ? (currentValue / targetValue) * 100
-    : 0;
+  const hasActiveFilters = customerFilter !== 'all' || featureFilter !== 'all' || ragFilter !== null;
+
+  const clearAllFilters = () => {
+    setCustomerFilter('all');
+    setFeatureFilter('all');
+    setRagFilter(null);
+  };
+
+  // RAG distribution counts for clickable badges
+  const ragCounts = useMemo(() => {
+    const counts: Record<string, number> = { green: 0, amber: 0, red: 0, 'not-set': 0 };
+    breakdown.forEach(c => {
+      const avgPct = Math.round(c.average * 100);
+      const status = getRAGFromPct(avgPct);
+      counts[status]++;
+    });
+    return counts;
+  }, [breakdown]);
+
+  const ragLabels: Record<string, string> = { green: 'On Track', amber: 'At Risk', red: 'Critical', 'not-set': 'Not Set' };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -255,20 +315,56 @@ export function IndicatorDerivationDialog({
           )}
         </div>
 
-        {/* RAG Bands Reference */}
+        {/* RAG Bands Reference — Clickable as filters */}
         {ragBands.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">Bands:</span>
-            {ragBands.map(band => (
-              <Badge
-                key={band.id}
-                variant="outline"
-                className="text-xs"
-                style={{ borderColor: band.rag_color, color: band.rag_color }}
-              >
-                {band.band_label} ({band.rag_numeric})
-              </Badge>
-            ))}
+            {ragBands.map(band => {
+              const bandRag = band.rag_color as RAGStatus;
+              const isActive = ragFilter === bandRag;
+              return (
+                <Badge
+                  key={band.id}
+                  variant={isActive ? 'default' : 'outline'}
+                  className="text-xs cursor-pointer transition-all hover:scale-105"
+                  style={{
+                    borderColor: band.rag_color === 'green' ? RAG_COLORS.green : band.rag_color === 'amber' ? RAG_COLORS.amber : RAG_COLORS.red,
+                    color: isActive ? 'white' : band.rag_color === 'green' ? RAG_COLORS.green : band.rag_color === 'amber' ? RAG_COLORS.amber : RAG_COLORS.red,
+                    backgroundColor: isActive ? (band.rag_color === 'green' ? RAG_COLORS.green : band.rag_color === 'amber' ? RAG_COLORS.amber : RAG_COLORS.red) : 'transparent',
+                  }}
+                  onClick={() => setRagFilter(isActive ? null : bandRag)}
+                >
+                  {band.band_label} ({band.rag_numeric})
+                </Badge>
+              );
+            })}
+          </div>
+        )}
+
+        {/* RAG Status Filter Badges */}
+        {breakdown.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">Filter by status:</span>
+            {(['green', 'amber', 'red'] as RAGStatus[]).map(status => {
+              const count = ragCounts[status];
+              if (count === 0) return null;
+              const isActive = ragFilter === status;
+              return (
+                <Badge
+                  key={status}
+                  variant={isActive ? 'default' : 'outline'}
+                  className="text-xs cursor-pointer transition-all hover:scale-105 gap-1"
+                  style={{
+                    borderColor: RAG_COLORS[status],
+                    color: isActive ? 'white' : RAG_COLORS[status],
+                    backgroundColor: isActive ? RAG_COLORS[status] : 'transparent',
+                  }}
+                  onClick={() => setRagFilter(isActive ? null : status)}
+                >
+                  {ragLabels[status]} ({count})
+                </Badge>
+              );
+            })}
           </div>
         )}
 
@@ -283,100 +379,154 @@ export function IndicatorDerivationDialog({
           </Card>
         ) : (
           <>
-            {/* Bar Chart */}
-            <Card>
-              <CardContent className="pt-4">
-                <p className="text-sm font-medium mb-3">Customer Average Scores</p>
-                <ResponsiveContainer width="100%" height={Math.max(200, breakdown.length * 40)}>
-                  <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} />
-                    <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      formatter={(value: number) => [`${value}%`, 'Avg Score']}
-                      labelFormatter={(label: string, payload: any[]) => payload?.[0]?.payload?.fullName || label}
-                    />
-                    {targetValue !== null && (
-                      <ReferenceLine x={targetValue} stroke="hsl(var(--primary))" strokeDasharray="5 5" label={{ value: `Target: ${targetValue}%`, position: 'top', fontSize: 11 }} />
-                    )}
-                    <Bar dataKey="average" radius={[0, 4, 4, 0]}>
-                      {chartData.map((entry, idx) => (
-                        <Cell key={idx} fill={getBarColor(entry.average)} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            {/* Customer & Feature Filters */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <Select value={customerFilter} onValueChange={setCustomerFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="All Customers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
+                  {allCustomerNames.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            {/* Aggregation Summary */}
+              <Select value={featureFilter} onValueChange={setFeatureFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="All Features" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Features</SelectItem>
+                  {allFeatureNames.map(f => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearAllFilters} className="gap-1 text-xs text-muted-foreground hover:text-foreground">
+                  <X className="h-3.5 w-3.5" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            {/* Bar Chart */}
+            {filteredBreakdown.length > 0 ? (
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-sm font-medium mb-3">Customer Average Scores</p>
+                  <ResponsiveContainer width="100%" height={Math.max(200, filteredBreakdown.length * 40)}>
+                    <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} />
+                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value: number) => [`${value}%`, 'Avg Score']}
+                        labelFormatter={(label: string, payload: any[]) => payload?.[0]?.payload?.fullName || label}
+                      />
+                      {targetValue !== null && (
+                        <ReferenceLine x={targetValue} stroke="hsl(var(--primary))" strokeDasharray="5 5" label={{ value: `Target: ${targetValue}%`, position: 'top', fontSize: 11 }} />
+                      )}
+                      <Bar dataKey="average" radius={[0, 4, 4, 0]}>
+                        {chartData.map((entry, idx) => (
+                          <Cell key={idx} fill={getBarColor(entry.average)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="p-6 text-center">
+                <p className="text-muted-foreground text-sm">No customers match the selected filters.</p>
+              </Card>
+            )}
+
+            {/* Aggregation Summary (always shows unfiltered aggregate) */}
             <Card className="bg-muted/30">
               <CardContent className="pt-4 pb-3">
                 <p className="text-sm font-medium mb-1">Aggregation Formula</p>
                 <p className="text-xs text-muted-foreground">
                   AVG of {breakdown.length} customer averages → ({breakdown.map(c => `${Math.round(c.average * 100)}%`).join(' + ')}) ÷ {breakdown.length} = <span className="font-bold text-foreground">{Math.round(kpiAggregate * 10) / 10}%</span>
                 </p>
+                {hasActiveFilters && (
+                  <p className="text-[11px] text-muted-foreground/70 mt-1 italic">
+                    Note: Aggregate is calculated from all {breakdown.length} customers. Filters only affect the view below.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
             {/* Detailed Breakdown Table */}
-            <div className="overflow-x-auto">
-              <p className="text-sm font-medium mb-2">Customer × Feature Breakdown</p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">Customer</TableHead>
-                    {featureNames.map(f => (
-                      <TableHead key={f} className="text-center min-w-[100px] text-xs">{f}</TableHead>
-                    ))}
-                    <TableHead className="text-center font-bold min-w-[80px]">Avg</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {breakdown.map(customer => (
-                    <TableRow key={customer.customerId}>
-                      <TableCell className="sticky left-0 bg-background z-10 font-medium text-sm">{customer.customerName}</TableCell>
-                      {featureNames.map(featureName => {
-                        const score = customer.featureScores.find(f => f.featureName === featureName);
-                        const val = score?.value;
-                        const pctVal = val !== null && val !== undefined ? Math.round(val * 100) : null;
-                        return (
-                          <TableCell key={featureName} className="text-center text-sm">
-                            {pctVal !== null ? (
+            {filteredBreakdown.length > 0 && (
+              <div className="overflow-x-auto">
+                <p className="text-sm font-medium mb-2">
+                  Customer × Feature Breakdown
+                  {hasActiveFilters && (
+                    <span className="text-xs text-muted-foreground font-normal ml-2">
+                      (Showing {filteredBreakdown.length} of {breakdown.length} customers)
+                    </span>
+                  )}
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">Customer</TableHead>
+                      {visibleFeatureNames.map(f => (
+                        <TableHead key={f} className="text-center min-w-[100px] text-xs">{f}</TableHead>
+                      ))}
+                      <TableHead className="text-center font-bold min-w-[80px]">Avg</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBreakdown.map(customer => (
+                      <TableRow key={customer.customerId}>
+                        <TableCell className="sticky left-0 bg-background z-10 font-medium text-sm">{customer.customerName}</TableCell>
+                        {visibleFeatureNames.map(featureName => {
+                          const score = customer.featureScores.find(f => f.featureName === featureName);
+                          const val = score?.value;
+                          const pctVal = val !== null && val !== undefined ? Math.round(val * 100) : null;
+                          return (
+                            <TableCell key={featureName} className="text-center text-sm">
+                              {pctVal !== null ? (
+                                <span className={
+                                  pctVal >= 76 ? 'text-rag-green font-medium' :
+                                  pctVal >= 51 ? 'text-rag-amber font-medium' :
+                                  pctVal > 0 ? 'text-rag-red font-medium' :
+                                  'text-muted-foreground'
+                                }>
+                                  {pctVal}%
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground/50">—</span>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-center font-bold text-sm">
+                          {(() => {
+                            const avgPct = Math.round(customer.average * 100);
+                            return (
                               <span className={
-                                pctVal >= 76 ? 'text-rag-green font-medium' :
-                                pctVal >= 51 ? 'text-rag-amber font-medium' :
-                                pctVal > 0 ? 'text-rag-red font-medium' :
+                                avgPct >= 76 ? 'text-rag-green' :
+                                avgPct >= 51 ? 'text-rag-amber' :
+                                avgPct > 0 ? 'text-rag-red' :
                                 'text-muted-foreground'
                               }>
-                                {pctVal}%
+                                {avgPct}%
                               </span>
-                            ) : (
-                              <span className="text-muted-foreground/50">—</span>
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell className="text-center font-bold text-sm">
-                        {(() => {
-                          const avgPct = Math.round(customer.average * 100);
-                          return (
-                            <span className={
-                              avgPct >= 76 ? 'text-rag-green' :
-                              avgPct >= 51 ? 'text-rag-amber' :
-                              avgPct > 0 ? 'text-rag-red' :
-                              'text-muted-foreground'
-                            }>
-                              {avgPct}%
-                            </span>
-                          );
-                        })()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                            );
+                          })()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </>
         )}
       </DialogContent>
