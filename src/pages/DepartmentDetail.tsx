@@ -823,35 +823,8 @@ export default function DepartmentDetail() {
           </TabsList>
         </Tabs>
 
-        {/* Customer Filter */}
-        <Select value={customerFilter} onValueChange={setCustomerFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Customers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Customers</SelectItem>
-            {customers.map(customer => (
-              <SelectItem key={customer.id} value={customer.id}>
-                {customer.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
-        {/* Feature Filter */}
-        <Select value={featureFilter} onValueChange={setFeatureFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Features" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Features</SelectItem>
-            {features.map(feature => (
-              <SelectItem key={feature.id} value={feature.id}>
-                {feature.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
 
 
         {/* Clear Filters */}
