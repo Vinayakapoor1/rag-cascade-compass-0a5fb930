@@ -14,7 +14,7 @@ import { getRAGMutedBg, getRAGBorderColor } from '@/lib/ragUtils';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, LogIn, Settings, Building2, Target, TrendingUp, RefreshCw, Layers, ClipboardCheck } from 'lucide-react';
-import { CSMComplianceWidget } from '@/components/CSMComplianceWidget';
+
 import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 
 const Index = () => {
@@ -157,8 +157,6 @@ const Index = () => {
           ))}
         </div>
 
-        {/* CSM Compliance Widget — visible to admins */}
-        {user && isAdmin && <CSMComplianceWidget />}
 
         {/* Login prompt for non-logged in users */}
         {!user && (
