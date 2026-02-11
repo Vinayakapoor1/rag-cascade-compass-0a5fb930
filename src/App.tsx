@@ -23,6 +23,7 @@ import DataEntryTimeline from "./pages/DataEntryTimeline";
 import AdminDepartmentStatus from "./pages/AdminDepartmentStatus";
 import AdminDashboard from "./pages/AdminDashboard";
 import CSMDataEntry from "./pages/CSMDataEntry";
+import ComplianceReport from "./pages/ComplianceReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -64,6 +65,7 @@ const App = () => (
 
               {/* Utility routes */}
               <Route path="/admin" element={<AppLayout><AdminDashboard /></AppLayout>} />
+              <Route path="/compliance-report" element={<AppLayout><ComplianceReport /></AppLayout>} />
               <Route path="/admin/upload" element={<AppLayout><AdminUpload /></AppLayout>} />
               <Route path="*" element={<AppLayout><NotFound /></AppLayout>} />
             </Routes>
