@@ -27,14 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        setTimeout(() => {
-          checkUserRoles(session.user.id);
-        }, 0);
+        checkUserRoles(session.user.id);
       } else {
         setIsAdmin(false);
         setIsDepartmentHead(false);
@@ -42,19 +43,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCsmId(null);
         setAccessibleDepartments([]);
       }
-      setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        checkUserRoles(session.user.id);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await checkUserRoles(session.user.id);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkUserRoles = async (userId: string) => {
