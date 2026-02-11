@@ -7,13 +7,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { RAGBadge } from '@/components/RAGBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell, LineChart, Line } from 'recharts';
 import { progressToRAG } from '@/lib/formulaCalculations';
 import { RAGStatus } from '@/types/venture';
-import { X } from 'lucide-react';
+import { X, Calendar as CalendarIcon, ToggleLeft, ToggleRight, TrendingUp } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format, getISOWeek, getYear } from 'date-fns';
+
+type PeriodMode = 'monthly' | 'weekly';
+
+function getISOWeekString(date: Date): string {
+  const week = getISOWeek(date);
+  const year = getYear(date);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+function dateToPeriod(date: Date, mode: PeriodMode): string {
+  if (mode === 'weekly') return getISOWeekString(date);
+  return format(date, 'yyyy-MM');
+}
 
 interface IndicatorDerivationDialogProps {
   indicatorId: string;
@@ -63,6 +80,21 @@ function getRAGFromPct(pct: number): RAGStatus {
   return 'not-set';
 }
 
+function computeAggregateFromScores(scores: ScoreRow[]): number {
+  const grouped = new Map<string, number[]>();
+  scores.forEach(s => {
+    if (s.value === null) return;
+    if (!grouped.has(s.customer_id)) grouped.set(s.customer_id, []);
+    grouped.get(s.customer_id)!.push(s.value);
+  });
+  if (grouped.size === 0) return 0;
+  let total = 0;
+  grouped.forEach(values => {
+    total += values.reduce((a, b) => a + b, 0) / values.length;
+  });
+  return (total / grouped.size) * 100;
+}
+
 export function IndicatorDerivationDialog({
   indicatorId,
   indicatorName,
@@ -73,32 +105,27 @@ export function IndicatorDerivationDialog({
   onOpenChange,
 }: IndicatorDerivationDialogProps) {
   const { isAdmin, isCSM, csmId } = useAuth();
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('monthly');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('');
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [featureFilter, setFeatureFilter] = useState<string>('all');
   const [ragFilter, setRagFilter] = useState<RAGStatus | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Fetch distinct periods for this indicator
-  const { data: periods = [] } = useQuery({
-    queryKey: ['derivation-periods', indicatorId],
+  // Fetch ALL scores for this indicator (for trendline + period list)
+  const { data: allScores = [], isLoading: allScoresLoading } = useQuery({
+    queryKey: ['derivation-all-scores', indicatorId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('csm_customer_feature_scores')
-        .select('period')
+        .select('id, customer_id, feature_id, value, period, customers(name), features(name)')
         .eq('indicator_id', indicatorId);
       if (error) throw error;
-      const unique = [...new Set((data || []).map(d => d.period))].sort().reverse();
-      return unique;
+      return (data || []) as ScoreRow[];
     },
     enabled: open,
+    staleTime: 60000,
   });
-
-  // Auto-select latest period
-  useEffect(() => {
-    if (periods.length > 0 && !selectedPeriod) {
-      setSelectedPeriod(periods[0]);
-    }
-  }, [periods, selectedPeriod]);
 
   // For CSMs, fetch their assigned customer IDs
   const { data: assignedCustomerIds } = useQuery({
@@ -115,28 +142,6 @@ export function IndicatorDerivationDialog({
     enabled: open && isCSM && !isAdmin && !!csmId,
   });
 
-  // Fetch scores for the selected period
-  const { data: scores = [], isLoading } = useQuery({
-    queryKey: ['derivation-scores', indicatorId, selectedPeriod, assignedCustomerIds],
-    queryFn: async () => {
-      let query = supabase
-        .from('csm_customer_feature_scores')
-        .select('id, customer_id, feature_id, value, period, customers(name), features(name)')
-        .eq('indicator_id', indicatorId)
-        .eq('period', selectedPeriod);
-
-      // RBAC: CSMs only see their assigned customers
-      if (isCSM && !isAdmin && assignedCustomerIds) {
-        query = query.in('customer_id', assignedCustomerIds);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data || []) as ScoreRow[];
-    },
-    enabled: open && !!selectedPeriod,
-  });
-
   // Fetch RAG bands for this indicator
   const { data: ragBands = [] } = useQuery({
     queryKey: ['kpi-rag-bands', indicatorId],
@@ -151,6 +156,63 @@ export function IndicatorDerivationDialog({
     },
     enabled: open,
   });
+
+  // Apply RBAC filter
+  const rbacFilteredScores = useMemo(() => {
+    if (isCSM && !isAdmin && assignedCustomerIds) {
+      return allScores.filter(s => assignedCustomerIds.includes(s.customer_id));
+    }
+    return allScores;
+  }, [allScores, isCSM, isAdmin, assignedCustomerIds]);
+
+  // Distinct periods from data, filtered by mode
+  const periods = useMemo(() => {
+    const unique = [...new Set(rbacFilteredScores.map(s => s.period))];
+    // Filter by mode: monthly = YYYY-MM, weekly = YYYY-Wxx
+    const filtered = unique.filter(p => {
+      if (periodMode === 'monthly') return /^\d{4}-\d{2}$/.test(p);
+      if (periodMode === 'weekly') return /^\d{4}-W\d{2}$/.test(p);
+      return true;
+    });
+    return filtered.sort().reverse();
+  }, [rbacFilteredScores, periodMode]);
+
+  // Auto-select latest period when periods change
+  useEffect(() => {
+    if (periods.length > 0) {
+      if (!periods.includes(selectedPeriod)) {
+        setSelectedPeriod(periods[0]);
+      }
+    } else {
+      setSelectedPeriod('');
+    }
+  }, [periods]);
+
+  // Scores for the selected period
+  const scores = useMemo(() => {
+    return rbacFilteredScores.filter(s => s.period === selectedPeriod);
+  }, [rbacFilteredScores, selectedPeriod]);
+
+  const isLoading = allScoresLoading;
+
+  // Trendline data: aggregate per period (sorted chronologically)
+  const trendlineData = useMemo(() => {
+    const periodGroups = new Map<string, ScoreRow[]>();
+    rbacFilteredScores.forEach(s => {
+      // Filter by current mode
+      if (periodMode === 'monthly' && !/^\d{4}-\d{2}$/.test(s.period)) return;
+      if (periodMode === 'weekly' && !/^\d{4}-W\d{2}$/.test(s.period)) return;
+      if (!periodGroups.has(s.period)) periodGroups.set(s.period, []);
+      periodGroups.get(s.period)!.push(s);
+    });
+
+    return Array.from(periodGroups.entries())
+      .map(([period, scores]) => ({
+        period,
+        aggregate: Math.round(computeAggregateFromScores(scores) * 10) / 10,
+      }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+  }, [rbacFilteredScores, periodMode]);
 
   // Group scores by customer (unfiltered — for aggregate calculation)
   const breakdown = useMemo((): CustomerBreakdown[] => {
@@ -180,7 +242,7 @@ export function IndicatorDerivationDialog({
         customerId,
         customerName: data.customerName,
         featureScores,
-        average, // vector weight average (0-1 scale)
+        average,
       };
     }).sort((a, b) => a.customerName.localeCompare(b.customerName));
   }, [scores]);
@@ -199,20 +261,15 @@ export function IndicatorDerivationDialog({
   // Filtered breakdown based on customer, feature, and RAG filters
   const filteredBreakdown = useMemo(() => {
     let filtered = breakdown;
-
-    // Filter by customer
     if (customerFilter !== 'all') {
       filtered = filtered.filter(c => c.customerId === customerFilter);
     }
-
-    // Filter by RAG status (based on customer average percentage)
     if (ragFilter) {
       filtered = filtered.filter(c => {
         const avgPct = Math.round(c.average * 100);
         return getRAGFromPct(avgPct) === ragFilter;
       });
     }
-
     return filtered;
   }, [breakdown, customerFilter, ragFilter]);
 
@@ -262,6 +319,14 @@ export function IndicatorDerivationDialog({
 
   const ragLabels: Record<string, string> = { green: 'On Track', amber: 'At Risk', red: 'Critical', 'not-set': 'Not Set' };
 
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (!date) return;
+    const p = dateToPeriod(date, periodMode);
+    // If matching period exists in data, select it; otherwise set it anyway
+    setSelectedPeriod(p);
+    setCalendarOpen(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
@@ -297,23 +362,108 @@ export function IndicatorDerivationDialog({
           </Card>
         </div>
 
-        {/* Period Selector */}
-        <div className="flex items-center gap-3">
+        {/* Period Selection Controls */}
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium">Period:</span>
+
+          {/* Mode Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPeriodMode(m => m === 'monthly' ? 'weekly' : 'monthly')}
+            className="gap-1.5"
+          >
+            {periodMode === 'monthly' ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
+            {periodMode === 'monthly' ? 'Monthly' : 'Weekly'}
+          </Button>
+
+          {/* Period Dropdown */}
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[180px]">
+              <CalendarIcon className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
             <SelectContent>
               {periods.map(p => (
                 <SelectItem key={p} value={p}>{p}</SelectItem>
               ))}
+              {periods.length === 0 && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">No {periodMode} data</div>
+              )}
             </SelectContent>
           </Select>
+
+          {/* Calendar Picker */}
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" title="Pick a date">
+                <CalendarIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                onSelect={handleCalendarSelect}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+
           {isCSM && !isAdmin && (
-            <Badge variant="outline" className="text-xs">CSM View — Showing your assigned customers only</Badge>
+            <Badge variant="outline" className="text-xs">CSM View — Your customers only</Badge>
           )}
         </div>
+
+        {/* Historical Trendline */}
+        {trendlineData.length > 1 && (
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Historical Trendline ({periodMode === 'monthly' ? 'Monthly' : 'Weekly'})
+              </p>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={trendlineData} margin={{ left: 10, right: 30, top: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(value: number) => [`${value}%`, 'Aggregate']} />
+                  {targetValue !== null && (
+                    <ReferenceLine y={targetValue} stroke="hsl(var(--primary))" strokeDasharray="5 5" label={{ value: `Target`, position: 'right', fontSize: 10 }} />
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="aggregate"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={(props: any) => {
+                      const { cx, cy, payload } = props;
+                      const isSelected = payload.period === selectedPeriod;
+                      return (
+                        <circle
+                          key={payload.period}
+                          cx={cx}
+                          cy={cy}
+                          r={isSelected ? 6 : 4}
+                          fill={getBarColor(payload.aggregate)}
+                          stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
+                          strokeWidth={isSelected ? 2 : 0}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setSelectedPeriod(payload.period)}
+                        />
+                      );
+                    }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <p className="text-[11px] text-muted-foreground text-center mt-1">
+                Click a point to view that period's breakdown • {trendlineData.length} periods with data
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* RAG Bands Reference — Clickable as filters */}
         {ragBands.length > 0 && (
@@ -445,7 +595,7 @@ export function IndicatorDerivationDialog({
               </Card>
             )}
 
-            {/* Aggregation Summary (always shows unfiltered aggregate) */}
+            {/* Aggregation Summary */}
             <Card className="bg-muted/30">
               <CardContent className="pt-4 pb-3">
                 <p className="text-sm font-medium mb-1">Aggregation Formula</p>
