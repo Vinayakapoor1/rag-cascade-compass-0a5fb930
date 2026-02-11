@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
@@ -283,7 +283,11 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   const handleCellChange = (indicatorId: string, customerId: string, featureId: string, bandValue: string) => {
     const key = cellKey(indicatorId, customerId, featureId);
     if (bandValue === '' || bandValue === 'unset') {
-      setScores(prev => ({ ...prev, [key]: null }));
+      setScores(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
       return;
     }
     // bandValue is the rag_numeric as string
@@ -291,6 +295,30 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     if (!isNaN(weight)) {
       setScores(prev => ({ ...prev, [key]: weight }));
     }
+  };
+
+  const clearRow = (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => {
+    setScores(prev => {
+      const next = { ...prev };
+      for (const ind of indicators) {
+        if (indFeatMap[ind.id]?.has(featureId)) {
+          delete next[cellKey(ind.id, custId, featureId)];
+        }
+      }
+      return next;
+    });
+  };
+
+  const clearColumn = (custId: string, indId: string, features: { id: string }[], indFeatMap: Record<string, Set<string>>) => {
+    setScores(prev => {
+      const next = { ...prev };
+      for (const feat of features) {
+        if (indFeatMap[indId]?.has(feat.id)) {
+          delete next[cellKey(indId, custId, feat.id)];
+        }
+      }
+      return next;
+    });
   };
 
   const applyToRow = (custId: string, featureId: string, value: number, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => {
@@ -357,6 +385,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
     try {
       const upserts: any[] = [];
+      const deletes: { indicator_id: string; customer_id: string; feature_id: string }[] = [];
+      
       for (const section of customerSections) {
         for (const feat of section.features) {
           for (const ind of section.indicators) {
@@ -364,6 +394,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
             if (!feats?.has(feat.id)) continue;
             const key = cellKey(ind.id, section.id, feat.id);
             const val = scores[key];
+            const origVal = originalScores[key];
+            
             if (val != null) {
               upserts.push({
                 indicator_id: ind.id,
@@ -373,9 +405,23 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
                 period,
                 created_by: user.id,
               });
+            } else if (origVal != null && val === undefined) {
+              // Was set before, now cleared → delete from DB
+              deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: feat.id });
             }
           }
         }
+      }
+
+      // Delete cleared scores
+      for (const del of deletes) {
+        await supabase
+          .from('csm_customer_feature_scores' as any)
+          .delete()
+          .eq('indicator_id', del.indicator_id)
+          .eq('customer_id', del.customer_id)
+          .eq('feature_id', del.feature_id)
+          .eq('period', period);
       }
 
       if (upserts.length > 0) {
@@ -590,6 +636,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           onCellChange={handleCellChange}
           applyToRow={applyToRow}
           applyToColumn={applyToColumn}
+          clearRow={clearRow}
+          clearColumn={clearColumn}
           getFeatureRowAvg={getFeatureRowAvg}
           getCustomerOverallAvg={getCustomerOverallAvg}
         />
@@ -664,13 +712,15 @@ interface CustomerSectionCardProps {
   onCellChange: (indicatorId: string, customerId: string, featureId: string, value: string) => void;
   applyToRow: (custId: string, featureId: string, value: number, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => void;
   applyToColumn: (custId: string, indId: string, value: number, features: { id: string }[], indFeatMap: Record<string, Set<string>>) => void;
+  clearRow: (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => void;
+  clearColumn: (custId: string, indId: string, features: { id: string }[], indFeatMap: Record<string, Set<string>>) => void;
   getFeatureRowAvg: (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => number | null;
   getCustomerOverallAvg: (section: CustomerSection) => number | null;
 }
 
 function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
-  applyToRow, applyToColumn, getFeatureRowAvg, getCustomerOverallAvg,
+  applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
@@ -772,6 +822,19 @@ function CustomerSectionCard({
                             >
                               <CopyCheck className="h-3 w-3" />
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                              title="Clear column"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                clearColumn(section.id, ind.id, section.features, section.indicatorFeatureMap);
+                                toast.success(`Cleared all ${ind.name} cells`);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
                         </td>
                       );
@@ -863,6 +926,18 @@ function CustomerSectionCard({
                               }}
                             >
                               <CopyCheck className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                              title="Clear row"
+                              onClick={() => {
+                                clearRow(section.id, feat.id, section.indicators, section.indicatorFeatureMap);
+                                toast.success(`Cleared all KPIs for ${feat.name}`);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
                             </Button>
                           </div>
                         </td>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,56 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+const COMMON_TIMEZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Toronto',
+  'America/Sao_Paulo',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Moscow',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Asia/Singapore',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+  'Africa/Cairo',
+  'Africa/Johannesburg',
+];
+
+function getAllTimezones(): string[] {
+  try {
+    const intl = Intl as any;
+    if (intl.supportedValuesOf) {
+      return intl.supportedValuesOf('timeZone');
+    }
+    return COMMON_TIMEZONES;
+  } catch {
+    return COMMON_TIMEZONES;
+  }
+}
+
+function guessUserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -13,7 +63,10 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [timezone, setTimezone] = useState(guessUserTimezone());
   const [loading, setLoading] = useState(false);
+
+  const timezones = useMemo(() => getAllTimezones(), []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -41,15 +94,24 @@ export default function Auth() {
         if (error) throw error;
         toast.success('Logged in successfully');
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
-            data: { full_name: fullName }
+            data: { full_name: fullName, timezone }
           }
         });
         if (error) throw error;
+        
+        // Update profile with timezone after signup
+        if (data.user) {
+          await supabase
+            .from('profiles')
+            .update({ timezone })
+            .eq('user_id', data.user.id);
+        }
+        
         toast.success('Account created successfully');
       }
     } catch (error: any) {
@@ -140,6 +202,24 @@ export default function Auth() {
               className="h-12 rounded-lg border-border"
             />
           </div>
+
+          {!isLogin && (
+            <div className="space-y-2">
+              <Label htmlFor="timezone" className="text-sm font-medium">Timezone</Label>
+              <Select value={timezone} onValueChange={setTimezone}>
+                <SelectTrigger className="h-12 rounded-lg border-border">
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {timezones.map(tz => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           <Button 
             type="submit" 

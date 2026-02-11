@@ -170,20 +170,23 @@ export default function Portfolio() {
 
   const { data: rawOrgObjectives, isLoading, refetch } = useOrgObjectives(selectedVentureId ?? undefined);
 
-  // Department-scoped filtering: non-admin logged-in users only see their assigned departments
+  const { isDepartmentHead } = useAuth();
+
+  // Department-scoped filtering: CSM and viewer roles see only assigned departments
+  // Admins and Department Heads see everything (full portfolio)
   const orgObjectives = useMemo(() => {
     if (!rawOrgObjectives) return rawOrgObjectives;
-    // Admins and unauthenticated users see everything
-    if (isAdmin || !user) return rawOrgObjectives;
+    // Admins, department heads, and unauthenticated users see everything
+    if (isAdmin || isDepartmentHead || !user) return rawOrgObjectives;
     
-    // Filter departments within each org objective
+    // CSMs and viewers: filter departments within each org objective
     return rawOrgObjectives
       .map(obj => ({
         ...obj,
         departments: obj.departments.filter(d => accessibleDepartments.includes(d.id))
       }))
       .filter(obj => obj.departments.length > 0);
-  }, [rawOrgObjectives, isAdmin, user, accessibleDepartments]);
+  }, [rawOrgObjectives, isAdmin, isDepartmentHead, user, accessibleDepartments]);
 
   // Fetch customer and feature counts
   useEffect(() => {
