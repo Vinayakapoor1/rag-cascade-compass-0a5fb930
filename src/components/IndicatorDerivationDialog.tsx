@@ -168,7 +168,7 @@ export function IndicatorDerivationDialog({
         customerId,
         customerName: data.customerName,
         featureScores,
-        average,
+        average, // This is a vector weight average (0-1 scale)
       };
     }).sort((a, b) => a.customerName.localeCompare(b.customerName));
   }, [scores]);
@@ -181,19 +181,21 @@ export function IndicatorDerivationDialog({
   }, [breakdown]);
 
   // Overall KPI aggregate
+  // Overall KPI aggregate: average of customer vector-weight averages, then × 100 for percentage
   const kpiAggregate = useMemo(() => {
     if (breakdown.length === 0) return 0;
     const total = breakdown.reduce((sum, c) => sum + c.average, 0);
-    return total / breakdown.length;
+    const rawAvg = total / breakdown.length;
+    return rawAvg * 100; // Convert vector weight (0-1) to percentage (0-100)
   }, [breakdown]);
 
   const kpiStatus = progressToRAG(kpiAggregate);
 
-  // Chart data
+  // Chart data - customer averages converted to percentage
   const chartData = breakdown.map(c => ({
     name: c.customerName.length > 15 ? c.customerName.slice(0, 14) + '…' : c.customerName,
     fullName: c.customerName,
-    average: Math.round(c.average * 10) / 10,
+    average: Math.round(c.average * 100 * 10) / 10, // vector weight → percentage
   }));
 
   const percentage = currentValue !== null && targetValue !== null && targetValue > 0
@@ -312,7 +314,7 @@ export function IndicatorDerivationDialog({
               <CardContent className="pt-4 pb-3">
                 <p className="text-sm font-medium mb-1">Aggregation Formula</p>
                 <p className="text-xs text-muted-foreground">
-                  AVG of {breakdown.length} customer averages → {breakdown.map(c => `${Math.round(c.average)}%`).join(' + ')} ÷ {breakdown.length} = <span className="font-bold text-foreground">{Math.round(kpiAggregate * 10) / 10}%</span>
+                  AVG of {breakdown.length} customer averages → ({breakdown.map(c => `${Math.round(c.average * 100)}%`).join(' + ')}) ÷ {breakdown.length} = <span className="font-bold text-foreground">{Math.round(kpiAggregate * 10) / 10}%</span>
                 </p>
               </CardContent>
             </Card>
@@ -337,16 +339,17 @@ export function IndicatorDerivationDialog({
                       {featureNames.map(featureName => {
                         const score = customer.featureScores.find(f => f.featureName === featureName);
                         const val = score?.value;
+                        const pctVal = val !== null && val !== undefined ? Math.round(val * 100) : null;
                         return (
                           <TableCell key={featureName} className="text-center text-sm">
-                            {val !== null && val !== undefined ? (
+                            {pctVal !== null ? (
                               <span className={
-                                val >= 76 ? 'text-rag-green font-medium' :
-                                val >= 51 ? 'text-rag-amber font-medium' :
-                                val > 0 ? 'text-rag-red font-medium' :
+                                pctVal >= 76 ? 'text-rag-green font-medium' :
+                                pctVal >= 51 ? 'text-rag-amber font-medium' :
+                                pctVal > 0 ? 'text-rag-red font-medium' :
                                 'text-muted-foreground'
                               }>
-                                {val}%
+                                {pctVal}%
                               </span>
                             ) : (
                               <span className="text-muted-foreground/50">—</span>
@@ -355,14 +358,19 @@ export function IndicatorDerivationDialog({
                         );
                       })}
                       <TableCell className="text-center font-bold text-sm">
-                        <span className={
-                          customer.average >= 76 ? 'text-rag-green' :
-                          customer.average >= 51 ? 'text-rag-amber' :
-                          customer.average > 0 ? 'text-rag-red' :
-                          'text-muted-foreground'
-                        }>
-                          {Math.round(customer.average)}%
-                        </span>
+                        {(() => {
+                          const avgPct = Math.round(customer.average * 100);
+                          return (
+                            <span className={
+                              avgPct >= 76 ? 'text-rag-green' :
+                              avgPct >= 51 ? 'text-rag-amber' :
+                              avgPct > 0 ? 'text-rag-red' :
+                              'text-muted-foreground'
+                            }>
+                              {avgPct}%
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                     </TableRow>
                   ))}
