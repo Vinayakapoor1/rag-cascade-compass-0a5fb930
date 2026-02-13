@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CustomerAttachments } from './CustomerAttachments';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
 import {
   Select,
@@ -704,6 +705,8 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           clearColumn={clearColumn}
           getFeatureRowAvg={getFeatureRowAvg}
           getCustomerOverallAvg={getCustomerOverallAvg}
+          departmentId={departmentId}
+          period={period}
         />
       ))}
     </div>
@@ -780,11 +783,14 @@ interface CustomerSectionCardProps {
   clearColumn: (custId: string, indId: string, features: { id: string }[], indFeatMap: Record<string, Set<string>>) => void;
   getFeatureRowAvg: (custId: string, featureId: string, indicators: IndicatorInfo[], indFeatMap: Record<string, Set<string>>) => number | null;
   getCustomerOverallAvg: (section: CustomerSection) => number | null;
+  departmentId: string;
+  period: string;
 }
 
 function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
+  departmentId, period,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
@@ -1029,6 +1035,11 @@ function CustomerSectionCard({
                 </tbody>
               </table>
             </div>
+            <CustomerAttachments
+              customerId={section.id}
+              departmentId={departmentId}
+              period={period}
+            />
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
