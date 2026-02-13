@@ -53,6 +53,63 @@ export type Database = {
         }
         Relationships: []
       }
+      csm_checkin_attachments: {
+        Row: {
+          attachment_type: string
+          created_at: string
+          created_by: string
+          customer_id: string
+          department_id: string
+          file_name: string | null
+          file_path: string | null
+          id: string
+          link_url: string | null
+          notes: string | null
+          period: string
+        }
+        Insert: {
+          attachment_type: string
+          created_at?: string
+          created_by: string
+          customer_id: string
+          department_id: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          link_url?: string | null
+          notes?: string | null
+          period: string
+        }
+        Update: {
+          attachment_type?: string
+          created_at?: string
+          created_by?: string
+          customer_id?: string
+          department_id?: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          link_url?: string | null
+          notes?: string | null
+          period?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csm_checkin_attachments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "csm_checkin_attachments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       csm_customer_feature_scores: {
         Row: {
           created_at: string
