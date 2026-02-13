@@ -69,13 +69,18 @@ export default function Auth() {
 
   const timezones = useMemo(() => getAllTimezones(), []);
 
+  const COMMON_PASSWORDS = ['password', 'password1', '12345678', 'qwerty123', 'abc12345', 'letmein1', 'welcome1', 'admin123', 'iloveyou', 'monkey123'];
+
   const validatePassword = (pwd: string): string[] => {
     const errors: string[] = [];
-    if (pwd.length < 8) errors.push('At least 8 characters');
+    if (pwd.length < 10) errors.push('At least 10 characters');
     if (!/[A-Z]/.test(pwd)) errors.push('At least one uppercase letter');
     if (!/[a-z]/.test(pwd)) errors.push('At least one lowercase letter');
     if (!/[0-9]/.test(pwd)) errors.push('At least one number');
     if (!/[^A-Za-z0-9]/.test(pwd)) errors.push('At least one special character');
+    if (/(.)\1{2,}/.test(pwd)) errors.push('No 3+ repeating characters');
+    if (COMMON_PASSWORDS.some(cp => pwd.toLowerCase().includes(cp))) errors.push('Must not contain common passwords');
+    if (email && pwd.toLowerCase().includes(email.split('@')[0].toLowerCase()) && email.split('@')[0].length > 2) errors.push('Must not contain your email username');
     return errors;
   };
 
@@ -225,12 +230,12 @@ export default function Auth() {
               onChange={handlePasswordChange}
               placeholder="••••••••"
               required
-              minLength={8}
+              minLength={10}
               className="h-12 rounded-lg border-border"
             />
-            {!isLogin && passwordErrors.length > 0 && password.length > 0 && (
+            {!isLogin && password.length > 0 && (
               <ul className="text-xs space-y-0.5 mt-1">
-                {['At least 8 characters', 'At least one uppercase letter', 'At least one lowercase letter', 'At least one number', 'At least one special character'].map(rule => {
+                {['At least 10 characters', 'At least one uppercase letter', 'At least one lowercase letter', 'At least one number', 'At least one special character', 'No 3+ repeating characters', 'Must not contain common passwords', 'Must not contain your email username'].map(rule => {
                   const passed = !passwordErrors.includes(rule);
                   return (
                     <li key={rule} className={passed ? 'text-rag-green' : 'text-destructive'}>
