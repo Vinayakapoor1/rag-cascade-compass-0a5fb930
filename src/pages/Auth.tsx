@@ -230,7 +230,7 @@ export default function Auth() {
               onChange={handlePasswordChange}
               placeholder="••••••••"
               required
-              minLength={10}
+              minLength={isLogin ? 1 : 10}
               className="h-12 rounded-lg border-border"
             />
             {!isLogin && password.length > 0 && (
