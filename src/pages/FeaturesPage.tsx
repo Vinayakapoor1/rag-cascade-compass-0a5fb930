@@ -7,14 +7,44 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Puzzle, Search, Activity, ChevronRight, Loader2, Filter, Tag, Plus, Pencil } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { EditFeatureDialog } from '@/components/EditFeatureDialog';
 import { AddFeatureDialog } from '@/components/AddFeatureDialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function FeaturesPage() {
-  const { data: features, isLoading, refetch } = useFeaturesWithImpact();
+  const { isAdmin, isDepartmentHead, isCSM, csmId } = useAuth();
+  const { data: allFeatures, isLoading, refetch } = useFeaturesWithImpact();
+
+  // For CSMs, fetch their assigned customer feature IDs to scope the list
+  const [csmFeatureIds, setCsmFeatureIds] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!isCSM || isAdmin || isDepartmentHead || !csmId) {
+      setCsmFeatureIds(null);
+      return;
+    }
+    const fetchCsmFeatures = async () => {
+      const { data } = await supabase
+        .from('customer_features')
+        .select('feature_id, customers!inner(csm_id)')
+        .eq('customers.csm_id', csmId);
+      if (data) {
+        setCsmFeatureIds(new Set(data.map(r => r.feature_id)));
+      }
+    };
+    fetchCsmFeatures();
+  }, [isCSM, isAdmin, isDepartmentHead, csmId]);
+
+  const features = useMemo(() => {
+    if (!allFeatures) return allFeatures;
+    if (csmFeatureIds) {
+      return allFeatures.filter(f => csmFeatureIds.has(f.id));
+    }
+    return allFeatures;
+  }, [allFeatures, csmFeatureIds]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
