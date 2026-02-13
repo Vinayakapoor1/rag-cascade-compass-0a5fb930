@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -15,47 +15,28 @@ import {
 } from '@/components/ui/select';
 
 const COMMON_TIMEZONES = [
-  'UTC',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Toronto',
-  'America/Sao_Paulo',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Europe/Moscow',
-  'Asia/Dubai',
-  'Asia/Kolkata',
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Singapore',
-  'Australia/Sydney',
-  'Pacific/Auckland',
-  'Africa/Cairo',
-  'Africa/Johannesburg',
+  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver',
+  'America/Los_Angeles', 'America/Toronto', 'America/Sao_Paulo',
+  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
+  'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Asia/Tokyo',
+  'Asia/Singapore', 'Australia/Sydney', 'Pacific/Auckland',
+  'Africa/Cairo', 'Africa/Johannesburg',
 ];
 
 function getAllTimezones(): string[] {
   try {
     const intl = Intl as any;
-    if (intl.supportedValuesOf) {
-      return intl.supportedValuesOf('timeZone');
-    }
+    if (intl.supportedValuesOf) return intl.supportedValuesOf('timeZone');
     return COMMON_TIMEZONES;
-  } catch {
-    return COMMON_TIMEZONES;
-  }
+  } catch { return COMMON_TIMEZONES; }
 }
 
 function guessUserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return 'UTC';
-  }
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone; }
+  catch { return 'UTC'; }
 }
+
+const COMMON_PASSWORDS = ['password', 'password1', '12345678', 'qwerty123', 'abc12345', 'letmein1', 'welcome1', 'admin123', 'iloveyou', 'monkey123'];
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -66,10 +47,10 @@ export default function Auth() {
   const [timezone, setTimezone] = useState(guessUserTimezone());
   const [loading, setLoading] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  const [blocked, setBlocked] = useState(false);
+  const [blockedMinutes, setBlockedMinutes] = useState(0);
 
   const timezones = useMemo(() => getAllTimezones(), []);
-
-  const COMMON_PASSWORDS = ['password', 'password1', '12345678', 'qwerty123', 'abc12345', 'letmein1', 'welcome1', 'admin123', 'iloveyou', 'monkey123'];
 
   const validatePassword = (pwd: string): string[] => {
     const errors: string[] = [];
@@ -97,18 +78,62 @@ export default function Auth() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        navigate('/');
+        // Don't auto-redirect; login handler manages 2FA flow
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        navigate('/');
+        const verified = sessionStorage.getItem('2fa_verified');
+        if (verified === 'true') {
+          navigate('/');
+        }
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const checkLoginAttempts = async (): Promise<boolean> => {
+    try {
+      const response = await supabase.functions.invoke('login-attempts', {
+        body: { action: 'check', email: email.toLowerCase() },
+      });
+      if (response.data?.blocked) {
+        setBlocked(true);
+        setBlockedMinutes(response.data.remainingMinutes || 15);
+        return false;
+      }
+      setBlocked(false);
+      return true;
+    } catch {
+      // If the check fails, allow the attempt
+      return true;
+    }
+  };
+
+  const logLoginAttempt = async (success: boolean) => {
+    try {
+      await supabase.functions.invoke('login-attempts', {
+        body: { action: 'log', email: email.toLowerCase(), success },
+      });
+    } catch {
+      // Non-critical, don't block the flow
+    }
+  };
+
+  const check2FARequired = async (userId: string): Promise<boolean> => {
+    try {
+      const { data } = await supabase
+        .from('user_2fa')
+        .select('is_enabled')
+        .eq('user_id', userId)
+        .maybeSingle();
+      return data?.is_enabled === true;
+    } catch {
+      return false;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,9 +141,34 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        // Check rate limiting
+        const allowed = await checkLoginAttempts();
+        if (!allowed) {
+          toast.error(`Too many failed attempts. Try again in ${blockedMinutes} minutes.`);
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          await logLoginAttempt(false);
+          throw error;
+        }
+
+        await logLoginAttempt(true);
+
+        // Check if 2FA is required
+        if (data.user) {
+          const needs2FA = await check2FARequired(data.user.id);
+          if (needs2FA) {
+            navigate(`/auth/verify-2fa?uid=${data.user.id}`);
+            return;
+          }
+        }
+
+        sessionStorage.setItem('2fa_verified', 'true');
         toast.success('Logged in successfully');
+        navigate('/');
       } else {
         const errors = validatePassword(password);
         if (errors.length > 0) {
@@ -135,15 +185,14 @@ export default function Auth() {
           }
         });
         if (error) throw error;
-        
-        // Update profile with timezone after signup
+
         if (data.user) {
           await supabase
             .from('profiles')
             .update({ timezone })
             .eq('user_id', data.user.id);
         }
-        
+
         toast.success('Account created successfully');
       }
     } catch (error: any) {
@@ -153,14 +202,20 @@ export default function Auth() {
     }
   };
 
+  const PASSWORD_RULES = [
+    'At least 10 characters', 'At least one uppercase letter',
+    'At least one lowercase letter', 'At least one number',
+    'At least one special character', 'No 3+ repeating characters',
+    'Must not contain common passwords', 'Must not contain your email username',
+  ];
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md bg-card rounded-3xl shadow-lg p-8">
-        {/* Logo */}
         <div className="flex justify-center mb-8">
-          <img 
-            src="/images/klarity-logo-full.png" 
-            alt="KlaRity by Infosec Ventures" 
+          <img
+            src="/images/klarity-logo-full.png"
+            alt="KlaRity by Infosec Ventures"
             className="h-20 w-auto logo-dark-mode-adjust"
           />
         </div>
@@ -169,10 +224,10 @@ export default function Auth() {
         <div className="flex bg-muted rounded-lg p-1 mb-8">
           <button
             type="button"
-            onClick={() => setIsLogin(true)}
+            onClick={() => { setIsLogin(true); setBlocked(false); }}
             className={`flex-1 py-3 text-sm font-medium rounded-md transition-all ${
-              isLogin 
-                ? 'bg-card text-foreground shadow-sm' 
+              isLogin
+                ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -180,10 +235,10 @@ export default function Auth() {
           </button>
           <button
             type="button"
-            onClick={() => setIsLogin(false)}
+            onClick={() => { setIsLogin(false); setBlocked(false); }}
             className={`flex-1 py-3 text-sm font-medium rounded-md transition-all ${
-              !isLogin 
-                ? 'bg-card text-foreground shadow-sm' 
+              !isLogin
+                ? 'bg-card text-foreground shadow-sm'
                 : 'text-[hsl(0,72%,51%)] hover:text-[hsl(0,72%,45%)]'
             }`}
           >
@@ -191,7 +246,16 @@ export default function Auth() {
           </button>
         </div>
 
-        {/* Form */}
+        {/* Blocked Warning */}
+        {blocked && (
+          <div className="flex items-center gap-2 bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-4">
+            <ShieldAlert className="h-5 w-5 text-destructive shrink-0" />
+            <p className="text-sm text-destructive">
+              Too many failed login attempts. Please try again in {blockedMinutes} minute{blockedMinutes !== 1 ? 's' : ''}.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           {!isLogin && (
             <div className="space-y-2">
@@ -207,7 +271,7 @@ export default function Auth() {
               />
             </div>
           )}
-          
+
           <div className="space-y-2">
             <Label htmlFor="email" className="text-sm font-medium">Email</Label>
             <Input
@@ -220,7 +284,7 @@ export default function Auth() {
               className="h-12 rounded-lg border-border"
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password" className="text-sm font-medium">Password</Label>
             <Input
@@ -235,7 +299,7 @@ export default function Auth() {
             />
             {!isLogin && password.length > 0 && (
               <ul className="text-xs space-y-0.5 mt-1">
-                {['At least 10 characters', 'At least one uppercase letter', 'At least one lowercase letter', 'At least one number', 'At least one special character', 'No 3+ repeating characters', 'Must not contain common passwords', 'Must not contain your email username'].map(rule => {
+                {PASSWORD_RULES.map(rule => {
                   const passed = !passwordErrors.includes(rule);
                   return (
                     <li key={rule} className={passed ? 'text-rag-green' : 'text-destructive'}>
@@ -264,11 +328,11 @@ export default function Auth() {
               </Select>
             </div>
           )}
-          
-          <Button 
-            type="submit" 
-            className="w-full h-12 rounded-lg text-base font-medium bg-[hsl(0,72%,51%)] hover:bg-[hsl(0,72%,45%)] text-white" 
-            disabled={loading}
+
+          <Button
+            type="submit"
+            className="w-full h-12 rounded-lg text-base font-medium bg-[hsl(0,72%,51%)] hover:bg-[hsl(0,72%,45%)] text-white"
+            disabled={loading || blocked}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isLogin ? 'Login' : 'Sign Up'}

@@ -1110,6 +1110,30 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: {
+          attempted_at: string
+          email: string
+          id: string
+          ip_fingerprint: string | null
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string
+          email: string
+          id?: string
+          ip_fingerprint?: string | null
+          success?: boolean
+        }
+        Update: {
+          attempted_at?: string
+          email?: string
+          id?: string
+          ip_fingerprint?: string | null
+          success?: boolean
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string | null
@@ -1367,6 +1391,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_2fa: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          totp_secret: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          totp_secret: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          totp_secret?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
