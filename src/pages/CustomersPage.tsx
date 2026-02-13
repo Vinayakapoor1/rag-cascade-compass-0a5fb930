@@ -14,6 +14,7 @@ import { RAGBadge } from '@/components/RAGBadge';
 import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server, TrendingUp, Globe, Factory, UserCheck, Settings } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, ResponsiveContainer, CartesianGrid, YAxis, Tooltip as RechartsTooltip } from 'recharts';
@@ -84,7 +85,17 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
 }
 
 export default function CustomersPage() {
-  const { data: customers, isLoading, refetch } = useCustomersWithImpact();
+  const { isAdmin, isDepartmentHead, isCSM, csmId } = useAuth();
+  const { data: allCustomers, isLoading, refetch } = useCustomersWithImpact();
+
+  // CSM users see only their assigned customers
+  const customers = useMemo(() => {
+    if (!allCustomers) return allCustomers;
+    if (isCSM && !isAdmin && !isDepartmentHead && csmId) {
+      return allCustomers.filter(c => c.csmId === csmId);
+    }
+    return allCustomers;
+  }, [allCustomers, isCSM, isAdmin, isDepartmentHead, csmId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
