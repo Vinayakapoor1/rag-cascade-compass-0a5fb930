@@ -806,22 +806,31 @@ function CustomerSectionCard({
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0"
-                              disabled={!applyColBand[ind.id]}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const weight = parseFloat(applyColBand[ind.id]);
-                                if (isNaN(weight)) return;
-                                applyToColumn(section.id, ind.id, weight, section.features, section.indicatorFeatureMap);
-                                const band = bands.find(b => b.rag_numeric === weight);
-                                toast.success(`Applied "${band?.band_label || weight}" to all ${ind.name} cells`);
-                              }}
-                            >
-                              <CopyCheck className="h-3 w-3" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0"
+                                    disabled={!applyColBand[ind.id]}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const weight = parseFloat(applyColBand[ind.id]);
+                                      if (isNaN(weight)) return;
+                                      applyToColumn(section.id, ind.id, weight, section.features, section.indicatorFeatureMap);
+                                      const band = bands.find(b => b.rag_numeric === weight);
+                                      toast.success(`Applied "${band?.band_label || weight}" to all ${ind.name} cells`);
+                                    }}
+                                  >
+                                    <CopyCheck className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <p>Apply selected band to all customers for this KPI</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -912,21 +921,30 @@ function CustomerSectionCard({
                                 </SelectItem>
                               </SelectContent>
                             </Select>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0"
-                              disabled={!applyRowBand[feat.id]}
-                              onClick={() => {
-                                const weight = parseFloat(applyRowBand[feat.id]);
-                                if (isNaN(weight)) return;
-                                applyToRow(section.id, feat.id, weight, section.indicators, section.indicatorFeatureMap);
-                                const label = weight === 1 ? 'Green' : weight === 0.5 ? 'Amber' : 'Red';
-                                toast.success(`Applied ${label} to all KPIs for ${feat.name}`);
-                              }}
-                            >
-                              <CopyCheck className="h-3 w-3" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0"
+                                    disabled={!applyRowBand[feat.id]}
+                                    onClick={() => {
+                                      const weight = parseFloat(applyRowBand[feat.id]);
+                                      if (isNaN(weight)) return;
+                                      applyToRow(section.id, feat.id, weight, section.indicators, section.indicatorFeatureMap);
+                                      const label = weight === 1 ? 'Green' : weight === 0.5 ? 'Amber' : 'Red';
+                                      toast.success(`Applied ${label} to all KPIs for ${feat.name}`);
+                                    }}
+                                  >
+                                    <CopyCheck className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <p>Apply selected band to all KPIs for this feature</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <Button
                               variant="ghost"
                               size="icon"

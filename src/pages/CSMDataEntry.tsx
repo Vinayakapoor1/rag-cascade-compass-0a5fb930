@@ -11,7 +11,7 @@ import { CSMDataEntryMatrix } from '@/components/user/CSMDataEntryMatrix';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ClipboardCheck, Calendar as CalendarIcon, Info, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ClipboardCheck, Calendar as CalendarIcon, Info, ToggleLeft, ToggleRight, HelpCircle, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfWeek, getISOWeek, getYear } from 'date-fns';
 
@@ -270,6 +270,32 @@ export default function CSMDataEntry() {
           </Popover>
         </div>
       </div>
+
+      {/* CSM Instructions Card */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+              <BookOpen className="h-5 w-5 text-primary" />
+            </div>
+            <div className="space-y-2 text-sm">
+              <h3 className="font-semibold text-base">CSM Data Entry Guide</h3>
+              <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
+                <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month or week using the dropdown or calendar picker.</li>
+                <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their feature × KPI matrix.</li>
+                <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band (e.g. "76-100%" for Adoption).</li>
+                <li><span className="font-medium text-foreground">Use "Apply to Column"</span> — select a band in the column header and click the <strong>copy icon (✓)</strong> to fill all cells in that KPI column at once.</li>
+                <li><span className="font-medium text-foreground">Use "Apply to Row"</span> — select a band in the row's rightmost cell and click the <strong>copy icon (✓)</strong> to fill all KPIs for that feature at once.</li>
+                <li><span className="font-medium text-foreground">Save your entries</span> — click the <strong>Save</strong> button. Your data will be recorded with a timestamp and audit trail.</li>
+              </ol>
+              <p className="text-xs text-muted-foreground/80 pt-1">
+                💡 <strong>Tip:</strong> A green dot next to a period in the dropdown means data has already been submitted for that period.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
 
       {/* Matrix */}
       {departmentId ? (
