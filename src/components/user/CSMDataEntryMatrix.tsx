@@ -677,7 +677,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
             onChange={handleFileUpload}
             className="hidden"
           />
-          <Button variant="outline" onClick={handleNoUpdateCheckIn} disabled={saving} className="gap-2">
+          <Button variant="destructive" onClick={handleNoUpdateCheckIn} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             No Update & Check In
           </Button>
