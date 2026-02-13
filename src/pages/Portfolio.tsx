@@ -186,25 +186,49 @@ export default function Portfolio() {
       .filter(obj => obj.departments.length > 0);
   }, [rawOrgObjectives, isAdmin, isDepartmentHead, user, accessibleDepartments]);
 
-  // Derive customer and feature counts from the scoped orgObjectives hierarchy
-  const scopedCounts = useMemo(() => {
-    if (!orgObjectives) return { customers: 0, features: 0 };
-    const customerIds = new Set<string>();
+  // Derive feature IDs from the scoped orgObjectives hierarchy
+  const scopedFeatureIds = useMemo(() => {
+    if (!orgObjectives) return new Set<string>();
     const featureIds = new Set<string>();
     orgObjectives.forEach(org => {
       org.departments.forEach(dept => {
         dept.functional_objectives.forEach(fo => {
           fo.key_results.forEach(kr => {
             kr.indicators.forEach(ind => {
-              ind.linkedCustomerIds?.forEach(id => customerIds.add(id));
               ind.linkedFeatureIds?.forEach(id => featureIds.add(id));
             });
           });
         });
       });
     });
-    return { customers: customerIds.size, features: featureIds.size };
+    return featureIds;
   }, [orgObjectives]);
+
+  // Fetch customers linked to scoped features via customer_features
+  const [scopedCustomerCount, setScopedCustomerCount] = useState(0);
+  useEffect(() => {
+    if (scopedFeatureIds.size === 0) {
+      setScopedCustomerCount(0);
+      return;
+    }
+    const fetchScopedCustomers = async () => {
+      const featureIdArr = Array.from(scopedFeatureIds);
+      const { data } = await supabase
+        .from('customer_features')
+        .select('customer_id')
+        .in('feature_id', featureIdArr);
+      if (data) {
+        const uniqueCustomers = new Set(data.map(r => r.customer_id));
+        setScopedCustomerCount(uniqueCustomers.size);
+      }
+    };
+    fetchScopedCustomers();
+  }, [scopedFeatureIds]);
+
+  const scopedCounts = useMemo(() => ({
+    customers: scopedCustomerCount,
+    features: scopedFeatureIds.size,
+  }), [scopedCustomerCount, scopedFeatureIds]);
 
   // Calculate portfolio-level stats from ALL indicators across all org objectives
   const portfolioStats = orgObjectives?.reduce((stats, org) => {
