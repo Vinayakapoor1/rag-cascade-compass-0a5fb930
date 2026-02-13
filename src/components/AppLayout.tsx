@@ -1,17 +1,22 @@
-import { ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { ReactNode, useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
   LogIn,
   LogOut,
-  Settings
+  Settings,
+  ShieldCheck,
+  ShieldOff,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsPopover } from '@/components/NotificationsPopover';
 import { BellNotifications } from '@/components/BellNotifications';
+import { toast } from 'sonner';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -19,7 +24,42 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, isAdmin, isDepartmentHead, isCSM, signOut, loading } = useAuth();
+  const [has2FA, setHas2FA] = useState<boolean | null>(null);
+  const [toggling2FA, setToggling2FA] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('user_2fa')
+        .select('is_enabled')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => setHas2FA(data?.is_enabled === true));
+    } else {
+      setHas2FA(null);
+    }
+  }, [user]);
+
+  const handleDisable2FA = async () => {
+    if (!user) return;
+    setToggling2FA(true);
+    try {
+      await supabase.from('user_2fa').delete().eq('user_id', user.id);
+      setHas2FA(false);
+      toast.success('2FA has been disabled');
+    } catch {
+      toast.error('Failed to disable 2FA');
+    } finally {
+      setToggling2FA(false);
+    }
+  };
+
+  const handleEnable2FA = () => {
+    if (!user) return;
+    navigate(`/auth/verify-2fa?uid=${user.id}&setup=true`);
+  };
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -117,6 +157,24 @@ export function AppLayout({ children }: AppLayoutProps) {
                             <p className="text-xs text-muted-foreground">Signed in as</p>
                             <p className="text-sm font-medium truncate">{user.email}</p>
                           </div>
+                          {has2FA !== null && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={has2FA ? handleDisable2FA : handleEnable2FA}
+                              disabled={toggling2FA}
+                              className="w-full justify-start hover:bg-muted/50 transition-colors"
+                            >
+                              {toggling2FA ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : has2FA ? (
+                                <ShieldOff className="h-4 w-4 mr-2" />
+                              ) : (
+                                <ShieldCheck className="h-4 w-4 mr-2" />
+                              )}
+                              {has2FA ? 'Disable 2FA' : 'Enable 2FA'}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
