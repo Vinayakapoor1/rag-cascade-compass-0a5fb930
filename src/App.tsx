@@ -17,6 +17,7 @@ import FeaturesPage from "./pages/FeaturesPage";
 import FeatureDetailPage from "./pages/FeatureDetailPage";
 import AdminUpload from "./pages/AdminUpload";
 import Auth from "./pages/Auth";
+import Verify2FA from "./pages/Verify2FA";
 import DataManagement from "./pages/DataManagement";
 import DepartmentDataEntry from "./pages/DepartmentDataEntry";
 import DataEntryTimeline from "./pages/DataEntryTimeline";
@@ -39,6 +40,7 @@ const App = () => (
             <Routes>
               {/* Auth routes - no layout */}
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/verify-2fa" element={<Verify2FA />} />
 
               {/* Main app routes with layout */}
               <Route path="/" element={<AppLayout><Portfolio /></AppLayout>} />
