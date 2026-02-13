@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useActivityLog } from '@/hooks/useActivityLog';
@@ -119,24 +120,22 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   const { logActivity } = useActivityLog();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
-  const [customerSections, setCustomerSections] = useState<CustomerSection[]>([]);
-  const [allIndicators, setAllIndicators] = useState<IndicatorInfo[]>([]);
   const [scores, setScores] = useState<ScoreMap>({});
   const [originalScores, setOriginalScores] = useState<ScoreMap>({});
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
-  const [kpiBands, setKpiBands] = useState<BandMap>({});
   const [skipReasonDialogOpen, setSkipReasonDialogOpen] = useState(false);
   const [skipReasons, setSkipReasons] = useState<Record<string, string>>({});
   const [pendingSaveAction, setPendingSaveAction] = useState<'update' | 'no_update' | null>(null);
+  const scoresInitializedRef = useRef(false);
 
-  const fetchData = useCallback(async () => {
-    if (!departmentId || !user) return;
-    setLoading(true);
+  const { data: matrixData, isLoading: loading } = useQuery({
+    queryKey: ['csm-matrix', departmentId, period, user?.id, isAdmin],
+    queryFn: async () => {
+      if (!departmentId || !user) return null;
 
-    try {
       let csmId: string | null = null;
       if (!isAdmin && !isDepartmentHead) {
         const { data: csmRow } = await supabase
@@ -151,19 +150,19 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         .from('functional_objectives')
         .select('id, name')
         .eq('department_id', departmentId);
-      if (!fos?.length) { setCustomerSections([]); setLoading(false); return; }
+      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {} };
 
       const { data: krs } = await supabase
         .from('key_results')
         .select('id, name, functional_objective_id')
         .in('functional_objective_id', fos.map(f => f.id));
-      if (!krs?.length) { setCustomerSections([]); setLoading(false); return; }
+      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {} };
 
       const { data: indicators } = await supabase
         .from('indicators')
         .select('id, name, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
-      if (!indicators?.length) { setCustomerSections([]); setLoading(false); return; }
+      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {} };
 
       const indIds = indicators.map(i => i.id);
       const krMap = new Map(krs.map(k => [k.id, k]));
@@ -181,9 +180,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           fo_name: fo?.name || '',
         };
       });
-      setAllIndicators(indicatorInfos);
 
-      // Fetch KPI-specific bands
       const { data: bandsData } = await supabase
         .from('kpi_rag_bands')
         .select('indicator_id, band_label, rag_color, rag_numeric, sort_order')
@@ -200,7 +197,6 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           sort_order: b.sort_order,
         });
       });
-      setKpiBands(bandsMap);
 
       const { data: featureLinks } = await supabase
         .from('indicator_feature_links')
@@ -220,7 +216,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
       const allLinkedFeatureIds = new Set<string>();
       Object.values(indFeatureMap).forEach(s => s.forEach(id => allLinkedFeatureIds.add(id)));
-      if (allLinkedFeatureIds.size === 0) { setCustomerSections([]); setLoading(false); return; }
+      if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {} };
 
       const { data: customerFeatures } = await supabase
         .from('customer_features')
@@ -279,24 +275,36 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
       }
 
       sections.sort((a, b) => a.name.localeCompare(b.name));
-      setCustomerSections(sections);
-      setOpenSections(new Set());
 
       const scoreMap: ScoreMap = {};
       (existingScores || []).forEach((s: any) => {
         scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
       });
-      setScores({ ...scoreMap });
-      setOriginalScores({ ...scoreMap });
-    } catch (err) {
-      console.error('Error loading matrix data:', err);
-      toast.error('Failed to load matrix data');
-    } finally {
-      setLoading(false);
-    }
-  }, [departmentId, period, user, isAdmin]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+      return { sections, indicators: indicatorInfos, bands: bandsMap, scores: scoreMap };
+    },
+    enabled: !!departmentId && !!user,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const customerSections = matrixData?.sections ?? [];
+  const allIndicators = matrixData?.indicators ?? [];
+  const kpiBands = matrixData?.bands ?? {};
+
+  // Initialize scores from query data only once per query result
+  useEffect(() => {
+    if (matrixData?.scores && !scoresInitializedRef.current) {
+      setScores({ ...matrixData.scores });
+      setOriginalScores({ ...matrixData.scores });
+      scoresInitializedRef.current = true;
+    }
+  }, [matrixData?.scores]);
+
+  // Reset initialization flag when department/period changes
+  useEffect(() => {
+    scoresInitializedRef.current = false;
+  }, [departmentId, period]);
 
   const handleCellChange = (indicatorId: string, customerId: string, featureId: string, bandValue: string) => {
     const key = cellKey(indicatorId, customerId, featureId);
@@ -571,7 +579,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
       toast.success(`Saved ${upserts.length} score(s) and updated KPI values`);
       setOriginalScores({ ...scores });
       setSkipReasons({});
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['csm-matrix', departmentId, period] });
     } catch (err) {
       console.error('Error saving matrix:', err);
       toast.error('Failed to save matrix data');
