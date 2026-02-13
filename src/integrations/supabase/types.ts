@@ -724,6 +724,53 @@ export type Database = {
           },
         ]
       }
+      indicator_evidence: {
+        Row: {
+          created_at: string
+          created_by: string
+          evidence_type: string
+          file_name: string | null
+          file_path: string | null
+          id: string
+          indicator_id: string
+          link_url: string | null
+          notes: string | null
+          period: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          evidence_type: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          indicator_id: string
+          link_url?: string | null
+          notes?: string | null
+          period: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          evidence_type?: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          indicator_id?: string
+          link_url?: string | null
+          notes?: string | null
+          period?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicator_evidence_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       indicator_feature_links: {
         Row: {
           created_at: string | null

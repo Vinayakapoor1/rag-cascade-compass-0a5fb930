@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { IndicatorEvidenceInline } from '@/components/user/IndicatorEvidenceInline';
 
 interface Indicator {
     id: string;
@@ -106,6 +107,7 @@ export default function DepartmentDataEntry() {
     const [department, setDepartment] = useState<{ id: string; name: string } | null>(null);
     const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [updates, setUpdates] = useState<Record<string, IndicatorUpdate>>({});
+    const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
     const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
     const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
 
@@ -285,8 +287,11 @@ export default function DepartmentDataEntry() {
             return;
         }
 
-        // Validate that each update has either evidence file, URL, or reason
-        const invalidUpdates = changedUpdates.filter(u => !u.evidenceFile && !u.evidenceUrl?.trim() && !u.evidenceReason?.trim());
+        // Validate that each update has evidence (from new table) or reason
+        const invalidUpdates = changedUpdates.filter(u => {
+            const hasNewEvidence = (evidenceCounts[u.id] || 0) > 0;
+            return !hasNewEvidence && !u.evidenceReason?.trim();
+        });
         if (invalidUpdates.length > 0) {
             const invalidIndicators = invalidUpdates
                 .map(u => indicators.find(i => i.id === u.id)?.name)
@@ -420,8 +425,9 @@ export default function DepartmentDataEntry() {
             return;
         }
 
-        // Validate evidence
-        if (!update.evidenceFile && !update.evidenceUrl?.trim() && !update.evidenceReason?.trim()) {
+        // Validate evidence - check new evidence table count
+        const hasEvidence = (evidenceCounts[indicatorId] || 0) > 0;
+        if (!hasEvidence && !update.evidenceReason?.trim()) {
             const indicator = indicators.find(i => i.id === indicatorId);
             toast.error(`Evidence (file/link) or reason required for: ${indicator?.name}`);
             return;
@@ -778,7 +784,7 @@ export default function DepartmentDataEntry() {
 
                                         {expandedKRs.has(krId) && (
                                             <div className="p-4">
-                                                <div className="grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
+                                                <div className="grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
                                                     <div className="text-center">ℹ️</div>
                                                     <div>Indicator</div>
                                                     <div className="text-center">Target</div>
@@ -786,12 +792,9 @@ export default function DepartmentDataEntry() {
                                                     <div className="text-center">Current</div>
                                                     <div className="text-center">Progress</div>
                                                     <div className="text-center">RAG</div>
-                                                    <div className="text-center">File</div>
-                                                    <div className="text-center">🔗</div>
-                                                    <div className="text-center">Link</div>
+                                                    <div className="text-center">Evidence</div>
                                                     <div className="text-center">Reason</div>
                                                     <div className="text-center">History</div>
-                                                    <div className="text-center">Upload</div>
                                                     <div className="text-center">Save</div>
                                                 </div>
 
@@ -804,7 +807,7 @@ export default function DepartmentDataEntry() {
                                                             : 0;
                                                         const ragStatus = getRAGStatus(numValue, ind.target_value);
                                                         const hasChanged = updates[ind.id]?.hasChanged || false;
-                                                        const hasEvidence = updates[ind.id]?.evidenceFile || updates[ind.id]?.evidenceUrl?.trim() || ind.evidence_url;
+                                                        const hasEvidence = (evidenceCounts[ind.id] || 0) > 0;
                                                         const hasReason = updates[ind.id]?.evidenceReason?.trim();
                                                         const isInvalid = hasChanged && !hasEvidence && !hasReason;
 
@@ -812,13 +815,13 @@ export default function DepartmentDataEntry() {
                                                             <div
                                                                 key={ind.id}
                                                                 className={cn(
-                                                                    "grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,0.5fr,0.5fr,1.2fr,1.5fr,0.5fr,0.5fr,0.5fr] gap-2 items-center p-2 rounded-lg border",
+                                                                    "grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr] gap-2 items-start p-2 rounded-lg border",
                                                                     hasChanged && "border-primary/50 bg-muted/30",
                                                                     isInvalid && "border-destructive/50 bg-destructive/5"
                                                                 )}
                                                             >
                                                                 {/* Formula Info Button */}
-                                                                <div className="flex justify-center">
+                                                                <div className="flex justify-center pt-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
                                                                             <button
@@ -837,7 +840,7 @@ export default function DepartmentDataEntry() {
                                                                         </TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
-                                                                <div>
+                                                                <div className="pt-1">
                                                                     <p className="text-sm font-medium">{ind.name}</p>
                                                                     {ind.frequency && (
                                                                         <Badge variant="outline" className="text-[10px] mt-1">
@@ -845,10 +848,10 @@ export default function DepartmentDataEntry() {
                                                                         </Badge>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-center text-sm">
+                                                                <div className="text-center text-sm pt-1">
                                                                     {ind.target_value ?? '—'} {ind.unit}
                                                                 </div>
-                                                                <div className="text-center">
+                                                                <div className="text-center pt-1">
                                                                     {ind.previous_value !== null ? (
                                                                         <Badge variant="secondary" className="font-mono text-xs">
                                                                             {ind.previous_value}
@@ -867,72 +870,21 @@ export default function DepartmentDataEntry() {
                                                                         className="h-8 text-sm text-center"
                                                                     />
                                                                 </div>
-                                                                <div className="text-center">
+                                                                <div className="text-center pt-1">
                                                                     <span className="text-sm font-semibold">{progress}%</span>
                                                                 </div>
-                                                                <div className="flex justify-center">
+                                                                <div className="flex justify-center pt-1">
                                                                     <RAGBadge status={ragStatus} />
                                                                 </div>
-                                                                {/* File column - shows paperclip for uploaded files */}
-                                                                <div className="flex justify-center">
-                                                                    {updates[ind.id]?.evidenceFile ? (
-                                                                        <span title="File pending upload">
-                                                                            <Paperclip className="h-4 w-4 text-green-500" />
-                                                                        </span>
-                                                                    ) : (ind.evidence_url && ind.evidence_url.startsWith('evidence/')) ? (
-                                                                        <button 
-                                                                            type="button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                openEvidenceUrl(ind.evidence_url);
-                                                                            }}
-                                                                            className="hover:opacity-70"
-                                                                            title="View uploaded file"
-                                                                        >
-                                                                            <Paperclip className="h-4 w-4 text-primary cursor-pointer" />
-                                                                        </button>
-                                                                    ) : (
-                                                                        <Paperclip className="h-4 w-4 text-muted-foreground/30" />
-                                                                    )}
-                                                                </div>
-                                                                {/* Link icon column - shows clickable link when URL exists */}
-                                                                <div className="flex justify-center">
-                                                                    {(() => {
-                                                                        const urlValue = updates[ind.id]?.evidenceUrl?.trim() || '';
-                                                                        const existingUrl = ind.evidence_url;
-                                                                        const hasExternalLink = urlValue || (existingUrl && (existingUrl.startsWith('http') || (!existingUrl.startsWith('evidence/') && existingUrl.includes('.'))));
-                                                                        
-                                                                        if (hasExternalLink) {
-                                                                            return (
-                                                                                <button 
-                                                                                    type="button"
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        openEvidenceUrl(urlValue || existingUrl);
-                                                                                    }}
-                                                                                    className="hover:opacity-70"
-                                                                                    title="Open link"
-                                                                                >
-                                                                                    <LinkIcon className="h-4 w-4 text-primary cursor-pointer" />
-                                                                                </button>
-                                                                            );
-                                                                        }
-                                                                        return <LinkIcon className="h-4 w-4 text-muted-foreground/30" />;
-                                                                    })()}
-                                                                </div>
-                                                                {/* Link input column */}
+                                                                {/* Multi-evidence column */}
                                                                 <div>
-                                                                    <Input
-                                                                        type="url"
-                                                                        value={updates[ind.id]?.evidenceUrl || ''}
-                                                                        onChange={(e) => handleUrlChange(ind.id, e.target.value)}
-                                                                        placeholder="Evidence link"
-                                                                        className={cn(
-                                                                            "h-8 text-xs",
-                                                                            isInvalid && "border-destructive"
-                                                                        )}
+                                                                    <IndicatorEvidenceInline
+                                                                        indicatorId={ind.id}
+                                                                        period={period}
+                                                                        onEvidenceChange={(count) => setEvidenceCounts(prev => ({ ...prev, [ind.id]: count }))}
                                                                     />
                                                                 </div>
+                                                                {/* Reason column */}
                                                                 <div>
                                                                     {!hasEvidence ? (
                                                                         <textarea
@@ -950,7 +902,7 @@ export default function DepartmentDataEntry() {
                                                                         <span className="text-xs text-muted-foreground">—</span>
                                                                     )}
                                                                 </div>
-                                                                <div className="flex justify-center">
+                                                                <div className="flex justify-center pt-1">
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
@@ -967,22 +919,7 @@ export default function DepartmentDataEntry() {
                                                                         <History className="h-4 w-4" />
                                                                     </Button>
                                                                 </div>
-                                                                <div className="flex justify-center">
-                                                                    <label htmlFor={`file-${ind.id}`} className="cursor-pointer">
-                                                                        <Upload className={cn(
-                                                                            "h-4 w-4",
-                                                                            updates[ind.id]?.evidenceFile ? "text-green-500" : "text-muted-foreground"
-                                                                        )} />
-                                                                        <input
-                                                                            id={`file-${ind.id}`}
-                                                                            type="file"
-                                                                            className="hidden"
-                                                                            accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
-                                                                            onChange={(e) => handleFileChange(ind.id, e.target.files?.[0] || null)}
-                                                                        />
-                                                                    </label>
-                                                                </div>
-                                                                <div className="flex justify-center">
+                                                                <div className="flex justify-center pt-1">
                                                                     {hasChanged && (
                                                                         <Button
                                                                             variant="ghost"
