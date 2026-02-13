@@ -53,7 +53,7 @@ interface KPIBand {
 interface CustomerSection {
   id: string;
   name: string;
-  features: { id: string; name: string }[];
+  features: { id: string; name: string; description?: string | null; category?: string | null }[];
   indicators: IndicatorInfo[];
   indicatorFeatureMap: Record<string, Set<string>>;
 }
@@ -192,16 +192,18 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
 
       const { data: featureLinks } = await supabase
         .from('indicator_feature_links')
-        .select('indicator_id, feature_id, features(id, name)')
+        .select('indicator_id, feature_id, features(id, name, description, category)')
         .in('indicator_id', indIds);
 
       const indFeatureMap: Record<string, Set<string>> = {};
       const featureNameMap = new Map<string, string>();
+      const featureMetaMap = new Map<string, { description?: string | null; category?: string | null }>();
       (featureLinks || []).forEach((fl: any) => {
         if (!fl.features) return;
         if (!indFeatureMap[fl.indicator_id]) indFeatureMap[fl.indicator_id] = new Set();
         indFeatureMap[fl.indicator_id].add(fl.features.id);
         featureNameMap.set(fl.features.id, fl.features.name);
+        featureMetaMap.set(fl.features.id, { description: fl.features.description, category: fl.features.category });
       });
 
       const allLinkedFeatureIds = new Set<string>();
@@ -235,7 +237,10 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         if (relevantFeatureIds.length === 0) continue;
 
         const features = relevantFeatureIds
-          .map(fid => ({ id: fid, name: featureNameMap.get(fid) || 'Unknown' }))
+          .map(fid => {
+            const meta = featureMetaMap.get(fid);
+            return { id: fid, name: featureNameMap.get(fid) || 'Unknown', description: meta?.description, category: meta?.category };
+          })
           .sort((a, b) => a.name.localeCompare(b.name));
 
         const relevantIndicators: IndicatorInfo[] = [];
@@ -930,7 +935,18 @@ function CustomerSectionCard({
                     return (
                       <tr key={feat.id} className="border-t hover:bg-muted/20 transition-colors">
                         <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium text-xs border-r">
-                          {feat.name}
+                          <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help border-b border-dotted border-muted-foreground/40">
+                                {feat.name}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="font-semibold text-sm">{feat.name}</p>
+                              {feat.category && <p className="text-xs text-muted-foreground mt-0.5">Category: {feat.category}</p>}
+                              <p className="text-xs mt-1">{feat.description || 'No description available'}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </td>
                         {section.indicators.map(ind => {
                           const canEdit = section.indicatorFeatureMap[ind.id]?.has(feat.id) ?? false;
