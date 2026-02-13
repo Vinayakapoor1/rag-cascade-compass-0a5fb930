@@ -252,8 +252,15 @@ export function ActivityTimelineWidget() {
                                                         </div>
                                                     )}
 
+                                                        {/* Skip Reason */}
+                                                        {log.metadata?.skip_reason && (
+                                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-orange-500/10 text-orange-700 border-orange-500/20 dark:text-orange-400">
+                                                                SKIPPED
+                                                            </Badge>
+                                                        )}
+
                                                         {/* Value Change - for any update with old/new values */}
-                                                        {log.action === 'update' && (log.old_value || log.new_value) && (
+                                                        {log.action === 'update' && (log.old_value || log.new_value) && !log.metadata?.skip_reason && (
                                                             <div className="flex items-center gap-1 text-xs">
                                                                 <span className="font-mono text-muted-foreground">
                                                                     {getDisplayValue(log.old_value)}
@@ -263,6 +270,13 @@ export function ActivityTimelineWidget() {
                                                                     {getDisplayValue(log.new_value)}
                                                                 </span>
                                                             </div>
+                                                        )}
+
+                                                        {/* Skip Reason Text */}
+                                                        {log.metadata?.skip_reason && (
+                                                            <span className="text-xs italic text-muted-foreground truncate max-w-[200px]" title={log.metadata.skip_reason}>
+                                                                "{log.metadata.skip_reason}"
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>
