@@ -27,7 +27,14 @@ import CSMDataEntry from "./pages/CSMDataEntry";
 import ComplianceReport from "./pages/ComplianceReport";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 60 * 1000,
+    },
+  },
+});
 
 const App = () => (
   <ThemeProvider>
