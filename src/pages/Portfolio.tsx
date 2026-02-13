@@ -440,10 +440,10 @@ export default function Portfolio() {
 
       {/* 2. Business Outcome */}
       <BusinessOutcomeSection 
-        businessOutcome={orgObjectives?.find(obj => obj.business_outcome)?.business_outcome ?? null} 
+        businessOutcome={rawOrgObjectives?.find(obj => obj.business_outcome)?.business_outcome ?? null} 
         status={portfolioHealth}
         percentage={avgScore}
-        orgObjectiveId={orgObjectives?.find(obj => obj.business_outcome)?.id ?? orgObjectives?.[0]?.id ?? null}
+        orgObjectiveId={rawOrgObjectives?.find(obj => obj.business_outcome)?.id ?? orgObjectives?.[0]?.id ?? null}
         onEditSuccess={() => refetch()}
       />
 
