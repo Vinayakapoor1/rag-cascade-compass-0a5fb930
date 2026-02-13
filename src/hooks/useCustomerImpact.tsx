@@ -364,6 +364,7 @@ export interface CustomerWithImpact {
   deploymentType: string | null;
   trendData: TrendDataPoint[];
   csmName: string | null;
+  csmId: string | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
@@ -526,6 +527,7 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       deploymentType: c.deployment_type,
       trendData: customerTrendData.get(c.id) || [],
       csmName: c.csm_id ? (csmMap.get(c.csm_id) || null) : null,
+      csmId: c.csm_id || null,
     };
   });
 }
