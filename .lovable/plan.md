@@ -1,36 +1,25 @@
 
-# Fix CSM Customer Count on Portfolio + Confirm Attachments
+## Add Feature Hover Tooltips in CSM Data Entry Matrix
 
-## Problem
-On the Portfolio page, CSM users (like Abhay) see **all 80 customers** linked to department features instead of only their 3 assigned customers. The customer count query fetches from `customer_features` without filtering by the CSM's assigned customers.
+### What Changes
+When a CSM hovers over a feature name in the data entry matrix table, a tooltip will appear showing the feature's description and category -- giving immediate context without leaving the page.
 
-## Changes
+### Current State
+- Feature names are displayed as plain text in the leftmost column of each customer's matrix table (line 932-933 of `CSMDataEntryMatrix.tsx`)
+- The `features` table already has `description` and `category` columns, but only `id` and `name` are fetched currently
 
-### 1. Fix Portfolio customer scoping for CSMs
-**File: `src/pages/Portfolio.tsx`**
+### Implementation Steps
 
-- Destructure `isCSM` and `csmId` from the existing `useAuth()` call (line 159).
-- In the `fetchScopedCustomers` effect (lines 209-226), add a CSM filter:
-  - If the user is a CSM (not admin, not department head) and has a `csmId`, query `customer_features` joined with `customers` and filter where `customers.csm_id` equals the CSM's ID.
-  - This ensures only customers assigned to the CSM are counted.
-- The feature count (`scopedFeatureIds.size`) should also be refined: after identifying the CSM's assigned customers, trace back to only the features those customers use, rather than all features in the department.
+1. **Update data fetching** in `CSMDataEntryMatrix.tsx`:
+   - Change the `features` select query (line 196) to also fetch `description` and `category` fields
+   - Update the `CustomerSection.features` type to include `description` and `category`
 
-### 2. Attachments (already working)
-The `CustomerAttachments` component already supports multiple files and links per customer per period. It is rendered inside each `CustomerSectionCard` accordion. No additional changes are needed here -- CSMs and Team Leads can already add multiple files and links.
+2. **Add tooltips to feature name cells** (around line 932):
+   - Wrap each feature name in a `Tooltip` component (already imported)
+   - Show description and category in the tooltip content
+   - If no description exists, show "No description available" as fallback
 
-## Technical Detail
-
-Current problematic query (line 216-219):
-```text
-supabase.from('customer_features').select('customer_id').in('feature_id', featureIdArr)
-```
-
-Fixed approach for CSMs:
-```text
-supabase.from('customer_features')
-  .select('customer_id, customers!inner(csm_id)')
-  .in('feature_id', featureIdArr)
-  .eq('customers.csm_id', csmId)
-```
-
-For admins, department heads, and viewers, the query remains unchanged (no `csm_id` filter).
+### Technical Details
+- The `features` table has `description` (text) and `category` (text) columns -- currently most have "PLATFORM" as description
+- The tooltip will use the existing `TooltipProvider` / `Tooltip` / `TooltipTrigger` / `TooltipContent` components already imported in the file
+- Zero-delay tooltips (consistent with existing KPI formula tooltips per project style)
