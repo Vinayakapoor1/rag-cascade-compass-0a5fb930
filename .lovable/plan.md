@@ -1,38 +1,36 @@
 
+# Fix CSM Customer Count on Portfolio + Confirm Attachments
 
-# Replace "Save All" with "Update & Check In" / "No Update & Check In"
+## Problem
+On the Portfolio page, CSM users (like Abhay) see **all 80 customers** linked to department features instead of only their 3 assigned customers. The customer count query fetches from `customer_features` without filtering by the CSM's assigned customers.
 
-## What Changes
+## Changes
 
-Replace the single "Save All" button in the CSM Data Entry Matrix with two distinct action buttons:
+### 1. Fix Portfolio customer scoping for CSMs
+**File: `src/pages/Portfolio.tsx`**
 
-1. **"Update & Check In"** -- Saves all changed scores to the database, updates indicator aggregates, logs activity, and records the CSM's check-in for the period (existing save logic).
-2. **"No Update & Check In"** -- Records the CSM's check-in for the period WITHOUT saving any score changes. This allows CSMs to confirm they reviewed their data but have no updates to make.
+- Destructure `isCSM` and `csmId` from the existing `useAuth()` call (line 159).
+- In the `fetchScopedCustomers` effect (lines 209-226), add a CSM filter:
+  - If the user is a CSM (not admin, not department head) and has a `csmId`, query `customer_features` joined with `customers` and filter where `customers.csm_id` equals the CSM's ID.
+  - This ensures only customers assigned to the CSM are counted.
+- The feature count (`scopedFeatureIds.size`) should also be refined: after identifying the CSM's assigned customers, trace back to only the features those customers use, rather than all features in the department.
 
-## Why
+### 2. Attachments (already working)
+The `CustomerAttachments` component already supports multiple files and links per customer per period. It is rendered inside each `CustomerSectionCard` accordion. No additional changes are needed here -- CSMs and Team Leads can already add multiple files and links.
 
-This gives CSMs a clear way to "check in" even when they have no new data to enter, which supports the weekly compliance system. Currently there's no way for a CSM to signal "I looked, nothing changed" -- they can only save if they have changes.
+## Technical Detail
 
-## Technical Details
+Current problematic query (line 216-219):
+```text
+supabase.from('customer_features').select('customer_id').in('feature_id', featureIdArr)
+```
 
-### File: `src/components/user/CSMDataEntryMatrix.tsx`
+Fixed approach for CSMs:
+```text
+supabase.from('customer_features')
+  .select('customer_id, customers!inner(csm_id)')
+  .in('feature_id', featureIdArr)
+  .eq('customers.csm_id', csmId)
+```
 
-**1. Add a new `handleNoUpdateCheckIn` function** (around line 501):
-- Inserts a record into `activity_logs` with action `'update'` and metadata indicating a "no-update check-in" for the current period and department.
-- Optionally upserts a minimal entry into `csm_customer_feature_scores` (a sentinel/marker) so the compliance system recognizes a submission for this period -- OR inserts into a dedicated check-in log. Since the compliance system checks `csm_customer_feature_scores` for period data, we will insert a lightweight activity log entry and also touch the scores table with existing values (re-save current scores without changes) to register the period as "submitted."
-- Shows a success toast: "Checked in -- no updates for this period."
-
-**2. Replace the Save All button** (lines 620-623):
-- Remove the single `<Button>Save All</Button>`.
-- Add two buttons side by side:
-  - `<Button onClick={handleSaveAll} disabled={saving}>Update & Check In</Button>` -- always enabled (even without changes, re-saves current state as confirmation).
-  - `<Button variant="outline" onClick={handleNoUpdateCheckIn} disabled={saving}>No Update & Check In</Button>` -- records the check-in without modifying scores.
-
-**3. Update icons**:
-- "Update & Check In" uses `Save` or `ClipboardCheck` icon.
-- "No Update & Check In" uses `ClipboardCheck` or `Check` icon.
-
-### Compliance Integration
-
-The existing compliance system (`csm-compliance-check` edge function) checks `csm_customer_feature_scores` for entries in the current period. The "No Update & Check In" flow will re-upsert existing scores for the period (effectively a no-op data-wise) so that the compliance query finds records and marks the CSM as compliant.
-
+For admins, department heads, and viewers, the query remains unchanged (no `csm_id` filter).
