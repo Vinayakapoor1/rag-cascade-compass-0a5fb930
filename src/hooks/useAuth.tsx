@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -25,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [csmId, setCsmId] = useState<string | null>(null);
   const [accessibleDepartments, setAccessibleDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const lastCheckedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -35,8 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        checkUserRoles(session.user.id);
+        // Only re-check roles if user actually changed (not just token refresh)
+        if (lastCheckedUserIdRef.current !== session.user.id) {
+          checkUserRoles(session.user.id);
+        }
       } else {
+        lastCheckedUserIdRef.current = null;
         setIsAdmin(false);
         setIsDepartmentHead(false);
         setIsCSM(false);
@@ -70,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkUserRoles = async (userId: string) => {
+    lastCheckedUserIdRef.current = userId;
     // Check admin role
     const { data: adminData } = await supabase
       .from('user_roles')
