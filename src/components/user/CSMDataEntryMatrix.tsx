@@ -7,12 +7,21 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CustomerAttachments } from './CustomerAttachments';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -119,6 +128,9 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [kpiBands, setKpiBands] = useState<BandMap>({});
+  const [skipReasonDialogOpen, setSkipReasonDialogOpen] = useState(false);
+  const [skipReasons, setSkipReasons] = useState<Record<string, string>>({});
+  const [pendingSaveAction, setPendingSaveAction] = useState<'update' | 'no_update' | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!departmentId || !user) return;
@@ -385,7 +397,48 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     return false;
   }, [scores, originalScores]);
 
-  const handleSaveAll = async () => {
+  // Detect customers with zero scores filled
+  const getEmptyCustomers = useCallback((): CustomerSection[] => {
+    return customerSections.filter(section => {
+      const hasAnyScore = section.indicators.some(ind => {
+        const feats = section.indicatorFeatureMap[ind.id];
+        if (!feats) return false;
+        return [...feats].some(fid => scores[cellKey(ind.id, section.id, fid)] != null);
+      });
+      return !hasAnyScore;
+    });
+  }, [customerSections, scores]);
+
+  const initiateCheckIn = (action: 'update' | 'no_update') => {
+    const empty = getEmptyCustomers();
+    if (empty.length > 0) {
+      // Initialize reasons for empty customers
+      setSkipReasons(prev => {
+        const next = { ...prev };
+        empty.forEach(c => { if (!next[c.id]) next[c.id] = ''; });
+        return next;
+      });
+      setPendingSaveAction(action);
+      setSkipReasonDialogOpen(true);
+    } else {
+      if (action === 'update') doSaveAll();
+      else doNoUpdateCheckIn();
+    }
+  };
+
+  const confirmSkipAndSave = () => {
+    const empty = getEmptyCustomers();
+    const missingReasons = empty.filter(c => !skipReasons[c.id]?.trim());
+    if (missingReasons.length > 0) {
+      toast.error(`Please provide a reason for all customers without scores`);
+      return;
+    }
+    setSkipReasonDialogOpen(false);
+    if (pendingSaveAction === 'update') doSaveAll();
+    else doNoUpdateCheckIn();
+  };
+
+  const doSaveAll = async () => {
     if (!user) return;
     setSaving(true);
 
@@ -495,8 +548,29 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         });
       }
 
+      // Log skip reasons for empty customers
+      const emptyCustomers = getEmptyCustomers();
+      for (const ec of emptyCustomers) {
+        const reason = skipReasons[ec.id]?.trim();
+        if (reason) {
+          await logActivity({
+            action: 'update',
+            entityType: 'department',
+            entityId: departmentId,
+            entityName: `Skip reason: ${ec.name}`,
+            metadata: {
+              department_id: departmentId,
+              period,
+              source: 'customer_feature_matrix',
+              skip_reason: reason,
+            },
+          });
+        }
+      }
+
       toast.success(`Saved ${upserts.length} score(s) and updated KPI values`);
       setOriginalScores({ ...scores });
+      setSkipReasons({});
       fetchData();
     } catch (err) {
       console.error('Error saving matrix:', err);
@@ -506,7 +580,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     }
   };
 
-  const handleNoUpdateCheckIn = async () => {
+  const doNoUpdateCheckIn = async () => {
     if (!user) return;
     setSaving(true);
     try {
@@ -557,7 +631,28 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         },
       });
 
+      // Log skip reasons for empty customers
+      const emptyCustomers = getEmptyCustomers();
+      for (const ec of emptyCustomers) {
+        const reason = skipReasons[ec.id]?.trim();
+        if (reason) {
+          await logActivity({
+            action: 'update',
+            entityType: 'department',
+            entityId: departmentId,
+            entityName: `Skip reason: ${ec.name}`,
+            metadata: {
+              department_id: departmentId,
+              period,
+              source: 'customer_feature_matrix',
+              skip_reason: reason,
+            },
+          });
+        }
+      }
+
       toast.success('Checked in — no updates for this period.');
+      setSkipReasons({});
     } catch (err) {
       console.error('Error during no-update check-in:', err);
       toast.error('Failed to check in');
@@ -683,11 +778,11 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
             onChange={handleFileUpload}
             className="hidden"
           />
-          <Button variant="destructive" onClick={handleNoUpdateCheckIn} disabled={saving} className="gap-2">
+          <Button variant="destructive" onClick={() => initiateCheckIn('no_update')} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             No Update & Check In
           </Button>
-          <Button onClick={handleSaveAll} disabled={saving} className="gap-2">
+          <Button onClick={() => initiateCheckIn('update')} disabled={saving} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
             Update & Check In
           </Button>
@@ -714,6 +809,42 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
           period={period}
         />
       ))}
+
+      {/* Skip Reason Dialog */}
+      <Dialog open={skipReasonDialogOpen} onOpenChange={setSkipReasonDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-rag-amber" />
+              Reason Required for Empty Customers
+            </DialogTitle>
+            <DialogDescription>
+              The following customers have no scores entered. Please provide a reason for each before checking in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {getEmptyCustomers().map(c => (
+              <div key={c.id} className="space-y-1.5">
+                <label className="text-sm font-medium">{c.name}</label>
+                <Textarea
+                  placeholder="e.g. Customer on hold, No meeting this week, Data not available..."
+                  value={skipReasons[c.id] || ''}
+                  onChange={e => setSkipReasons(prev => ({ ...prev, [c.id]: e.target.value }))}
+                  className="min-h-[60px] text-sm"
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSkipReasonDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSkipAndSave}>
+              Confirm & Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
