@@ -30,15 +30,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!isMounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
+      
+      // On TOKEN_REFRESHED, skip state updates if the user hasn't changed
+      // This prevents unnecessary re-renders that reset child component state
+      if (event === 'TOKEN_REFRESHED' && newSession?.user?.id === lastCheckedUserIdRef.current) {
+        return;
+      }
 
-      if (session?.user) {
-        // Only re-check roles if user actually changed (not just token refresh)
-        if (lastCheckedUserIdRef.current !== session.user.id) {
-          checkUserRoles(session.user.id);
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+
+      if (newSession?.user) {
+        if (lastCheckedUserIdRef.current !== newSession.user.id) {
+          checkUserRoles(newSession.user.id);
         }
       } else {
         lastCheckedUserIdRef.current = null;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,6 +40,8 @@ export default function CSMDataEntry() {
   const [loading, setLoading] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
+  const depsInitializedRef = useRef(false);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate('/auth'); return; }
@@ -48,7 +50,10 @@ export default function CSMDataEntry() {
       navigate('/');
       return;
     }
-    fetchDepartments();
+    if (!depsInitializedRef.current) {
+      depsInitializedRef.current = true;
+      fetchDepartments();
+    }
   }, [user, isCSM, isAdmin, authLoading]);
 
   // Fetch periods that have data
