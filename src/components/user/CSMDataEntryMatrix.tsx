@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
@@ -500,6 +500,66 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
     }
   };
 
+  const handleNoUpdateCheckIn = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      // Re-upsert all existing scores for the period so compliance system sees entries
+      const existingUpserts: any[] = [];
+      for (const section of customerSections) {
+        for (const ind of section.indicators) {
+          const feats = section.indicatorFeatureMap[ind.id];
+          if (!feats) continue;
+          for (const fid of feats) {
+            const val = scores[cellKey(ind.id, section.id, fid)];
+            if (val != null) {
+              existingUpserts.push({
+                indicator_id: ind.id,
+                customer_id: section.id,
+                feature_id: fid,
+                value: val,
+                period,
+                created_by: user.id,
+              });
+            }
+          }
+        }
+      }
+
+      // Upsert existing scores to touch updated_at timestamps
+      if (existingUpserts.length > 0) {
+        for (let i = 0; i < existingUpserts.length; i += 500) {
+          const chunk = existingUpserts.slice(i, i + 500);
+          await supabase
+            .from('csm_customer_feature_scores' as any)
+            .upsert(chunk, { onConflict: 'indicator_id,customer_id,feature_id,period' });
+        }
+      }
+
+      // Log the no-update check-in
+      await logActivity({
+        action: 'update',
+        entityType: 'department',
+        entityId: departmentId,
+        entityName: `No-update check-in`,
+        metadata: {
+          department_id: departmentId,
+          period,
+          source: 'customer_feature_matrix',
+          check_in_type: 'no_update',
+          existing_scores_touched: existingUpserts.length,
+        },
+      });
+
+      toast.success('Checked in — no updates for this period.');
+    } catch (err) {
+      console.error('Error during no-update check-in:', err);
+      toast.error('Failed to check in');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDownloadTemplate = async () => {
     try {
       await generateMatrixTemplate(customerSections, period, scores, kpiBands);
@@ -617,9 +677,13 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
             onChange={handleFileUpload}
             className="hidden"
           />
-          <Button onClick={handleSaveAll} disabled={saving || !hasChanges} className="gap-2">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save All
+          <Button variant="outline" onClick={handleNoUpdateCheckIn} disabled={saving} className="gap-2">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            No Update & Check In
+          </Button>
+          <Button onClick={handleSaveAll} disabled={saving} className="gap-2">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
+            Update & Check In
           </Button>
         </div>
       </div>
