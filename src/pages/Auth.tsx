@@ -65,8 +65,29 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [timezone, setTimezone] = useState(guessUserTimezone());
   const [loading, setLoading] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
 
   const timezones = useMemo(() => getAllTimezones(), []);
+
+  const validatePassword = (pwd: string): string[] => {
+    const errors: string[] = [];
+    if (pwd.length < 8) errors.push('At least 8 characters');
+    if (!/[A-Z]/.test(pwd)) errors.push('At least one uppercase letter');
+    if (!/[a-z]/.test(pwd)) errors.push('At least one lowercase letter');
+    if (!/[0-9]/.test(pwd)) errors.push('At least one number');
+    if (!/[^A-Za-z0-9]/.test(pwd)) errors.push('At least one special character');
+    return errors;
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setPassword(val);
+    if (!isLogin && val.length > 0) {
+      setPasswordErrors(validatePassword(val));
+    } else {
+      setPasswordErrors([]);
+    }
+  };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -94,6 +115,12 @@ export default function Auth() {
         if (error) throw error;
         toast.success('Logged in successfully');
       } else {
+        const errors = validatePassword(password);
+        if (errors.length > 0) {
+          setPasswordErrors(errors);
+          toast.error('Please fix password requirements');
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -195,12 +222,24 @@ export default function Auth() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={handlePasswordChange}
               placeholder="••••••••"
               required
-              minLength={6}
+              minLength={8}
               className="h-12 rounded-lg border-border"
             />
+            {!isLogin && passwordErrors.length > 0 && password.length > 0 && (
+              <ul className="text-xs space-y-0.5 mt-1">
+                {['At least 8 characters', 'At least one uppercase letter', 'At least one lowercase letter', 'At least one number', 'At least one special character'].map(rule => {
+                  const passed = !passwordErrors.includes(rule);
+                  return (
+                    <li key={rule} className={passed ? 'text-rag-green' : 'text-destructive'}>
+                      {passed ? '✓' : '✗'} {rule}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
 
           {!isLogin && (
