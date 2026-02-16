@@ -1,30 +1,40 @@
 
 
-# Update CSAT RAG Bands to 1-5 Scale
+# Display CSAT Band Labels Instead of Percentages
 
-## Current State
-The CSAT Score indicator currently uses percentage-based bands:
-- 90-100% = Green
-- 51-89% = Amber
-- 1-50% = Red
+## Problem
+The Indicator Derivation Dialog (the drilldown view shown when clicking a KPI on the Department Detail page) converts raw `rag_numeric` weights (0, 0.5, 1) to percentages (0%, 50%, 100%). For CSAT which uses a 1-5 scale, this is confusing -- users expect to see "4-5", "3", or "1-2" instead.
 
-## Requested Change
-Update to a 1-5 scoring scale:
-- **4-5** = Green
-- **3** = Amber
-- **1-2** = Red
+## Solution
+When an indicator has custom RAG bands configured (like CSAT), display the **band label** instead of the percentage in the breakdown table and charts. Fall back to percentage display for indicators that don't have custom bands.
 
-## Implementation
-A single database update to modify the three existing rows in the `kpi_rag_bands` table for the CSAT Score indicator (`c582917c-2296-46e9-8cfa-9401ed71577c`):
+## Changes
 
-| Band | Label | RAG Color | RAG Numeric |
-|------|-------|-----------|-------------|
-| 1 | 4-5 | green | 1 |
-| 2 | 3 | amber | 0.5 |
-| 3 | 1-2 | red | 0 |
+**File: `src/components/IndicatorDerivationDialog.tsx`**
+
+1. **Add a helper function** to map a `rag_numeric` value back to its band label using the already-fetched `ragBands` data:
+   - Match `value` to `ragBands[x].rag_numeric` and return `ragBands[x].band_label`
+   - If no match found, fall back to showing percentage
+
+2. **Update the Customer x Feature Breakdown table** (lines 638-657):
+   - When `ragBands` exist, show band label (e.g., "3") instead of percentage (e.g., "50%")
+   - Keep the RAG color coding based on the rag_color from the band
+
+3. **Update the Avg column** (lines 659-673):
+   - Keep showing the percentage here since it's an actual average, but consider showing the mapped RAG band label
+
+4. **Update the bar chart tooltips and axis** (lines 567-596):
+   - When bands exist, show band labels in tooltips alongside percentages
+
+5. **Update the Aggregation Formula summary** (line 603):
+   - When bands exist, show band labels in the formula breakdown (e.g., "3 + 4-5" instead of "50% + 100%")
 
 ## Technical Details
-- Update three rows in `kpi_rag_bands` via database migration
-- No code changes needed -- the CSM data entry matrix already reads band labels dynamically from this table
-- The `rag_numeric` values stay the same (1, 0.5, 0) so rollup calculations remain consistent
+
+The `ragBands` data is already fetched in the component (line 146-158). Each band has:
+- `band_label`: the display text (e.g., "4-5")
+- `rag_numeric`: the stored weight (e.g., 1)  
+- `rag_color`: the RAG status (e.g., "green")
+
+The mapping function will match the score's `value` field (which is `rag_numeric`) to find the corresponding `band_label`. Since `rag_numeric` values are 0, 0.5, and 1, exact matching works reliably.
 
