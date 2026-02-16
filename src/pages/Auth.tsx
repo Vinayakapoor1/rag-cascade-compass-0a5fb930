@@ -159,16 +159,16 @@ export default function Auth() {
 
         // Check if 2FA is required
         if (data.user) {
-          const needs2FA = await check2FARequired(data.user.id);
-          if (needs2FA) {
+          const has2FA = await check2FARequired(data.user.id);
+          if (has2FA) {
+            // Already set up — just ask for OTP
             navigate(`/auth/verify-2fa?uid=${data.user.id}`);
-            return;
+          } else {
+            // First time — show QR setup
+            navigate(`/auth/verify-2fa?uid=${data.user.id}&setup=true`);
           }
+          return;
         }
-
-        sessionStorage.setItem('2fa_verified', 'true');
-        toast.success('Logged in successfully');
-        navigate('/');
       } else {
         const errors = validatePassword(password);
         if (errors.length > 0) {
