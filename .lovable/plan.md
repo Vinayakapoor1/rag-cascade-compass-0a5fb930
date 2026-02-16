@@ -1,40 +1,30 @@
 
 
-# Add "Remove User" Option to Team Access
+# Update CSAT RAG Bands to 1-5 Scale
 
-## Overview
-Add a delete button for each user row in the Team Access table, with a confirmation dialog to prevent accidental removal. Removing a user will clean up their role, department access, and CSM link.
+## Current State
+The CSAT Score indicator currently uses percentage-based bands:
+- 90-100% = Green
+- 51-89% = Amber
+- 1-50% = Red
 
-## What Changes
+## Requested Change
+Update to a 1-5 scoring scale:
+- **4-5** = Green
+- **3** = Amber
+- **1-2** = Red
 
-**Team Access table** -- each row gets a "Remove" button (trash icon) next to the existing "Edit" button. Clicking it opens a confirmation dialog. On confirm, the user's records are deleted from:
-1. `user_roles` (their role assignment)
-2. `department_access` (their department permissions)
-3. `csms` table (unlink `user_id`/`email` if they were a linked CSM)
-4. `profiles` (their profile record)
+## Implementation
+A single database update to modify the three existing rows in the `kpi_rag_bands` table for the CSAT Score indicator (`c582917c-2296-46e9-8cfa-9401ed71577c`):
 
-The user's `auth.users` entry is NOT deleted (that requires admin API access). This removes their application-level access only.
+| Band | Label | RAG Color | RAG Numeric |
+|------|-------|-----------|-------------|
+| 1 | 4-5 | green | 1 |
+| 2 | 3 | amber | 0.5 |
+| 3 | 1-2 | red | 0 |
 
 ## Technical Details
-
-| File | Change |
-|------|--------|
-| `src/components/admin/TeamAccessTab.tsx` | Add delete button, confirmation dialog via `AlertDialog`, and `handleRemoveUser` function |
-
-**`handleRemoveUser` logic:**
-```
-1. Delete from user_roles WHERE user_id = X
-2. Delete from department_access WHERE user_id = X
-3. Update csms SET user_id = null, email = null WHERE user_id = X
-4. Delete from user_2fa WHERE user_id = X
-5. Delete from profiles WHERE user_id = X
-6. Refresh the user list
-```
-
-**UI changes:**
-- Add a red trash icon button next to the Edit button in each row
-- Use an `AlertDialog` for delete confirmation showing the user's email
-- Show a success/error toast after the operation
-
-**No database changes needed** -- existing RLS policies already allow admins to manage `user_roles`, `department_access`, and `profiles` (via `is_admin` checks or authenticated user policies).
+- Update three rows in `kpi_rag_bands` via database migration
+- No code changes needed -- the CSM data entry matrix already reads band labels dynamically from this table
+- The `rag_numeric` values stay the same (1, 0.5, 0) so rollup calculations remain consistent
 
