@@ -73,6 +73,22 @@ function getBarColor(value: number): string {
   return RAG_COLORS['not-set'];
 }
 
+/** Map a rag_numeric weight (0, 0.5, 1) to its band label if custom bands exist */
+function getBandLabel(ragNumeric: number, ragBands: { band_label: string; rag_numeric: number; rag_color: string }[]): string | null {
+  if (ragBands.length === 0) return null;
+  const band = ragBands.find(b => b.rag_numeric === ragNumeric);
+  return band ? band.band_label : null;
+}
+
+function getBandColorClass(ragNumeric: number, ragBands: { band_label: string; rag_numeric: number; rag_color: string }[]): string {
+  const band = ragBands.find(b => b.rag_numeric === ragNumeric);
+  if (!band) return 'text-muted-foreground';
+  if (band.rag_color === 'green') return 'text-rag-green font-medium';
+  if (band.rag_color === 'amber') return 'text-rag-amber font-medium';
+  if (band.rag_color === 'red') return 'text-rag-red font-medium';
+  return 'text-muted-foreground';
+}
+
 function getRAGFromPct(pct: number): RAGStatus {
   if (pct >= 76) return 'green';
   if (pct >= 51) return 'amber';
@@ -574,7 +590,13 @@ export function IndicatorDerivationDialog({
                       <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} />
                       <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value: number) => [`${value}%`, 'Avg Score']}
+                        formatter={(value: number) => {
+                          if (ragBands.length > 0) {
+                            const bandLabel = getBandLabel(value / 100, ragBands);
+                            return [bandLabel ? `${bandLabel} (${value}%)` : `${value}%`, 'Avg Score'];
+                          }
+                          return [`${value}%`, 'Avg Score'];
+                        }}
                         labelFormatter={(label: string, payload: any[]) => payload?.[0]?.payload?.fullName || label}
                       />
                       {targetValue !== null && (
@@ -600,7 +622,11 @@ export function IndicatorDerivationDialog({
               <CardContent className="pt-4 pb-3">
                 <p className="text-sm font-medium mb-1">Aggregation Formula</p>
                 <p className="text-xs text-muted-foreground">
-                  AVG of {breakdown.length} customer averages → ({breakdown.map(c => `${Math.round(c.average * 100)}%`).join(' + ')}) ÷ {breakdown.length} = <span className="font-bold text-foreground">{Math.round(kpiAggregate * 10) / 10}%</span>
+                  AVG of {breakdown.length} customer averages → ({breakdown.map(c => {
+                    const pct = Math.round(c.average * 100);
+                    const label = getBandLabel(c.average, ragBands);
+                    return label ? label : `${pct}%`;
+                  }).join(' + ')}) ÷ {breakdown.length} = <span className="font-bold text-foreground">{Math.round(kpiAggregate * 10) / 10}%</span>
                 </p>
                 {hasActiveFilters && (
                   <p className="text-[11px] text-muted-foreground/70 mt-1 italic">
@@ -639,16 +665,19 @@ export function IndicatorDerivationDialog({
                           const score = customer.featureScores.find(f => f.featureName === featureName);
                           const val = score?.value;
                           const pctVal = val !== null && val !== undefined ? Math.round(val * 100) : null;
+                          const bandLabel = val !== null && val !== undefined ? getBandLabel(val, ragBands) : null;
                           return (
                             <TableCell key={featureName} className="text-center text-sm">
                               {pctVal !== null ? (
                                 <span className={
-                                  pctVal >= 76 ? 'text-rag-green font-medium' :
-                                  pctVal >= 51 ? 'text-rag-amber font-medium' :
-                                  pctVal > 0 ? 'text-rag-red font-medium' :
-                                  'text-muted-foreground'
+                                  ragBands.length > 0
+                                    ? getBandColorClass(val!, ragBands)
+                                    : pctVal >= 76 ? 'text-rag-green font-medium' :
+                                      pctVal >= 51 ? 'text-rag-amber font-medium' :
+                                      pctVal > 0 ? 'text-rag-red font-medium' :
+                                      'text-muted-foreground'
                                 }>
-                                  {pctVal}%
+                                  {bandLabel ?? `${pctVal}%`}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground/50">—</span>
@@ -659,6 +688,7 @@ export function IndicatorDerivationDialog({
                         <TableCell className="text-center font-bold text-sm">
                           {(() => {
                             const avgPct = Math.round(customer.average * 100);
+                            const avgBandLabel = getBandLabel(customer.average, ragBands);
                             return (
                               <span className={
                                 avgPct >= 76 ? 'text-rag-green' :
@@ -666,7 +696,7 @@ export function IndicatorDerivationDialog({
                                 avgPct > 0 ? 'text-rag-red' :
                                 'text-muted-foreground'
                               }>
-                                {avgPct}%
+                                {avgBandLabel ? `${avgBandLabel} (${avgPct}%)` : `${avgPct}%`}
                               </span>
                             );
                           })()}
