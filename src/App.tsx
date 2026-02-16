@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AppLayout } from "@/components/AppLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Portfolio from "./pages/Portfolio";
 import OrgObjectiveDetail from "./pages/OrgObjectiveDetail";
 import DepartmentDetail from "./pages/DepartmentDetail";
@@ -45,38 +46,38 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Auth routes - no layout */}
+              {/* Auth routes - no layout, no guard */}
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/verify-2fa" element={<Verify2FA />} />
 
-              {/* Main app routes with layout */}
-              <Route path="/" element={<AppLayout><Portfolio /></AppLayout>} />
-              <Route path="/portfolio" element={<AppLayout><Portfolio /></AppLayout>} />
-              <Route path="/data" element={<DataManagement />} />
-              <Route path="/org-objective/:orgObjectiveId" element={<AppLayout><OrgObjectiveDetail /></AppLayout>} />
-              <Route path="/department/:departmentId" element={<AppLayout><DepartmentDetail /></AppLayout>} />
-              <Route path="/department/:departmentId/data-entry" element={<AppLayout><DepartmentDataEntry /></AppLayout>} />
-              <Route path="/admin/data-timeline" element={<AppLayout><DataEntryTimeline /></AppLayout>} />
-              <Route path="/admin/status" element={<AppLayout><AdminDepartmentStatus /></AppLayout>} />
-              <Route path="/org-objective/:orgObjectiveId/okr/:krId" element={<AppLayout><KeyResultDetail /></AppLayout>} />
-              <Route path="/org-objective/:orgObjectiveId/indicator/:indicatorId" element={<AppLayout><IndicatorDetail /></AppLayout>} />
+              {/* All other routes - protected */}
+              <Route path="/" element={<ProtectedRoute><AppLayout><Portfolio /></AppLayout></ProtectedRoute>} />
+              <Route path="/portfolio" element={<ProtectedRoute><AppLayout><Portfolio /></AppLayout></ProtectedRoute>} />
+              <Route path="/data" element={<ProtectedRoute><DataManagement /></ProtectedRoute>} />
+              <Route path="/org-objective/:orgObjectiveId" element={<ProtectedRoute><AppLayout><OrgObjectiveDetail /></AppLayout></ProtectedRoute>} />
+              <Route path="/department/:departmentId" element={<ProtectedRoute><AppLayout><DepartmentDetail /></AppLayout></ProtectedRoute>} />
+              <Route path="/department/:departmentId/data-entry" element={<ProtectedRoute><AppLayout><DepartmentDataEntry /></AppLayout></ProtectedRoute>} />
+              <Route path="/admin/data-timeline" element={<ProtectedRoute><AppLayout><DataEntryTimeline /></AppLayout></ProtectedRoute>} />
+              <Route path="/admin/status" element={<ProtectedRoute><AppLayout><AdminDepartmentStatus /></AppLayout></ProtectedRoute>} />
+              <Route path="/org-objective/:orgObjectiveId/okr/:krId" element={<ProtectedRoute><AppLayout><KeyResultDetail /></AppLayout></ProtectedRoute>} />
+              <Route path="/org-objective/:orgObjectiveId/indicator/:indicatorId" element={<ProtectedRoute><AppLayout><IndicatorDetail /></AppLayout></ProtectedRoute>} />
 
               {/* Customer impact routes */}
-              <Route path="/customers" element={<AppLayout><CustomersPage /></AppLayout>} />
-              <Route path="/customers/:customerId" element={<AppLayout><CustomerDetailPage /></AppLayout>} />
+              <Route path="/customers" element={<ProtectedRoute><AppLayout><CustomersPage /></AppLayout></ProtectedRoute>} />
+              <Route path="/customers/:customerId" element={<ProtectedRoute><AppLayout><CustomerDetailPage /></AppLayout></ProtectedRoute>} />
 
               {/* Feature impact routes */}
-              <Route path="/features" element={<AppLayout><FeaturesPage /></AppLayout>} />
-              <Route path="/features/:featureId" element={<AppLayout><FeatureDetailPage /></AppLayout>} />
+              <Route path="/features" element={<ProtectedRoute><AppLayout><FeaturesPage /></AppLayout></ProtectedRoute>} />
+              <Route path="/features/:featureId" element={<ProtectedRoute><AppLayout><FeatureDetailPage /></AppLayout></ProtectedRoute>} />
 
               {/* CSM data entry route */}
-              <Route path="/csm/data-entry" element={<AppLayout><CSMDataEntry /></AppLayout>} />
+              <Route path="/csm/data-entry" element={<ProtectedRoute><AppLayout><CSMDataEntry /></AppLayout></ProtectedRoute>} />
 
               {/* Utility routes */}
-              <Route path="/admin" element={<AppLayout><AdminDashboard /></AppLayout>} />
-              <Route path="/compliance-report" element={<AppLayout><ComplianceReport /></AppLayout>} />
-              <Route path="/admin/upload" element={<AppLayout><AdminUpload /></AppLayout>} />
-              <Route path="*" element={<AppLayout><NotFound /></AppLayout>} />
+              <Route path="/admin" element={<ProtectedRoute><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>} />
+              <Route path="/compliance-report" element={<ProtectedRoute><AppLayout><ComplianceReport /></AppLayout></ProtectedRoute>} />
+              <Route path="/admin/upload" element={<ProtectedRoute><AppLayout><AdminUpload /></AppLayout></ProtectedRoute>} />
+              <Route path="*" element={<ProtectedRoute><AppLayout><NotFound /></AppLayout></ProtectedRoute>} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
