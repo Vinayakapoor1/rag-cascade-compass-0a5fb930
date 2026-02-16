@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
     if (!isValid) {
       return new Response(
         JSON.stringify({ verified: false, error: "Invalid verification code" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
