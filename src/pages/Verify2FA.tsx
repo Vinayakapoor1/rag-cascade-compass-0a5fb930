@@ -9,13 +9,14 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function Verify2FA() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [otpauthUrl, setOtpauthUrl] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [isSetup, setIsSetup] = useState(false);
 
@@ -52,7 +53,7 @@ export default function Verify2FA() {
         return;
       }
 
-      setQrUrl(data.qr_url);
+      setOtpauthUrl(data.otpauth_url);
       setSecret(data.secret);
       setIsSetup(true);
     } catch (err: any) {
@@ -129,9 +130,11 @@ export default function Verify2FA() {
         </div>
 
         {/* QR Code for setup */}
-        {isSetup && qrUrl && (
+        {isSetup && otpauthUrl && (
           <div className="flex flex-col items-center mb-6">
-            <img src={qrUrl} alt="2FA QR Code" className="w-48 h-48 rounded-lg border" />
+            <div className="p-3 bg-white rounded-lg border">
+              <QRCodeSVG value={otpauthUrl} size={256} level="M" />
+            </div>
             {secret && (
               <div className="mt-3 text-center">
                 <p className="text-xs text-muted-foreground">Manual entry key:</p>
