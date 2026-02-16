@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Base32 encoding for TOTP secrets
-function generateSecret(length = 20): string {
+function generateSecret(length = 32): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   const array = new Uint8Array(length);
   crypto.getRandomValues(array);
@@ -86,11 +86,8 @@ Deno.serve(async (req) => {
         .insert({ user_id: userId, totp_secret: secret, is_enabled: false });
     }
 
-    // Generate QR code using a public API
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
-
     return new Response(
-      JSON.stringify({ secret, otpauth_url: otpauthUrl, qr_url: qrUrl }),
+      JSON.stringify({ secret, otpauth_url: otpauthUrl }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
