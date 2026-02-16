@@ -9,7 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck } from 'lucide-react';
+import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface UserWithRole {
   id: string;
@@ -44,6 +48,9 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [userToRemove, setUserToRemove] = useState<UserWithRole | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -206,6 +213,31 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     }));
   };
 
+  const openRemoveDialog = (user: UserWithRole) => {
+    setUserToRemove(user);
+    setRemoveDialogOpen(true);
+  };
+
+  const handleRemoveUser = async () => {
+    if (!userToRemove) return;
+    setRemoving(true);
+    try {
+      await supabase.from('user_roles').delete().eq('user_id', userToRemove.id);
+      await supabase.from('department_access').delete().eq('user_id', userToRemove.id);
+      await supabase.from('csms').update({ user_id: null, email: null }).eq('user_id', userToRemove.id);
+      await supabase.from('user_2fa').delete().eq('user_id', userToRemove.id);
+      await supabase.from('profiles').delete().eq('user_id', userToRemove.id);
+      toast.success(`Removed ${userToRemove.email}`);
+      setRemoveDialogOpen(false);
+      setUserToRemove(null);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to remove user');
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const getRoleBadge = (role: string | null, linkedCsmName?: string | null) => {
     switch (role) {
       case 'admin':
@@ -287,14 +319,24 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                     </TableCell>
                     {isAdmin && (
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditDialog(user)}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(user)}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => openRemoveDialog(user)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -403,6 +445,28 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Remove User Confirmation */}
+      <AlertDialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove User Access</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all application access for <strong>{userToRemove?.email}</strong>, including their role, department assignments, and CSM link. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveUser}
+              disabled={removing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
