@@ -256,68 +256,110 @@ export default function Auth() {
           </div>
         )}
 
-        <form name="auth-form" onSubmit={handleSubmit} className="space-y-5">
-          {!isLogin && (
+        {isLogin ? (
+          <form method="post" action="/auth" onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-sm font-medium">Full Name</Label>
+              <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
               <Input
-                id="fullName"
+                id="login-email"
+                name="email"
+                type="email"
+                autoComplete="username email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="h-12 rounded-lg border-border"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
+              <Input
+                id="login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                aria-label="Current password"
+                value={password}
+                onChange={handlePasswordChange}
+                placeholder="••••••••"
+                required
+                minLength={1}
+                className="h-12 rounded-lg border-border"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-lg text-base font-medium bg-[hsl(0,72%,51%)] hover:bg-[hsl(0,72%,45%)] text-white"
+              disabled={loading || blocked}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Login
+            </Button>
+          </form>
+        ) : (
+          <form method="post" action="/auth" onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
+            <div className="space-y-2">
+              <Label htmlFor="signup-fullname" className="text-sm font-medium">Full Name</Label>
+              <Input
+                id="signup-fullname"
                 name="fullName"
                 type="text"
                 autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="John Doe"
-                required={!isLogin}
+                required
                 className="h-12 rounded-lg border-border"
               />
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              className="h-12 rounded-lg border-border"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-email" className="text-sm font-medium">Email</Label>
+              <Input
+                id="signup-email"
+                name="email"
+                type="email"
+                autoComplete="username email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="h-12 rounded-lg border-border"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={isLogin ? "current-password" : "new-password"}
-              value={password}
-              onChange={handlePasswordChange}
-              placeholder="••••••••"
-              required
-              minLength={isLogin ? 1 : 10}
-              className="h-12 rounded-lg border-border"
-            />
-            {!isLogin && password.length > 0 && (
-              <ul className="text-xs space-y-0.5 mt-1">
-                {PASSWORD_RULES.map(rule => {
-                  const passed = !passwordErrors.includes(rule);
-                  return (
-                    <li key={rule} className={passed ? 'text-rag-green' : 'text-destructive'}>
-                      {passed ? '✓' : '✗'} {rule}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
+              <Input
+                id="signup-password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                aria-label="New password"
+                value={password}
+                onChange={handlePasswordChange}
+                placeholder="••••••••"
+                required
+                minLength={10}
+                className="h-12 rounded-lg border-border"
+              />
+              {password.length > 0 && (
+                <ul className="text-xs space-y-0.5 mt-1">
+                  {PASSWORD_RULES.map(rule => {
+                    const passed = !passwordErrors.includes(rule);
+                    return (
+                      <li key={rule} className={passed ? 'text-rag-green' : 'text-destructive'}>
+                        {passed ? '✓' : '✗'} {rule}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
 
-          {!isLogin && (
             <div className="space-y-2">
               <Label htmlFor="timezone" className="text-sm font-medium">Timezone</Label>
               <Select value={timezone} onValueChange={setTimezone}>
@@ -333,17 +375,17 @@ export default function Auth() {
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          <Button
-            type="submit"
-            className="w-full h-12 rounded-lg text-base font-medium bg-[hsl(0,72%,51%)] hover:bg-[hsl(0,72%,45%)] text-white"
-            disabled={loading || blocked}
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isLogin ? 'Login' : 'Sign Up'}
-          </Button>
-        </form>
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-lg text-base font-medium bg-[hsl(0,72%,51%)] hover:bg-[hsl(0,72%,45%)] text-white"
+              disabled={loading || blocked}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Sign Up
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   );
