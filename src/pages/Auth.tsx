@@ -264,7 +264,7 @@ export default function Auth() {
                 id="login-email"
                 name="email"
                 type="email"
-                autoComplete="username email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
@@ -322,7 +322,7 @@ export default function Auth() {
                 id="signup-email"
                 name="email"
                 type="email"
-                autoComplete="username email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
@@ -343,7 +343,6 @@ export default function Auth() {
                 onChange={handlePasswordChange}
                 placeholder="••••••••"
                 required
-                minLength={10}
                 className="h-12 rounded-lg border-border"
               />
               {password.length > 0 && (
