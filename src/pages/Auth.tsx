@@ -256,13 +256,15 @@ export default function Auth() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form name="auth-form" onSubmit={handleSubmit} className="space-y-5">
           {!isLogin && (
             <div className="space-y-2">
               <Label htmlFor="fullName" className="text-sm font-medium">Full Name</Label>
               <Input
                 id="fullName"
+                name="fullName"
                 type="text"
+                autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="John Doe"
@@ -276,7 +278,9 @@ export default function Auth() {
             <Label htmlFor="email" className="text-sm font-medium">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
@@ -289,7 +293,9 @@ export default function Auth() {
             <Label htmlFor="password" className="text-sm font-medium">Password</Label>
             <Input
               id="password"
+              name="password"
               type="password"
+              autoComplete={isLogin ? "current-password" : "new-password"}
               value={password}
               onChange={handlePasswordChange}
               placeholder="••••••••"
