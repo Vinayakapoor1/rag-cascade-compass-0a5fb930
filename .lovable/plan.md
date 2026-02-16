@@ -1,40 +1,48 @@
 
+# Protect All Routes Behind Authentication and 2FA
 
-# Display CSAT Band Labels Instead of Percentages
-
-## Problem
-The Indicator Derivation Dialog (the drilldown view shown when clicking a KPI on the Department Detail page) converts raw `rag_numeric` weights (0, 0.5, 1) to percentages (0%, 50%, 100%). For CSAT which uses a 1-5 scale, this is confusing -- users expect to see "4-5", "3", or "1-2" instead.
-
-## Solution
-When an indicator has custom RAG bands configured (like CSAT), display the **band label** instead of the percentage in the breakdown table and charts. Fall back to percentage display for indicators that don't have custom bands.
+## Overview
+Currently, all app routes (including Portfolio) are accessible without signing in. This plan adds a route guard that redirects unauthenticated users to `/auth`, and ensures 2FA verification is enforced before granting access.
 
 ## Changes
 
-**File: `src/components/IndicatorDerivationDialog.tsx`**
+### 1. Create a ProtectedRoute component
+**New file: `src/components/ProtectedRoute.tsx`**
 
-1. **Add a helper function** to map a `rag_numeric` value back to its band label using the already-fetched `ragBands` data:
-   - Match `value` to `ragBands[x].rag_numeric` and return `ragBands[x].band_label`
-   - If no match found, fall back to showing percentage
+- Wraps child routes and checks authentication state from `useAuth()`
+- While `loading` is true, shows a spinner
+- If no `user`, redirects to `/auth`
+- If user exists, checks `user_2fa` table to see if 2FA is enabled
+  - If 2FA is enabled and the session hasn't been verified via 2FA yet, redirects to `/auth/verify-2fa`
+  - Uses a sessionStorage flag (set after successful 2FA verification) to track whether 2FA was completed in this session
+- If all checks pass, renders children
 
-2. **Update the Customer x Feature Breakdown table** (lines 638-657):
-   - When `ragBands` exist, show band label (e.g., "3") instead of percentage (e.g., "50%")
-   - Keep the RAG color coding based on the rag_color from the band
+### 2. Update App.tsx routes
+- Wrap all `AppLayout` routes with `ProtectedRoute`
+- Keep `/auth` and `/auth/verify-2fa` outside the guard (they must remain public)
 
-3. **Update the Avg column** (lines 659-673):
-   - Keep showing the percentage here since it's an actual average, but consider showing the mapped RAG band label
+```
+Routes structure:
+  /auth              -> public
+  /auth/verify-2fa   -> public
+  Everything else    -> ProtectedRoute -> AppLayout -> Page
+```
 
-4. **Update the bar chart tooltips and axis** (lines 567-596):
-   - When bands exist, show band labels in tooltips alongside percentages
+### 3. Update Verify2FA page
+- After successful 2FA verification, set a sessionStorage flag (e.g., `2fa_verified`) so the ProtectedRoute knows 2FA was completed
+- This flag clears automatically when the browser tab/session closes
 
-5. **Update the Aggregation Formula summary** (line 603):
-   - When bands exist, show band labels in the formula breakdown (e.g., "3 + 4-5" instead of "50% + 100%")
+### 4. Update Auth page redirect
+- After successful login, check if the user has 2FA enabled
+  - If yes, redirect to `/auth/verify-2fa` (this likely already happens)
+  - If no, redirect to `/` (Portfolio)
 
-## Technical Details
+## What stays the same
+- No database changes needed
+- No RLS policy changes
+- The existing auth flow (login, signup, 2FA setup/verify) remains intact
+- AppLayout structure unchanged
 
-The `ragBands` data is already fetched in the component (line 146-158). Each band has:
-- `band_label`: the display text (e.g., "4-5")
-- `rag_numeric`: the stored weight (e.g., 1)  
-- `rag_color`: the RAG status (e.g., "green")
-
-The mapping function will match the score's `value` field (which is `rag_numeric`) to find the corresponding `band_label`. Since `rag_numeric` values are 0, 0.5, and 1, exact matching works reliably.
-
+## Technical Notes
+- Using `sessionStorage` for the 2FA-verified flag ensures it persists across page navigations but clears on tab close, forcing re-verification on new sessions
+- The ProtectedRoute component follows standard React Router patterns
