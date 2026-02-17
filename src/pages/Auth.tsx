@@ -66,14 +66,20 @@ export default function Auth() {
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setPassword(val);
-    if (!isLogin && val.length > 0) {
-      setPasswordErrors(validatePassword(val));
+    setPassword(e.target.value);
+  };
+
+  // Debounce password validation so Chrome can inject generated passwords
+  useEffect(() => {
+    if (!isLogin && password.length > 0) {
+      const timer = setTimeout(() => {
+        setPasswordErrors(validatePassword(password));
+      }, 300);
+      return () => clearTimeout(timer);
     } else {
       setPasswordErrors([]);
     }
-  };
+  }, [password, isLogin, email]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -267,7 +273,7 @@ export default function Auth() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="Enter your email"
                 required
                 className="h-12 rounded-lg border-border"
               />
@@ -283,9 +289,8 @@ export default function Auth() {
                 aria-label="Current password"
                 value={password}
                 onChange={handlePasswordChange}
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 required
-                minLength={1}
                 className="h-12 rounded-lg border-border"
               />
             </div>
@@ -325,7 +330,7 @@ export default function Auth() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="Enter your email"
                 required
                 className="h-12 rounded-lg border-border"
               />
@@ -335,13 +340,13 @@ export default function Auth() {
               <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
               <Input
                 id="signup-password"
-                name="password"
+                name="new-password"
                 type="password"
                 autoComplete="new-password"
                 aria-label="New password"
                 value={password}
                 onChange={handlePasswordChange}
-                placeholder="••••••••"
+                placeholder="Create a password"
                 required
                 className="h-12 rounded-lg border-border"
               />
