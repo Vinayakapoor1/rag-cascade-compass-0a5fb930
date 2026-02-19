@@ -610,16 +610,20 @@ export default function DepartmentDetail() {
       const validKRNames = new Set(filteredIndicators.map(ind => ind.parentKRName));
       let result = allKRs.filter(kr => validKRNames.has(kr.name));
 
-      // Also apply status filter at KR level
+      // Also apply status filter - include KR if any of its indicators match
       if (statusFilter !== 'all') {
-        result = result.filter(kr => calculateKRStatus(kr) === statusFilter);
+        result = result.filter(kr =>
+          (kr.indicators || []).some(ind => calculateIndicatorStatus(ind) === statusFilter)
+        );
       }
       return result;
     }
 
-    // Just status filter
+    // Just status filter - include KR if any of its indicators match
     if (statusFilter !== 'all') {
-      return allKRs.filter(kr => calculateKRStatus(kr) === statusFilter);
+      return allKRs.filter(kr =>
+        (kr.indicators || []).some(ind => calculateIndicatorStatus(ind) === statusFilter)
+      );
     }
 
     return allKRs;
@@ -636,16 +640,24 @@ export default function DepartmentDetail() {
       const validFONames = new Set(filteredKRs.map(kr => kr.parentFOName));
       let result = department.functional_objectives.filter(fo => validFONames.has(fo.name));
 
-      // Also apply status filter at FO level
+      // Also apply status filter - include FO if any nested indicator matches
       if (statusFilter !== 'all') {
-        result = result.filter(fo => calculateFOStatus(fo) === statusFilter);
+        result = result.filter(fo =>
+          (fo.key_results || []).some(kr =>
+            (kr.indicators || []).some(ind => calculateIndicatorStatus(ind) === statusFilter)
+          )
+        );
       }
       return result;
     }
 
-    // Just status filter
+    // Just status filter - include FO if any nested indicator matches
     if (statusFilter !== 'all') {
-      return department.functional_objectives.filter(fo => calculateFOStatus(fo) === statusFilter);
+      return department.functional_objectives.filter(fo =>
+        (fo.key_results || []).some(kr =>
+          (kr.indicators || []).some(ind => calculateIndicatorStatus(ind) === statusFilter)
+        )
+      );
     }
 
     return department.functional_objectives;
