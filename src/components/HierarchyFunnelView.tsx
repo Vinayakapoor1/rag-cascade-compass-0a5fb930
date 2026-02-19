@@ -229,7 +229,9 @@ export function HierarchyFunnelView({
     }
     
     if (statusFilter !== 'all') {
-      krs = krs.filter(kr => calculateKRStatus(kr) === statusFilter);
+      krs = krs.filter(kr =>
+        (kr.indicators || []).some(ind => calculateIndicatorStatus(ind) === statusFilter)
+      );
     }
     
     return krs;
