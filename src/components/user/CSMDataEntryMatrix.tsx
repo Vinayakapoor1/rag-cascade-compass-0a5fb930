@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CustomerAttachments } from './CustomerAttachments';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
+import { notifyAdminsOfCompletion } from '@/lib/notifyAdmins';
 import {
   Dialog,
   DialogContent,
@@ -580,6 +581,16 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
       setOriginalScores({ ...scores });
       setSkipReasons({});
       queryClient.invalidateQueries({ queryKey: ['csm-matrix', departmentId, period] });
+
+      // Notify admins of completion
+      const { data: deptInfo } = await supabase.from('departments').select('name').eq('id', departmentId).single();
+      notifyAdminsOfCompletion({
+        departmentName: deptInfo?.name || 'Unknown',
+        userName: user.email || 'Unknown user',
+        period,
+        indicatorCount: upserts.length,
+        source: 'customer_feature_matrix',
+      });
     } catch (err) {
       console.error('Error saving matrix:', err);
       toast.error('Failed to save matrix data');
