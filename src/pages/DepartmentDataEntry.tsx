@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { IndicatorEvidenceInline } from '@/components/user/IndicatorEvidenceInline';
+import { notifyAdminsOfCompletion } from '@/lib/notifyAdmins';
 
 interface Indicator {
     id: string;
@@ -410,6 +411,15 @@ export default function DepartmentDataEntry() {
             toast.success(`Saved ${changedUpdates.length} indicator${changedUpdates.length > 1 ? 's' : ''}`);
             setUpdates({});
             fetchData(); // Refresh data
+
+            // Notify admins of completion
+            notifyAdminsOfCompletion({
+              departmentName: department?.name || 'Unknown',
+              userName: user!.email || 'Unknown user',
+              period,
+              indicatorCount: changedUpdates.length,
+              source: 'per_indicator',
+            });
         } catch (error) {
             console.error('Error saving:', error);
             toast.error('Failed to save some values');
