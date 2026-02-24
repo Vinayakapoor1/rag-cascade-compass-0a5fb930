@@ -323,7 +323,7 @@ export default function CustomersPage() {
 
       {/* Filter Breakdown Stat Cards */}
       {filterBreakdowns.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${filterBreakdowns.length}, minmax(0, 1fr))` }}>
           {filterBreakdowns.map(breakdown => {
             const IconComponent = { globe: Globe, factory: Factory, usercheck: UserCheck, server: Server, tag: Tag, activity: Activity, settings: Settings }[breakdown.icon] || Tag;
             const maxShow = 5;
