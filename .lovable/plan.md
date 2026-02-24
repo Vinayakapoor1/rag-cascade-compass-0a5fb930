@@ -1,37 +1,45 @@
 
+# Bulk Industry Update + Managed Services Stats
 
-# Wire Up CSMComplianceWidget to Dashboard
+## Two Changes
 
-## Problem
-The `CSMComplianceWidget` component exists and has been updated with "Last updated" timestamps, but it is not imported or rendered anywhere in the app. The compliance report page at `/compliance-report` works, but the quick-glance widget on the dashboard is invisible.
+### 1. Bulk Industry Updater (Admin Panel - Data Management > Customers tab)
 
-## Proposed Change
+Add a new "Update Industry" uploader component alongside the existing `CustomerUploader` on the Data Management page. This uploader will:
 
-Add the `CSMComplianceWidget` to the **Index (home) page** so that logged-in admin users can see CSM compliance status at a glance without navigating away.
+- Accept an Excel file with two columns: **Company Name** and **Industry**
+- Parse the file and show a preview of how many customers will be updated
+- On import, **only update the `industry` column** -- no other fields will be touched (no upsert of the full record, no deletion of feature links)
+- Match customers by name (case-insensitive) against existing records
+- Show warnings for any company names not found in the database
+- Log the bulk update action to `activity_logs`
 
-### File: `src/pages/Index.tsx`
+This is deliberately separate from the full `CustomerUploader` to prevent accidental overwrites of other fields.
 
-- Import `CSMComplianceWidget` from `@/components/CSMComplianceWidget`
-- Render it just above the Activity Timeline section, visible only to logged-in users (ideally admins only)
-- It will show as a compact collapsible card with compliance status, pending CSM count, and last-updated timestamp
+### 2. Managed Services Stats (Customers Overview)
 
-### Placement
+Update `CustomersOverviewTab` to fetch the `managed_services` field and display summary stat badges showing:
+- Total customers with Managed Services
+- Total customers without Managed Services
 
-The widget will appear after the login prompt / team leader guide section and before the Activity Timeline, like this:
+These will appear as stat cards above the table.
 
-```
-[Stats Overview cards]
-[Login prompt / Team Leader guide]
-[CSM Compliance Widget]  <-- NEW
-[Activity Timeline + side widgets]
-[Org Objectives list]
-```
+---
 
-Only shown to logged-in users (admin check optional -- can show to all authenticated users since the data is read-only).
+## Technical Details
 
-## Files Modified
+### New file: `src/components/admin/CustomerIndustryUpdater.tsx`
+- Excel upload + preview UI (similar pattern to `CustomerUploader`)
+- Parses Excel for "Company Name" and "Industry" columns
+- Matches against existing customers by name (case-insensitive)
+- Calls `supabase.from('customers').update({ industry }).eq('id', matchedId)` for each match
+- Shows count of matched vs unmatched customers in preview
+- Only the `industry` column is written -- all other data remains untouched
 
-| File | Change |
-|------|--------|
-| `src/pages/Index.tsx` | Import and render `CSMComplianceWidget` for logged-in users |
+### Modified file: `src/pages/DataManagement.tsx`
+- Import and render `CustomerIndustryUpdater` below the existing `CustomerUploader` in the "customers" tab
 
+### Modified file: `src/components/admin/CustomersOverviewTab.tsx`
+- Add `managed_services` to the customer query
+- Compute counts: `withManagedServices` and `withoutManagedServices`
+- Render two small stat badges/cards above the table (e.g., "Managed Services: 42" and "Without: 58")
