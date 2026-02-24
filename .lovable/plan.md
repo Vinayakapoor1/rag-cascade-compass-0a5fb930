@@ -1,72 +1,78 @@
 
 
-# Fix: "On Track" Items Not Showing When Green Filter Applied
+# Add "Last Updated" Timestamp + CSM Status Summary to Compliance Report
 
-## Problem
+## Overview
 
-The current filtering logic applies the RAG status filter independently at each hierarchy level (FO, KR, Indicator). This means:
+Two changes:
+1. Add a visible "Last updated" timestamp to the Compliance Report page showing when data was last fetched
+2. Surface the status of the three CSMs with zero entries (Jagjit, Pooja, Sahil) -- these are confirmed as genuine compliance gaps (accounts are properly configured, they just haven't submitted)
 
-- An indicator like "SLA Compliance Rate" at 100% is correctly identified as green/On Track
-- Its parent KR "Improve service request closure SLA compliance to 90%" is also green (single indicator at 100%)
-- But the parent FO "Minimize Operational Disruptions" aggregates ALL its KRs including a red one (Workload Balance Index at 5.6%), so its overall status is NOT green
-- The FO gets filtered out, taking its green children with it
+## Changes
 
-## Root Cause
+### 1. "Last Updated" Timestamp on Compliance Report
 
-In `src/pages/DepartmentDetail.tsx`, the `filteredFOs` logic (around line 648) filters FOs by their own aggregate status:
+**File: `src/pages/ComplianceReport.tsx`**
 
-```
-result = result.filter(fo => calculateFOStatus(fo) === statusFilter);
-```
+- Track a `dataFetchedAt` timestamp using `useState`, updated inside each `useQuery`'s `onSuccess` or by capturing `Date.now()` after queries resolve
+- Simpler approach: use `useQuery`'s `dataUpdatedAt` property from the scores query (the most relevant timestamp)
+- Display it in the header subtitle next to Period and Deadline:
+  ```
+  Period: 2026-02 · Deadline: Friday 11:30 PM (3 days) · Last updated: 2 min ago
+  ```
+- Add a manual "Refresh" button (using `refetchAll` on the three queries) so admins can force a fresh fetch
+- Use `date-fns` `formatDistanceToNow` for the relative timestamp display
 
-This removes FOs that contain matching children but don't themselves aggregate to the target status.
+### 2. Enhanced Pending CSM Cards with Context
 
-The same issue exists for `filteredKRs` (line 621) -- a KR with mixed indicators might not pass the filter even though some of its indicators are green.
+**File: `src/pages/ComplianceReport.tsx`**
 
-## Solution
+- For each non-compliant CSM card, add a line showing how many customers are pending (already shown) and a "last active" indicator
+- Query `activity_logs` for recent actions by each CSM's `user_id` to show when they last logged any activity
+- Display "Last active: 2 days ago" or "No recent activity" beneath each non-compliant CSM name
+- This helps admins distinguish between CSMs who are active but haven't submitted vs. those who may not be logging in at all
 
-Change the filtering approach so that **parent containers are shown if they contain any matching children**, rather than being filtered by their own aggregate status.
+### 3. "Last Updated" on CSMComplianceWidget (Dashboard)
 
-### Changes to `src/pages/DepartmentDetail.tsx`
+**File: `src/components/CSMComplianceWidget.tsx`**
 
-**1. Fix `filteredKRs` logic (around lines 620-623)**
+- Similarly surface the `dataUpdatedAt` from the scores query in the collapsed subtitle line
+- Show as: `2026-02 · 2/5 submitted · Updated 5 min ago · Deadline: Friday 11:30 PM`
 
-Instead of filtering KRs by `calculateKRStatus(kr) === statusFilter`, filter KRs that contain at least one indicator matching the status filter:
+## Technical Details
 
-```
-if (statusFilter !== 'all') {
-  return allKRs.filter(kr =>
-    (kr.indicators || []).some(ind => calculateIndicatorStatus(ind) === statusFilter)
-  );
-}
-```
+### Data source for "Last Updated"
+- Use `@tanstack/react-query`'s built-in `dataUpdatedAt` property (returned by `useQuery`) -- no new database queries needed
+- Format with `date-fns`'s `formatDistanceToNow(new Date(dataUpdatedAt), { addSuffix: true })`
 
-**2. Fix `filteredFOs` logic (around lines 647-649)**
+### Refresh button
+- Call `.refetch()` on all three queries (csms, scores, customers)
+- Show a `RefreshCw` icon button with spinning animation while any query is fetching
 
-Instead of filtering FOs by `calculateFOStatus(fo) === statusFilter`, filter FOs that contain at least one KR with a matching indicator:
+### Activity lookup for non-compliant CSMs
+- Add one additional query to `ComplianceReport.tsx`:
+  ```sql
+  SELECT user_id, MAX(created_at) as last_active
+  FROM activity_logs
+  WHERE user_id IN (csm_user_ids)
+  GROUP BY user_id
+  ```
+- Map results to each non-compliant CSM card
 
-```
-if (statusFilter !== 'all') {
-  return department.functional_objectives.filter(fo =>
-    (fo.key_results || []).some(kr =>
-      (kr.indicators || []).some(ind => calculateIndicatorStatus(ind) === statusFilter)
-    )
-  );
-}
-```
+## Files Modified
 
-**3. Apply same fix to the combined filter paths (customer/feature + status)**
+| File | Change |
+|------|--------|
+| `src/pages/ComplianceReport.tsx` | Add dataUpdatedAt display, refresh button, activity lookup for pending CSMs |
+| `src/components/CSMComplianceWidget.tsx` | Add dataUpdatedAt to subtitle line |
 
-The same pattern applies to lines 613-616 and 639-643 where status filtering is combined with customer/feature filters.
+## Current CSM Status (for your awareness)
 
-### Why This Approach
+All three CSMs below have properly configured accounts (roles, department access). They have zero February entries -- this is a compliance gap, not a technical bug:
 
-- The filter becomes "show me everything that contains On Track items" rather than "show me only things that are themselves On Track as a whole"
-- Parent containers (FOs, KRs) act as grouping wrappers -- they should appear if any child matches
-- The individual card still shows its own actual RAG status, so users can see context
-- This matches user expectations: "I filtered for green, so show me all the green indicators and their parent hierarchy"
+- **Sahil Kapoor** -- 9 customers assigned, 0 submitted
+- **Pooja Singh** -- 7 customers assigned, 0 submitted  
+- **Jagjit Mann** -- 1 customer assigned, 0 submitted
 
-### Files Modified
-
-- `src/pages/DepartmentDetail.tsx` -- Update `filteredKRs` and `filteredFOs` memos to use child-based inclusion instead of self-status filtering
+The enhanced compliance report will make this immediately visible with "last active" timestamps so you can follow up appropriately.
 
