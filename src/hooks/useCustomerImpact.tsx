@@ -365,6 +365,7 @@ export interface CustomerWithImpact {
   trendData: TrendDataPoint[];
   csmName: string | null;
   csmId: string | null;
+  managedServices: boolean | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
@@ -372,7 +373,7 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
   const [customersResult, csmsResult, cfResult, iflResult] = await Promise.all([
     supabase
       .from('customers')
-      .select('id, name, tier, region, industry, status, logo_url, deployment_type, csm_id')
+      .select('id, name, tier, region, industry, status, logo_url, deployment_type, csm_id, managed_services')
       .order('name'),
     supabase
       .from('csms')
@@ -528,6 +529,7 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       trendData: customerTrendData.get(c.id) || [],
       csmName: c.csm_id ? (csmMap.get(c.csm_id) || null) : null,
       csmId: c.csm_id || null,
+      managedServices: c.managed_services ?? null,
     };
   });
 }

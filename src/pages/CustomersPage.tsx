@@ -224,6 +224,7 @@ export default function CustomersPage() {
       countBy(c => c.deploymentType, 'By Deployment', 'server'),
       countBy(c => c.tier, 'By Tier', 'tag'),
       countBy(c => c.status, 'By Status', 'activity'),
+      countBy(c => c.managedServices === true ? 'Yes' : c.managedServices === false ? 'No' : 'Unknown', 'By Managed Services', 'settings'),
     ].filter(Boolean) as { label: string; icon: string; counts: { name: string; count: number }[]; maxVisible?: number; totalDistinct: number }[];
   }, [filteredCustomers]);
 
@@ -324,7 +325,7 @@ export default function CustomersPage() {
       {filterBreakdowns.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {filterBreakdowns.map(breakdown => {
-            const IconComponent = { globe: Globe, factory: Factory, usercheck: UserCheck, server: Server, tag: Tag, activity: Activity }[breakdown.icon] || Tag;
+            const IconComponent = { globe: Globe, factory: Factory, usercheck: UserCheck, server: Server, tag: Tag, activity: Activity, settings: Settings }[breakdown.icon] || Tag;
             const maxShow = 5;
             const visible = breakdown.counts.slice(0, maxShow);
             const overflow = breakdown.counts.slice(maxShow);
