@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, AlertTriangle, Clock, Users, ArrowLeft, RefreshCw } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Clock, Users, ArrowLeft, RefreshCw, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, Navigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -92,6 +92,30 @@ export default function ComplianceReport() {
     },
     enabled: nonCompliantUserIds.length > 0,
   });
+
+  // Recent activity logs for all users
+  const { data: recentActivities = [] } = useQuery({
+    queryKey: ['compliance-recent-activities'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('id, action, entity_type, entity_name, user_id, created_at, metadata')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 60000,
+  });
+
+  // Map user_ids to CSM names for display
+  const userNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    csms.forEach(csm => {
+      if (csm.user_id) map[csm.user_id] = csm.name;
+    });
+    return map;
+  }, [csms]);
 
   const isLoading = csmsLoading || scoresLoading || customersLoading || authLoading;
   const isFetching = csmsFetching || scoresFetching || customersFetching;
@@ -304,6 +328,43 @@ export default function ComplianceReport() {
                         </Badge>
                         <CheckCircle2 className="h-4 w-4 text-rag-green" />
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Activity Log */}
+          {recentActivities.length > 0 && (
+            <Card className="card-3d">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Recent Activity ({recentActivities.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {recentActivities.map(activity => (
+                    <div key={activity.id} className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <p className="font-medium text-sm">
+                          {activity.user_id && userNameMap[activity.user_id]
+                            ? userNameMap[activity.user_id]
+                            : 'Unknown user'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium capitalize">{activity.action}</span>
+                          {' '}{activity.entity_type}
+                          {activity.entity_name && `: ${activity.entity_name}`}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0 ml-3">
+                        {activity.created_at
+                          ? formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })
+                          : ''}
+                      </span>
                     </div>
                   ))}
                 </div>
