@@ -1,45 +1,22 @@
 
-# Bulk Industry Update + Managed Services Stats
+# Add Managed Services Breakdown to Customers Page
 
-## Two Changes
+## What Changes
 
-### 1. Bulk Industry Updater (Admin Panel - Data Management > Customers tab)
+Add a "By Managed Services" stat card to the filter breakdown section on the /customers page, matching the style of the existing cards (By Region, By Industry, etc.). It will show counts for "With Managed Services" and "Without Managed Services".
 
-Add a new "Update Industry" uploader component alongside the existing `CustomerUploader` on the Data Management page. This uploader will:
+## Technical Steps
 
-- Accept an Excel file with two columns: **Company Name** and **Industry**
-- Parse the file and show a preview of how many customers will be updated
-- On import, **only update the `industry` column** -- no other fields will be touched (no upsert of the full record, no deletion of feature links)
-- Match customers by name (case-insensitive) against existing records
-- Show warnings for any company names not found in the database
-- Log the bulk update action to `activity_logs`
+### 1. Update `src/hooks/useCustomerImpact.tsx`
+- Add `managed_services` to the customer query select string (line 375): append `, managed_services` to the select
+- Add `managedServices: boolean | null` to the `CustomerWithImpact` interface
+- Map `c.managed_services` to `managedServices` in the return object (around line 516-531)
 
-This is deliberately separate from the full `CustomerUploader` to prevent accidental overwrites of other fields.
-
-### 2. Managed Services Stats (Customers Overview)
-
-Update `CustomersOverviewTab` to fetch the `managed_services` field and display summary stat badges showing:
-- Total customers with Managed Services
-- Total customers without Managed Services
-
-These will appear as stat cards above the table.
-
----
-
-## Technical Details
-
-### New file: `src/components/admin/CustomerIndustryUpdater.tsx`
-- Excel upload + preview UI (similar pattern to `CustomerUploader`)
-- Parses Excel for "Company Name" and "Industry" columns
-- Matches against existing customers by name (case-insensitive)
-- Calls `supabase.from('customers').update({ industry }).eq('id', matchedId)` for each match
-- Shows count of matched vs unmatched customers in preview
-- Only the `industry` column is written -- all other data remains untouched
-
-### Modified file: `src/pages/DataManagement.tsx`
-- Import and render `CustomerIndustryUpdater` below the existing `CustomerUploader` in the "customers" tab
-
-### Modified file: `src/components/admin/CustomersOverviewTab.tsx`
-- Add `managed_services` to the customer query
-- Compute counts: `withManagedServices` and `withoutManagedServices`
-- Render two small stat badges/cards above the table (e.g., "Managed Services: 42" and "Without: 58")
+### 2. Update `src/pages/CustomersPage.tsx`
+- Add a new breakdown entry in the `filterBreakdowns` useMemo (around line 220-227):
+  ```
+  countBy(c => c.managedServices === true ? 'Yes' : c.managedServices === false ? 'No' : 'Unknown', 'By Managed Services', 'settings')
+  ```
+- This will render as a stat card with the Settings icon, showing counts like "Yes: 42" and "No: 41", consistent with the existing breakdown cards
+- Import the `Settings` icon (already imported on line 14)
+- Add `'settings': Settings` to the icon mapping object (line 327)
