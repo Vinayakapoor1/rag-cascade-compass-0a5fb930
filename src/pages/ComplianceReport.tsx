@@ -143,17 +143,17 @@ export default function ComplianceReport() {
 
     const customersWithScores = new Set(scores.map(s => s.customer_id));
 
-    const compliant: { name: string; email: string | null; customerCount: number; lastSubmitted: string | null }[] = [];
+    const compliant: { name: string; email: string | null; customerCount: number; submittedCount: number; lastSubmitted: string | null }[] = [];
     const nonCompliant: { name: string; email: string | null; userId: string | null; customerCount: number; pendingCustomers: string[] }[] = [];
 
     csms.forEach(csm => {
       const csmCustomers = customersByCsm.get(csm.id) || [];
       if (csmCustomers.length === 0) return;
 
-      const pending = csmCustomers.filter(c => !customersWithScores.has(c.id));
       const submitted = csmCustomers.filter(c => customersWithScores.has(c.id));
+      const hasAnyScores = submitted.length > 0;
 
-      if (pending.length === 0) {
+      if (hasAnyScores) {
         const latestScore = scores
           .filter(s => csmCustomers.some(c => c.id === s.customer_id))
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
@@ -161,6 +161,7 @@ export default function ComplianceReport() {
           name: csm.name,
           email: csm.email,
           customerCount: csmCustomers.length,
+          submittedCount: submitted.length,
           lastSubmitted: latestScore?.created_at || null,
         });
       } else {
@@ -169,7 +170,7 @@ export default function ComplianceReport() {
           email: csm.email,
           userId: csm.user_id,
           customerCount: csmCustomers.length,
-          pendingCustomers: pending.map(c => c.name),
+          pendingCustomers: csmCustomers.map(c => c.name),
         });
       }
     });
@@ -324,8 +325,8 @@ export default function ComplianceReport() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] border-rag-green/30 text-rag-green">
-                          {csm.customerCount} customers
-                        </Badge>
+                           {csm.submittedCount}/{csm.customerCount} customers
+                         </Badge>
                         <CheckCircle2 className="h-4 w-4 text-rag-green" />
                       </div>
                     </div>
