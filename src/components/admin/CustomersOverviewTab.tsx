@@ -16,6 +16,7 @@ interface Customer {
   status: string;
   contact_person: string | null;
   email: string | null;
+  managed_services: boolean | null;
 }
 
 export function CustomersOverviewTab() {
@@ -38,7 +39,7 @@ export function CustomersOverviewTab() {
     setLoading(true);
     const { data, error } = await supabase
       .from('customers')
-      .select('id, name, tier, region, industry, status, contact_person, email')
+      .select('id, name, tier, region, industry, status, contact_person, email, managed_services')
       .order('name');
 
     if (!error && data) {
@@ -72,6 +73,8 @@ export function CustomersOverviewTab() {
 
   const uniqueRegions = [...new Set(customers.map(c => c.region).filter(Boolean))] as string[];
   const uniqueTiers = [...new Set(customers.map(c => c.tier))];
+  const withManagedServices = customers.filter(c => c.managed_services === true).length;
+  const withoutManagedServices = customers.filter(c => !c.managed_services).length;
 
   if (loading) {
     return (
@@ -124,7 +127,15 @@ export function CustomersOverviewTab() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Badge variant="outline" className="gap-1.5 py-1 px-3">
+            <span className="font-semibold">{withManagedServices}</span> Managed Services
+          </Badge>
+          <Badge variant="secondary" className="gap-1.5 py-1 px-3">
+            <span className="font-semibold">{withoutManagedServices}</span> Without Managed Services
+          </Badge>
+        </div>
         <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
