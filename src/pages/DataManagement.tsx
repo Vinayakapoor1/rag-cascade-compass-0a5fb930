@@ -18,6 +18,7 @@ import { CustomerIndustryUpdater } from '@/components/admin/CustomerIndustryUpda
 import { OKRHierarchyTab } from '@/components/admin/OKRHierarchyTab';
 import { OrgObjectivesManager } from '@/components/admin/OrgObjectivesManager';
 import { RAGRulesTab } from '@/components/admin/RAGRulesTab';
+import { IndustryManager } from '@/components/admin/IndustryManager';
 import { TeamAccessTab } from '@/components/admin/TeamAccessTab';
 import { FormulasTab } from '@/components/admin/FormulasTab';
 import { SnapshotsTab } from '@/components/admin/SnapshotsTab';
@@ -303,6 +304,7 @@ export default function DataManagement() {
                 <SnapshotsTab isAdmin={isAdmin} />
               </TabsContent>
             </Tabs>
+            {isAdmin && <IndustryManager />}
           </TabsContent>
 
           {isAdmin && (
