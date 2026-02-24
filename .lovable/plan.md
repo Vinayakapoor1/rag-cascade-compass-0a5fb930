@@ -1,78 +1,37 @@
 
 
-# Add "Last Updated" Timestamp + CSM Status Summary to Compliance Report
+# Wire Up CSMComplianceWidget to Dashboard
 
-## Overview
+## Problem
+The `CSMComplianceWidget` component exists and has been updated with "Last updated" timestamps, but it is not imported or rendered anywhere in the app. The compliance report page at `/compliance-report` works, but the quick-glance widget on the dashboard is invisible.
 
-Two changes:
-1. Add a visible "Last updated" timestamp to the Compliance Report page showing when data was last fetched
-2. Surface the status of the three CSMs with zero entries (Jagjit, Pooja, Sahil) -- these are confirmed as genuine compliance gaps (accounts are properly configured, they just haven't submitted)
+## Proposed Change
 
-## Changes
+Add the `CSMComplianceWidget` to the **Index (home) page** so that logged-in admin users can see CSM compliance status at a glance without navigating away.
 
-### 1. "Last Updated" Timestamp on Compliance Report
+### File: `src/pages/Index.tsx`
 
-**File: `src/pages/ComplianceReport.tsx`**
+- Import `CSMComplianceWidget` from `@/components/CSMComplianceWidget`
+- Render it just above the Activity Timeline section, visible only to logged-in users (ideally admins only)
+- It will show as a compact collapsible card with compliance status, pending CSM count, and last-updated timestamp
 
-- Track a `dataFetchedAt` timestamp using `useState`, updated inside each `useQuery`'s `onSuccess` or by capturing `Date.now()` after queries resolve
-- Simpler approach: use `useQuery`'s `dataUpdatedAt` property from the scores query (the most relevant timestamp)
-- Display it in the header subtitle next to Period and Deadline:
-  ```
-  Period: 2026-02 · Deadline: Friday 11:30 PM (3 days) · Last updated: 2 min ago
-  ```
-- Add a manual "Refresh" button (using `refetchAll` on the three queries) so admins can force a fresh fetch
-- Use `date-fns` `formatDistanceToNow` for the relative timestamp display
+### Placement
 
-### 2. Enhanced Pending CSM Cards with Context
+The widget will appear after the login prompt / team leader guide section and before the Activity Timeline, like this:
 
-**File: `src/pages/ComplianceReport.tsx`**
+```
+[Stats Overview cards]
+[Login prompt / Team Leader guide]
+[CSM Compliance Widget]  <-- NEW
+[Activity Timeline + side widgets]
+[Org Objectives list]
+```
 
-- For each non-compliant CSM card, add a line showing how many customers are pending (already shown) and a "last active" indicator
-- Query `activity_logs` for recent actions by each CSM's `user_id` to show when they last logged any activity
-- Display "Last active: 2 days ago" or "No recent activity" beneath each non-compliant CSM name
-- This helps admins distinguish between CSMs who are active but haven't submitted vs. those who may not be logging in at all
-
-### 3. "Last Updated" on CSMComplianceWidget (Dashboard)
-
-**File: `src/components/CSMComplianceWidget.tsx`**
-
-- Similarly surface the `dataUpdatedAt` from the scores query in the collapsed subtitle line
-- Show as: `2026-02 · 2/5 submitted · Updated 5 min ago · Deadline: Friday 11:30 PM`
-
-## Technical Details
-
-### Data source for "Last Updated"
-- Use `@tanstack/react-query`'s built-in `dataUpdatedAt` property (returned by `useQuery`) -- no new database queries needed
-- Format with `date-fns`'s `formatDistanceToNow(new Date(dataUpdatedAt), { addSuffix: true })`
-
-### Refresh button
-- Call `.refetch()` on all three queries (csms, scores, customers)
-- Show a `RefreshCw` icon button with spinning animation while any query is fetching
-
-### Activity lookup for non-compliant CSMs
-- Add one additional query to `ComplianceReport.tsx`:
-  ```sql
-  SELECT user_id, MAX(created_at) as last_active
-  FROM activity_logs
-  WHERE user_id IN (csm_user_ids)
-  GROUP BY user_id
-  ```
-- Map results to each non-compliant CSM card
+Only shown to logged-in users (admin check optional -- can show to all authenticated users since the data is read-only).
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/pages/ComplianceReport.tsx` | Add dataUpdatedAt display, refresh button, activity lookup for pending CSMs |
-| `src/components/CSMComplianceWidget.tsx` | Add dataUpdatedAt to subtitle line |
-
-## Current CSM Status (for your awareness)
-
-All three CSMs below have properly configured accounts (roles, department access). They have zero February entries -- this is a compliance gap, not a technical bug:
-
-- **Sahil Kapoor** -- 9 customers assigned, 0 submitted
-- **Pooja Singh** -- 7 customers assigned, 0 submitted  
-- **Jagjit Mann** -- 1 customer assigned, 0 submitted
-
-The enhanced compliance report will make this immediately visible with "last active" timestamps so you can follow up appropriately.
+| `src/pages/Index.tsx` | Import and render `CSMComplianceWidget` for logged-in users |
 
