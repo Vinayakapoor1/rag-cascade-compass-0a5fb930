@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DepartmentUploader } from '@/components/admin/DepartmentUploader';
 import { CustomerUploader } from '@/components/admin/CustomerUploader';
 import { FeatureUploader } from '@/components/admin/FeatureUploader';
+import { CustomerIndustryUpdater } from '@/components/admin/CustomerIndustryUpdater';
 import { OKRHierarchyTab } from '@/components/admin/OKRHierarchyTab';
 import { OrgObjectivesManager } from '@/components/admin/OrgObjectivesManager';
 import { RAGRulesTab } from '@/components/admin/RAGRulesTab';
@@ -408,8 +409,9 @@ export default function DataManagement() {
               <TabsContent value="upload">
                 <DepartmentUploader onImportComplete={handleImportComplete} />
               </TabsContent>
-              <TabsContent value="customers">
+              <TabsContent value="customers" className="space-y-4">
                 <CustomerUploader onImportComplete={handleImportComplete} />
+                <CustomerIndustryUpdater />
               </TabsContent>
               <TabsContent value="features">
                 <FeatureUploader onImportComplete={handleImportComplete} />
