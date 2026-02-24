@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { AlertTriangle, CheckCircle2, Clock, Users, ChevronDown, ChevronUp } fro
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 
 export function CSMComplianceWidget() {
   const [expanded, setExpanded] = useState(false);
@@ -28,7 +28,7 @@ export function CSMComplianceWidget() {
     staleTime: 60000,
   });
 
-  const { data: scores = [], isLoading: scoresLoading } = useQuery({
+  const { data: scores = [], isLoading: scoresLoading, dataUpdatedAt: scoresUpdatedAt } = useQuery({
     queryKey: ['compliance-scores', currentPeriod],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -124,7 +124,9 @@ export function CSMComplianceWidget() {
                     }
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {currentPeriod} • {complianceData.compliant.length}/{complianceData.total} submitted • Deadline: {deadlineLabel}
+                    {currentPeriod} • {complianceData.compliant.length}/{complianceData.total} submitted
+                    {scoresUpdatedAt ? ` • Updated ${formatDistanceToNow(new Date(scoresUpdatedAt), { addSuffix: true })}` : ''}
+                    {' • Deadline: '}{deadlineLabel}
                   </p>
                 </div>
               </div>
