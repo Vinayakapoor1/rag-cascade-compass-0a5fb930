@@ -1,20 +1,31 @@
 
-# Connect Customer Form Industry Dropdown to Managed Industries
+
+# Pre-populate Industries Table from Existing Customer Data
+
+## Problem
+Customers already have industry values assigned, but the `industries` table (used by the Industry Manager) is empty. This means the manager shows "No industries yet" even though industries are actively in use.
 
 ## What Changes
 
-Update the `CustomerFormDialog` so the **Industry** dropdown pulls its options from the `industries` database table (managed via the Industry Manager in Configuration) instead of using a hardcoded list.
+Run a database migration that inserts all 31 distinct industry values from the `customers` table into the `industries` table. This will:
 
-This means any industry added, edited, or removed in the Industry Manager will immediately appear in the customer add/edit form.
+- Populate the Industry Manager with all existing industry names
+- Allow you to edit, rename, or delete any of them
+- Make them available in the customer form dropdown
 
-## Technical Steps
+## Technical Details
 
-### Modified file: `src/components/CustomerFormDialog.tsx`
+A single SQL migration will:
 
-1. **Remove** the hardcoded `INDUSTRY_OPTIONS` array (lines 49-56)
-2. **Add state** for dynamic industries: `const [industries, setIndustries] = useState<string[]>([]);`
-3. **Add a fetch function** that queries `supabase.from('industries').select('name').order('name')` and maps results to a string array
-4. **Call the fetch** inside the existing `useEffect` when `open` is true (alongside `fetchFeatures()` and `fetchCsms()`)
-5. **Replace** `INDUSTRY_OPTIONS` reference in the Select dropdown (line 346) with the new `industries` state variable
+1. Insert all distinct non-null, non-empty `industry` values from the `customers` table into the `industries` table
+2. Use `ON CONFLICT` or deduplication to avoid errors if any already exist
+3. Normalize casing duplicates (e.g., "hospitality" vs "Hospitality") -- the lowercase variant will be skipped in favor of the capitalized one
 
-No other files need changes -- the Industry Manager and industries table already exist and work correctly.
+### Industries to be added (31 values):
+Banking, Business Process Outsourcing (BPO) and KPO, Capital Markets, Chemical, Consulting Engineering Firm, Defence, Digital Connectivity Infrastructure Partner, Education, Energy, Finance, FMCG, Government - Education, Government - Emergency & Disaster Management, Healthcare, Hospitality, Human Resources Services and Workforce Development industry, Insurance, IT Services, Logistics, Manufacturing, Manufacturing - Chemicals, Media, Pension Fund, Ports & Logistics, Public administration/government, Retail, Technology, Technology - Aviation Software, Technology - Healthcare IT, Telecommunications, Travel & Hospitality
+
+**Note:** "hospitality" (lowercase) will be normalized to "Hospitality" in both the `industries` table and the `customers` table.
+
+### File changes
+- **Database migration only** -- no code file changes needed
+
