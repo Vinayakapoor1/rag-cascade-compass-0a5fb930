@@ -122,13 +122,15 @@ export function BellNotifications() {
                   )}
                   onClick={() => {
                     if (!notification.is_read) markAsRead.mutate(notification.id);
-                    const t = notification.title;
-                    if (t.includes('Compliance') || t.includes('Check-in') || t.includes('📋') || t.includes('⚠️')) {
-                      setOpen(false);
-                      navigate('/compliance-report');
-                    } else if (notification.link) {
+                    if (notification.link) {
                       setOpen(false);
                       navigate(notification.link);
+                    } else {
+                      const t = notification.title;
+                      if (t.includes('Compliance') || t.includes('Check-in') || t.includes('📋') || t.includes('⚠️')) {
+                        setOpen(false);
+                        navigate('/compliance-report');
+                      }
                     }
                   }}
                 >

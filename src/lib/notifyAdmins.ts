@@ -28,11 +28,19 @@ export async function notifyAdminsOfCompletion({
       ? 'Customer × Feature Matrix'
       : 'Per-Indicator Entry';
 
+    // Determine the correct compliance report link based on department
+    const isContentManagement = departmentName === 'Content Management';
+    const link = isContentManagement
+      ? '/content-management/compliance'
+      : '/compliance-report';
+
+    const titlePrefix = isContentManagement ? '📋 Content Mgmt' : '✅';
+
     const notifications = adminRoles.map((r) => ({
       user_id: r.user_id,
-      title: `✅ Data Entry Completed`,
+      title: `${titlePrefix} Data Entry Completed`,
       message: `${userName} submitted ${indicatorCount} indicator${indicatorCount !== 1 ? 's' : ''} for ${departmentName} (${period}) via ${sourceLabel}.`,
-      link: '/compliance-report',
+      link,
       is_read: false,
     }));
 
