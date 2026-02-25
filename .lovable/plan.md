@@ -1,31 +1,95 @@
 
 
-# Pre-populate Industries Table from Existing Customer Data
+# Content Management Data Entry Forms
 
-## Problem
-Customers already have industry values assigned, but the `industries` table (used by the Industry Manager) is empty. This means the manager shows "No industries yet" even though industries are actively in use.
+## Overview
+Create a dedicated Content Management data entry page that mirrors the existing CSM Data Entry flow, but is specifically scoped to:
+- **Only the Content Management department** (auto-selected, no department picker)
+- **Only customers with `managed_services = true`** (71 customers)
+- **The 10 Content Management KPIs** from your uploaded spreadsheet (all already exist in the database)
 
 ## What Changes
 
-Run a database migration that inserts all 31 distinct industry values from the `customers` table into the `industries` table. This will:
+### 1. New Page: Content Management Data Entry
+**File:** `src/pages/ContentManagementDataEntry.tsx`
 
-- Populate the Industry Manager with all existing industry names
-- Allow you to edit, rename, or delete any of them
-- Make them available in the customer form dropdown
+A new page at route `/content-management/data-entry` that:
+- Has the same layout as CSM Data Entry (period selector, calendar picker, monthly/weekly toggle, instructions card)
+- Automatically targets the "Content Management" department (looked up by name, no dropdown needed)
+- Passes a new `managedServicesOnly={true}` prop to the matrix component
+- Title: "Content Management Data Entry" with appropriate subtitle
+
+### 2. Filter Managed Services Customers in Matrix
+**File:** `src/components/user/CSMDataEntryMatrix.tsx`
+
+Add an optional `managedServicesOnly?: boolean` prop:
+- When `true`, after building the customer-feature map, query customers where `managed_services = true` and remove all non-managed-services customers from the matrix
+- This is a small addition (~10 lines) to the existing query function
+- All other matrix logic (bands, scoring, saving, aggregation, apply-to-row/column) works unchanged
+
+### 3. New Role: `content_manager`
+**Database migration** to add `content_manager` to the `app_role` enum.
+
+This allows assigning users specifically for Content Management data entry, separate from CSM users. The auth hook will be updated to check for this role.
+
+### 4. Auth Hook Update
+**File:** `src/hooks/useAuth.tsx`
+
+Add `isContentManager` boolean to the auth context, checked the same way as `isCSM` -- by querying `user_roles` for `role = 'content_manager'`.
+
+### 5. Route and Navigation
+**File:** `src/App.tsx`
+- Add route: `/content-management/data-entry` pointing to the new page, wrapped in `ProtectedRoute` + `AppLayout`
+
+**File:** `src/components/AppLayout.tsx`
+- Add a "Content Management" button in the header for users with the `content_manager` role (similar to how CSM users see "Enter Data")
+- Admins also see this button
+
+### 6. Admin: Assign Content Manager Role
+**File:** `src/components/admin/TeamAccessTab.tsx`
+- Add "content_manager" as an assignable role in the team access management UI so admins can grant this role to users
 
 ## Technical Details
 
-A single SQL migration will:
+### Database Migration
+```sql
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'content_manager';
+```
 
-1. Insert all distinct non-null, non-empty `industry` values from the `customers` table into the `industries` table
-2. Use `ON CONFLICT` or deduplication to avoid errors if any already exist
-3. Normalize casing duplicates (e.g., "hospitality" vs "Hospitality") -- the lowercase variant will be skipped in favor of the capitalized one
+### CSMDataEntryMatrix Prop Change
+```typescript
+interface CSMDataEntryMatrixProps {
+  departmentId: string;
+  period: string;
+  managedServicesOnly?: boolean;  // NEW
+}
+```
 
-### Industries to be added (31 values):
-Banking, Business Process Outsourcing (BPO) and KPO, Capital Markets, Chemical, Consulting Engineering Firm, Defence, Digital Connectivity Infrastructure Partner, Education, Energy, Finance, FMCG, Government - Education, Government - Emergency & Disaster Management, Healthcare, Hospitality, Human Resources Services and Workforce Development industry, Insurance, IT Services, Logistics, Manufacturing, Manufacturing - Chemicals, Media, Pension Fund, Ports & Logistics, Public administration/government, Retail, Technology, Technology - Aviation Software, Technology - Healthcare IT, Telecommunications, Travel & Hospitality
+In the query function, after building `custFeatureMap`:
+```typescript
+if (managedServicesOnly) {
+  const { data: managedCusts } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('managed_services', true);
+  const managedIds = new Set(managedCusts?.map(c => c.id));
+  for (const custId of custFeatureMap.keys()) {
+    if (!managedIds.has(custId)) custFeatureMap.delete(custId);
+  }
+}
+```
 
-**Note:** "hospitality" (lowercase) will be normalized to "Hospitality" in both the `industries` table and the `customers` table.
+### Files Summary
+| File | Action |
+|------|--------|
+| `src/pages/ContentManagementDataEntry.tsx` | Create (mirrors CSMDataEntry pattern) |
+| `src/components/user/CSMDataEntryMatrix.tsx` | Add `managedServicesOnly` prop + filter |
+| `src/hooks/useAuth.tsx` | Add `isContentManager` role check |
+| `src/components/AppLayout.tsx` | Add nav button for content managers |
+| `src/App.tsx` | Add new route |
+| `src/components/admin/TeamAccessTab.tsx` | Add content_manager as assignable role |
+| Database migration | Add `content_manager` to `app_role` enum |
 
-### File changes
-- **Database migration only** -- no code file changes needed
+### No New Tables Required
+All data storage uses existing tables (`csm_customer_feature_scores`, `indicators`, `indicator_history`, etc.). The 10 KPIs and their RAG bands are already configured in the database.
 
