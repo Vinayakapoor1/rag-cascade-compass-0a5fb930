@@ -71,8 +71,15 @@ export function IndustryManager() {
       toast.error('Failed to update');
     } else {
       // Also update all customers that had the old industry name
-      if (oldName) {
-        await supabase.from('customers').update({ industry: trimmed }).eq('industry', oldName);
+      if (oldName && oldName !== trimmed) {
+        const { error: custError } = await supabase
+          .from('customers')
+          .update({ industry: trimmed })
+          .eq('industry', oldName);
+        if (custError) {
+          console.error('Failed to update customers:', custError);
+          toast.error('Industry renamed but failed to update customers');
+        }
       }
       toast.success('Updated');
       setEditingId(null);
