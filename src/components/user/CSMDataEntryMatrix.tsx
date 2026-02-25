@@ -43,6 +43,7 @@ import {
 interface CSMDataEntryMatrixProps {
   departmentId: string;
   period: string;
+  managedServicesOnly?: boolean;
 }
 
 interface IndicatorInfo {
@@ -116,7 +117,7 @@ const RAG_BADGE_STYLES: Record<string, string> = {
 type ScoreMap = Record<string, number | null>;
 type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
-export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixProps) {
+export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }: CSMDataEntryMatrixProps) {
   const { user, isAdmin, isDepartmentHead } = useAuth();
   const { logActivity } = useActivityLog();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,7 +134,7 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
   const scoresInitializedRef = useRef(false);
 
   const { data: matrixData, isLoading: loading } = useQuery({
-    queryKey: ['csm-matrix', departmentId, period, user?.id, isAdmin],
+    queryKey: ['csm-matrix', departmentId, period, user?.id, isAdmin, managedServicesOnly],
     queryFn: async () => {
       if (!departmentId || !user) return null;
 
@@ -233,6 +234,21 @@ export function CSMDataEntryMatrix({ departmentId, period }: CSMDataEntryMatrixP
         if (!custFeatureMap.has(cf.customer_id)) custFeatureMap.set(cf.customer_id, new Set());
         custFeatureMap.get(cf.customer_id)!.add(cf.feature_id);
       });
+
+      // Filter to managed services customers only if requested
+      if (managedServicesOnly) {
+        const { data: managedCusts } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('managed_services', true);
+        const managedIds = new Set(managedCusts?.map(c => c.id));
+        for (const custId of custFeatureMap.keys()) {
+          if (!managedIds.has(custId)) {
+            custFeatureMap.delete(custId);
+            custNameMap.delete(custId);
+          }
+        }
+      }
 
       const { data: existingScores } = await supabase
         .from('csm_customer_feature_scores' as any)

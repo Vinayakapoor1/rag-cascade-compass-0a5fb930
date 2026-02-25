@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck, Trash2 } from 'lucide-react';
+import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck, ClipboardCheck, Trash2 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -19,7 +19,7 @@ interface UserWithRole {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'department_head' | 'viewer' | 'csm' | null;
+  role: 'admin' | 'department_head' | 'viewer' | 'csm' | 'content_manager' | null;
   departments: { id: string; name: string }[];
   linkedCsmId?: string | null;
   linkedCsmName?: string | null;
@@ -54,7 +54,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
 
   // Form state
   const [formData, setFormData] = useState({
-    role: 'viewer' as 'admin' | 'department_head' | 'viewer' | 'csm',
+    role: 'viewer' as 'admin' | 'department_head' | 'viewer' | 'csm' | 'content_manager',
     departmentIds: [] as string[],
     linkedCsmId: '' as string,
   });
@@ -246,6 +246,8 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
         return <Badge className="bg-rag-amber/10 text-rag-amber"><Building className="h-3 w-3 mr-1" />Dept Head</Badge>;
       case 'csm':
         return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400"><UserCheck className="h-3 w-3 mr-1" />CSM{linkedCsmName ? ` (${linkedCsmName})` : ''}</Badge>;
+      case 'content_manager':
+        return <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400"><ClipboardCheck className="h-3 w-3 mr-1" />Content Mgr</Badge>;
       default:
         return <Badge variant="outline">Viewer</Badge>;
     }
@@ -372,6 +374,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                   <SelectContent>
                     <SelectItem value="viewer">Viewer</SelectItem>
                     <SelectItem value="csm">CSM</SelectItem>
+                    <SelectItem value="content_manager">Content Manager</SelectItem>
                     <SelectItem value="department_head">Department Head</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>

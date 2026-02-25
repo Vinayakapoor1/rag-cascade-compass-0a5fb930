@@ -25,6 +25,7 @@ import DataEntryTimeline from "./pages/DataEntryTimeline";
 import AdminDepartmentStatus from "./pages/AdminDepartmentStatus";
 import AdminDashboard from "./pages/AdminDashboard";
 import CSMDataEntry from "./pages/CSMDataEntry";
+import ContentManagementDataEntry from "./pages/ContentManagementDataEntry";
 import ComplianceReport from "./pages/ComplianceReport";
 import NotFound from "./pages/NotFound";
 
@@ -72,6 +73,7 @@ const App = () => (
 
               {/* CSM data entry route */}
               <Route path="/csm/data-entry" element={<ProtectedRoute><AppLayout><CSMDataEntry /></AppLayout></ProtectedRoute>} />
+              <Route path="/content-management/data-entry" element={<ProtectedRoute><AppLayout><ContentManagementDataEntry /></AppLayout></ProtectedRoute>} />
 
               {/* Utility routes */}
               <Route path="/admin" element={<ProtectedRoute><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>} />
