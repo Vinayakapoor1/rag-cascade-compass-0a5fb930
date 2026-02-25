@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, LogIn, Settings, Building2, Target, TrendingUp, RefreshCw, Layers, ClipboardCheck } from 'lucide-react';
 import { CSMComplianceWidget } from '@/components/CSMComplianceWidget';
-import { ContentMgmtComplianceWidget } from '@/components/ContentMgmtComplianceWidget';
 
 import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 
@@ -233,9 +232,6 @@ const Index = () => {
 
         {/* CSM Compliance Widget - for admins and CSMs */}
         {user && (isAdmin || isCSM) && <CSMComplianceWidget />}
-
-        {/* Content Management Compliance Widget - for admins and content managers */}
-        {user && (isAdmin || isContentManager) && <ContentMgmtComplianceWidget />}
 
         {/* Activity Timeline Widget - Only for logged in users */}
         {user && (
