@@ -46,19 +46,12 @@ interface CustomerFormDialogProps {
 const TIER_OPTIONS = ['Tier1', 'Tier2', 'Unassigned'];
 const REGION_OPTIONS = ['India', 'Middle East', 'Others'];
 const DEPLOYMENT_OPTIONS = ['Cloud', 'On Prem', 'Hybrid', 'India Cloud', 'UAE Cloud', 'Private Cloud'];
-const INDUSTRY_OPTIONS = [
-    'Aviation', 'BPO/KPO', 'Chemical', 'Education', 'Energy', 'Finance',
-    'Food Services', 'Government Administration', 'Healthcare', 'Hospitality',
-    'Human Resources Services and Workforce Development industry',
-    'Manufacturing', 'Media and Broadcasting', 'Pension Fund',
-    'Public administration/government', 'Retail', 'Technology',
-    'Telecommunications', 'Travel'
-];
 
 export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: CustomerFormDialogProps) {
     const [loading, setLoading] = useState(false);
     const [features, setFeatures] = useState<Feature[]>([]);
     const [csms, setCsms] = useState<CSM[]>([]);
+    const [industries, setIndustries] = useState<string[]>([]);
     const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -80,6 +73,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
         if (open) {
             fetchFeatures();
             fetchCsms();
+            fetchIndustries();
             if (customer?.id) {
                 fetchFullCustomer(customer.id);
                 fetchCustomerFeatures(customer.id);
@@ -142,6 +136,14 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
             .select('id, name')
             .order('name');
         if (!error && data) setCsms(data);
+    };
+
+    const fetchIndustries = async () => {
+        const { data, error } = await supabase
+            .from('industries')
+            .select('name')
+            .order('name');
+        if (!error && data) setIndustries(data.map(i => i.name));
     };
 
     const fetchCustomerFeatures = async (customerId: string) => {
@@ -343,7 +345,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSuccess }: 
                                         <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">Not specified</SelectItem>
-                                            {INDUSTRY_OPTIONS.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+                                            {industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
