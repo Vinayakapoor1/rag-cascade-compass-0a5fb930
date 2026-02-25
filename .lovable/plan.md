@@ -1,22 +1,20 @@
 
-# Add Managed Services Breakdown to Customers Page
+# Connect Customer Form Industry Dropdown to Managed Industries
 
 ## What Changes
 
-Add a "By Managed Services" stat card to the filter breakdown section on the /customers page, matching the style of the existing cards (By Region, By Industry, etc.). It will show counts for "With Managed Services" and "Without Managed Services".
+Update the `CustomerFormDialog` so the **Industry** dropdown pulls its options from the `industries` database table (managed via the Industry Manager in Configuration) instead of using a hardcoded list.
+
+This means any industry added, edited, or removed in the Industry Manager will immediately appear in the customer add/edit form.
 
 ## Technical Steps
 
-### 1. Update `src/hooks/useCustomerImpact.tsx`
-- Add `managed_services` to the customer query select string (line 375): append `, managed_services` to the select
-- Add `managedServices: boolean | null` to the `CustomerWithImpact` interface
-- Map `c.managed_services` to `managedServices` in the return object (around line 516-531)
+### Modified file: `src/components/CustomerFormDialog.tsx`
 
-### 2. Update `src/pages/CustomersPage.tsx`
-- Add a new breakdown entry in the `filterBreakdowns` useMemo (around line 220-227):
-  ```
-  countBy(c => c.managedServices === true ? 'Yes' : c.managedServices === false ? 'No' : 'Unknown', 'By Managed Services', 'settings')
-  ```
-- This will render as a stat card with the Settings icon, showing counts like "Yes: 42" and "No: 41", consistent with the existing breakdown cards
-- Import the `Settings` icon (already imported on line 14)
-- Add `'settings': Settings` to the icon mapping object (line 327)
+1. **Remove** the hardcoded `INDUSTRY_OPTIONS` array (lines 49-56)
+2. **Add state** for dynamic industries: `const [industries, setIndustries] = useState<string[]>([]);`
+3. **Add a fetch function** that queries `supabase.from('industries').select('name').order('name')` and maps results to a string array
+4. **Call the fetch** inside the existing `useEffect` when `open` is true (alongside `fetchFeatures()` and `fetchCsms()`)
+5. **Replace** `INDUSTRY_OPTIONS` reference in the Select dropdown (line 346) with the new `industries` state variable
+
+No other files need changes -- the Industry Manager and industries table already exist and work correctly.
