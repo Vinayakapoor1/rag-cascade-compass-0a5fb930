@@ -65,10 +65,15 @@ export function IndustryManager() {
       toast.error('Industry name already exists');
       return;
     }
+    const oldName = industries.find(i => i.id === editingId)?.name;
     const { error } = await supabase.from('industries').update({ name: trimmed }).eq('id', editingId);
     if (error) {
       toast.error('Failed to update');
     } else {
+      // Also update all customers that had the old industry name
+      if (oldName) {
+        await supabase.from('customers').update({ industry: trimmed }).eq('industry', oldName);
+      }
       toast.success('Updated');
       setEditingId(null);
       fetchIndustries();
