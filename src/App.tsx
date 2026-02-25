@@ -27,6 +27,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import CSMDataEntry from "./pages/CSMDataEntry";
 import ContentManagementDataEntry from "./pages/ContentManagementDataEntry";
 import ComplianceReport from "./pages/ComplianceReport";
+import ContentManagementComplianceReport from "./pages/ContentManagementComplianceReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -78,6 +79,7 @@ const App = () => (
               {/* Utility routes */}
               <Route path="/admin" element={<ProtectedRoute><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>} />
               <Route path="/compliance-report" element={<ProtectedRoute><AppLayout><ComplianceReport /></AppLayout></ProtectedRoute>} />
+              <Route path="/content-management/compliance" element={<ProtectedRoute><AppLayout><ContentManagementComplianceReport /></AppLayout></ProtectedRoute>} />
               <Route path="/admin/upload" element={<ProtectedRoute><AppLayout><AdminUpload /></AppLayout></ProtectedRoute>} />
               <Route path="*" element={<ProtectedRoute><AppLayout><NotFound /></AppLayout></ProtectedRoute>} />
             </Routes>
