@@ -21,7 +21,7 @@ import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 
 const Index = () => {
   const { data: orgObjectives, isLoading, error, refetch } = useOrgObjectives();
-  const { user, isAdmin, isDepartmentHead, loading: authLoading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isCSM, isContentManager, loading: authLoading } = useAuth();
 
   // Calculate totals
   const totalOrgObjectives = orgObjectives?.length ?? 0;
@@ -206,11 +206,36 @@ const Index = () => {
           </div>
         )}
 
-        {/* CSM Compliance Widget - for logged-in users */}
-        {user && <CSMComplianceWidget />}
+        {/* Content Manager Instructions - Only for content managers (not admins) */}
+        {user && isContentManager && !isAdmin && (
+          <div className="card-premium p-6 border-primary/20">
+            <div className="flex items-start gap-5 relative z-10">
+              <div className="p-4 rounded-2xl bg-primary/10 animate-float">
+                <ClipboardCheck className="h-7 w-7 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-lg mb-2">Content Management Data Entry Guide</p>
+                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                  <li>Navigate to Content Management Data Entry</li>
+                  <li>Select the reporting period (month or week)</li>
+                  <li>Expand a managed services customer to see their feature × KPI matrix</li>
+                  <li>Select the appropriate RAG band for each cell</li>
+                  <li>Use "Apply to Row" or "Apply to Column" for bulk entry</li>
+                  <li>Click Save to submit your scores</li>
+                </ol>
+              </div>
+              <Button asChild className="hover-glow shadow-lg shadow-primary/30">
+                <Link to="/content-management/data-entry">Go to Data Entry</Link>
+              </Button>
+            </div>
+          </div>
+        )}
 
-        {/* Content Management Compliance Widget - for logged-in users */}
-        {user && <ContentMgmtComplianceWidget />}
+        {/* CSM Compliance Widget - for admins and CSMs */}
+        {user && (isAdmin || isCSM) && <CSMComplianceWidget />}
+
+        {/* Content Management Compliance Widget - for admins and content managers */}
+        {user && (isAdmin || isContentManager) && <ContentMgmtComplianceWidget />}
 
         {/* Activity Timeline Widget - Only for logged in users */}
         {user && (
