@@ -1,26 +1,43 @@
 
 
-# Fix: Make Content Management Sub-Section Visible
+# Clear Content Management Indicator Data
 
 ## Problem
-The Content Management Indicators sub-section IS implemented in the code and the data exists, but users can't see it because:
-1. The section is **collapsed by default** (`cmOpen` starts as `false`)
-2. It's placed below the Feature x KPI matrix table, requiring scrolling
-3. Users may not realize they need to expand a customer accordion first and then look for a collapsible section within it
+The Content Management department's indicators have pre-filled `current_value` and `rag_status` values (e.g., 100/green, 50/red) that are not based on actual CSM-entered scores. These show up on the Content Management department detail page as filled data.
 
-## Solution
-Make the CM sub-section more discoverable:
+## What Will Be Done
 
-### File: `src/components/user/CSMDataEntryMatrix.tsx`
+### Database: Reset CM indicator values
+Run a single SQL migration to set all Content Management indicators back to their default/empty state:
 
-1. **Default to open** -- Change `useState(false)` to `useState(true)` in `CMSubSectionBlock` so the Content Management Indicators section is **expanded by default** instead of collapsed.
+- Set `current_value` to `0` (or `NULL`) for all 10 CM indicators
+- Set `rag_status` to `'grey'` (no data) for all 10 CM indicators
 
-2. **Add a visual indicator on the customer accordion header** -- Add a small badge like "CM" or "Content Management" next to each customer name in the accordion trigger so users know there's CM scoring available inside.
+The affected indicators:
+- Expansion Pipeline Influence (currently 100/green)
+- Release Timeliness Rate (currently 100/green)
+- Asset Launch Count vs Target (currently 100/green)
+- Completion Depth within 30 days (currently 100/green)
+- Avg. Production Cycle Time (currently 100/green)
+- Content Engagement Coverage (currently 50/red)
+- Pack Launch Count vs Target (currently 50/red)
+- Rights Management Compliance (currently 50/red)
+- Production Cost per Asset (currently 50/red)
+- Version Control Enforcement (currently 50/red)
 
-3. **Style the CM section header more prominently** -- Add a colored left border or background tint to the "Content Management Indicators" collapsible trigger so it stands out visually from the surrounding content (similar to how the instructions card uses `border-primary/20 bg-primary/5`).
+### SQL Statement
+```sql
+UPDATE indicators
+SET current_value = 0, rag_status = 'grey'
+WHERE id IN (
+  SELECT i.id
+  FROM indicators i
+  JOIN key_results kr ON kr.id = i.key_result_id
+  JOIN functional_objectives fo ON fo.id = kr.functional_objective_id
+  JOIN departments d ON d.id = fo.department_id
+  WHERE d.name = 'Content Management'
+);
+```
 
-## Technical Details
-- Line ~1858: Change `useState(false)` to `useState(true)` for the `cmOpen` state
-- Line ~1807: The condition `cmIndicators.length > 0` is correct and will render when viewing Customer Success department (not CM department itself)
-- The `managedServicesOnly` guard at line 354 correctly prevents duplication on the standalone CM page
-- Add a `<Badge>` with "CM" text next to customer name in the `CustomerSectionCard` trigger area (around line ~1700)
+No code changes needed -- this is a data-only fix.
+
