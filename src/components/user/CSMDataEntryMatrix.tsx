@@ -249,7 +249,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           .from('csm_customer_feature_scores' as any)
           .select('*')
           .in('indicator_id', indIds)
-          .eq('period', period);
+          .eq('period', period)
+          .limit(10000);
 
         const directSections: CustomerSection[] = (managedCusts || []).map(c => ({
           id: c.id,
@@ -303,7 +304,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         .from('csm_customer_feature_scores' as any)
         .select('*')
         .in('indicator_id', indIds)
-        .eq('period', period);
+        .eq('period', period)
+        .limit(10000);
 
       const sections: CustomerSection[] = [];
       for (const [custId, custFeatures] of custFeatureMap) {
@@ -412,7 +414,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                   .select('*')
                   .in('indicator_id', cmIndIds)
                   .in('customer_id', custIds)
-                  .eq('period', period);
+                  .eq('period', period)
+                  .limit(10000);
 
                 (cmScores || []).forEach((s: any) => {
                   scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
