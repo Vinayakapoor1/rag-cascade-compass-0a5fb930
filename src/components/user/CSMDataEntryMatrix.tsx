@@ -843,6 +843,19 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
     });
   };
 
+  // Detect if a specific customer has unsaved changes
+  const customerHasUnsavedChanges = useCallback((section: CustomerSection): boolean => {
+    for (const feat of section.features) {
+      for (const ind of section.indicators) {
+        const feats = section.indicatorFeatureMap[ind.id];
+        if (!feats?.has(feat.id)) continue;
+        const key = cellKey(ind.id, section.id, feat.id);
+        if (scores[key] !== originalScores[key]) return true;
+      }
+    }
+    return false;
+  }, [scores, originalScores]);
+
   const filteredCustomers = useMemo(() => {
     if (!searchTerm) return customerSections;
     const lower = searchTerm.toLowerCase();
@@ -928,7 +941,14 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             No Update & Check In
           </Button>
-          <Button onClick={() => initiateCheckIn('update')} disabled={saving} className="gap-2">
+          <Button
+            onClick={() => initiateCheckIn('update')}
+            disabled={saving}
+            className={cn(
+              "gap-2",
+              (hasChanges || savedCustomers.size > 0) && !saving && "animate-save-pulse ring-2 ring-primary/50"
+            )}
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
             Update & Check In
           </Button>
@@ -937,7 +957,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
       {/* Customer sections */}
       {filteredCustomers.map(section => (
-        <CustomerSectionCard
+          <CustomerSectionCard
           key={section.id}
           section={section}
           isOpen={openSections.has(section.id)}
@@ -956,6 +976,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           isSaved={savedCustomers.has(section.id)}
           isSaving={savingCustomerId === section.id}
           onSaveCustomer={doSaveCustomer}
+          hasUnsavedChanges={customerHasUnsavedChanges(section)}
         />
       ))}
 
@@ -1082,6 +1103,7 @@ interface CustomerSectionCardProps {
   isSaved: boolean;
   isSaving: boolean;
   onSaveCustomer: (customerId: string) => Promise<void>;
+  hasUnsavedChanges: boolean;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1092,7 +1114,7 @@ const isCMDirectMode = (section: CustomerSection) =>
 function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
-  departmentId, period, isSaved, isSaving, onSaveCustomer,
+  departmentId, period, isSaved, isSaving, onSaveCustomer, hasUnsavedChanges,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
@@ -1288,8 +1310,11 @@ function CustomerSectionCard({
                 <div className="flex justify-end pt-2">
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="gap-2"
+                    variant={hasUnsavedChanges && !isSaved ? "default" : "outline"}
+                    className={cn(
+                      "gap-2",
+                      hasUnsavedChanges && !isSaved && !isSaving && "animate-save-pulse ring-2 ring-primary/50"
+                    )}
                     disabled={isSaving}
                     onClick={() => onSaveCustomer(section.id)}
                   >
@@ -1524,8 +1549,11 @@ function CustomerSectionCard({
                 <div className="flex justify-end pt-2">
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="gap-2"
+                    variant={hasUnsavedChanges && !isSaved ? "default" : "outline"}
+                    className={cn(
+                      "gap-2",
+                      hasUnsavedChanges && !isSaved && !isSaving && "animate-save-pulse ring-2 ring-primary/50"
+                    )}
                     disabled={isSaving}
                     onClick={() => onSaveCustomer(section.id)}
                   >
