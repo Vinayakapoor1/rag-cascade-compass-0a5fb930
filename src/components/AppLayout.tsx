@@ -25,7 +25,7 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, isDepartmentHead, isCSM, signOut, loading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isCSM, isContentManager, signOut, loading } = useAuth();
   const [has2FA, setHas2FA] = useState<boolean | null>(null);
   const [toggling2FA, setToggling2FA] = useState(false);
 
@@ -113,6 +113,16 @@ export function AppLayout({ children }: AppLayoutProps) {
                     {/* CSM: Enter Data Button */}
                     {isCSM && !isAdmin && (
                       <Link to="/csm/data-entry">
+                        <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
+                          <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
+                          <span className="hidden sm:inline">Enter Data</span>
+                        </Button>
+                      </Link>
+                    )}
+
+                    {/* Content Manager: Enter Data Button */}
+                    {isContentManager && !isAdmin && (
+                      <Link to="/content-management/data-entry">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
                           <span className="hidden sm:inline">Enter Data</span>
