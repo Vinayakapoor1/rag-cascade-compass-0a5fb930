@@ -502,11 +502,25 @@
   animation: glow 3s ease-in-out infinite;
 }
 
+@keyframes save-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsla(var(--primary) / 0.5);
+  }
+  50% {
+    box-shadow: 0 0 12px 4px hsla(var(--primary) / 0.3);
+  }
+}
+
+.animate-save-pulse {
+  animation: save-pulse 1.5s ease-in-out infinite;
+}
+
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .gradient-orb,
   .animate-glow,
+  .animate-save-pulse,
   .shimmer {
     animation: none !important;
   }
