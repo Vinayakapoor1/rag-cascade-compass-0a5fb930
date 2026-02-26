@@ -336,7 +336,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       return { sections, indicators: indicatorInfos, bands: bandsMap, scores: scoreMap };
     },
     enabled: !!departmentId && !!user,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: 'always' as const,
     refetchOnWindowFocus: false,
   });
 
