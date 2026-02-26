@@ -124,12 +124,14 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [savingCustomerId, setSavingCustomerId] = useState<string | null>(null);
+  const [savedCustomers, setSavedCustomers] = useState<Set<string>>(new Set());
   const [scores, setScores] = useState<ScoreMap>({});
   const [originalScores, setOriginalScores] = useState<ScoreMap>({});
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [skipReasonDialogOpen, setSkipReasonDialogOpen] = useState(false);
-  const [skipReasons, setSkipReasons] = useState<Record<string, string>>({});
+  const [generalSkipReason, setGeneralSkipReason] = useState('');
   const [pendingSaveAction, setPendingSaveAction] = useState<'update' | 'no_update' | null>(null);
   const scoresInitializedRef = useRef(false);
 
@@ -458,9 +460,10 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
     return false;
   }, [scores, originalScores]);
 
-  // Detect customers with zero scores filled
+  // Detect customers with zero scores filled AND not individually saved
   const getEmptyCustomers = useCallback((): CustomerSection[] => {
     return customerSections.filter(section => {
+      if (savedCustomers.has(section.id)) return false; // individually saved = not empty
       const hasAnyScore = section.indicators.some(ind => {
         const feats = section.indicatorFeatureMap[ind.id];
         if (!feats) return false;
@@ -468,17 +471,91 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       });
       return !hasAnyScore;
     });
-  }, [customerSections, scores]);
+  }, [customerSections, scores, savedCustomers]);
+
+  // Per-customer save: upserts only that customer's scores, no indicator aggregation
+  const doSaveCustomer = async (customerId: string) => {
+    if (!user) return;
+    const section = customerSections.find(s => s.id === customerId);
+    if (!section) return;
+
+    setSavingCustomerId(customerId);
+    try {
+      const upserts: any[] = [];
+      const deletes: { indicator_id: string; customer_id: string; feature_id: string }[] = [];
+
+      for (const feat of section.features) {
+        for (const ind of section.indicators) {
+          const feats = section.indicatorFeatureMap[ind.id];
+          if (!feats?.has(feat.id)) continue;
+          const key = cellKey(ind.id, section.id, feat.id);
+          const val = scores[key];
+          const origVal = originalScores[key];
+
+          if (val != null) {
+            upserts.push({
+              indicator_id: ind.id,
+              customer_id: section.id,
+              feature_id: feat.id,
+              value: val,
+              period,
+              created_by: user.id,
+            });
+          } else if (origVal != null && val === undefined) {
+            deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: feat.id });
+          }
+        }
+      }
+
+      for (const del of deletes) {
+        await supabase
+          .from('csm_customer_feature_scores' as any)
+          .delete()
+          .eq('indicator_id', del.indicator_id)
+          .eq('customer_id', del.customer_id)
+          .eq('feature_id', del.feature_id)
+          .eq('period', period);
+      }
+
+      if (upserts.length > 0) {
+        for (let i = 0; i < upserts.length; i += 500) {
+          const chunk = upserts.slice(i, i + 500);
+          const { error } = await supabase
+            .from('csm_customer_feature_scores' as any)
+            .upsert(chunk, { onConflict: 'indicator_id,customer_id,feature_id,period' });
+          if (error) throw error;
+        }
+      }
+
+      // Update original scores for this customer so hasChanges recalculates
+      setOriginalScores(prev => {
+        const next = { ...prev };
+        for (const feat of section.features) {
+          for (const ind of section.indicators) {
+            const feats = section.indicatorFeatureMap[ind.id];
+            if (!feats?.has(feat.id)) continue;
+            const key = cellKey(ind.id, section.id, feat.id);
+            if (scores[key] != null) next[key] = scores[key];
+            else delete next[key];
+          }
+        }
+        return next;
+      });
+
+      setSavedCustomers(prev => new Set(prev).add(customerId));
+      toast.success(`Saved scores for ${section.name}`);
+    } catch (err) {
+      console.error('Error saving customer scores:', err);
+      toast.error(`Failed to save scores for ${section.name}`);
+    } finally {
+      setSavingCustomerId(null);
+    }
+  };
 
   const initiateCheckIn = (action: 'update' | 'no_update') => {
     const empty = getEmptyCustomers();
     if (empty.length > 0) {
-      // Initialize reasons for empty customers
-      setSkipReasons(prev => {
-        const next = { ...prev };
-        empty.forEach(c => { if (!next[c.id]) next[c.id] = ''; });
-        return next;
-      });
+      setGeneralSkipReason('');
       setPendingSaveAction(action);
       setSkipReasonDialogOpen(true);
     } else {
@@ -489,9 +566,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
   const confirmSkipAndSave = () => {
     const empty = getEmptyCustomers();
-    const missingReasons = empty.filter(c => !skipReasons[c.id]?.trim());
-    if (missingReasons.length > 0) {
-      toast.error(`Please provide a reason for all customers without scores`);
+    if (empty.length > 0 && !generalSkipReason.trim()) {
+      toast.error('Please provide a reason for customers without scores');
       return;
     }
     setSkipReasonDialogOpen(false);
@@ -609,29 +685,29 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         });
       }
 
-      // Log skip reasons for empty customers
+      // Log general skip reason for empty customers
       const emptyCustomers = getEmptyCustomers();
-      for (const ec of emptyCustomers) {
-        const reason = skipReasons[ec.id]?.trim();
-        if (reason) {
-          await logActivity({
-            action: 'update',
-            entityType: 'department',
-            entityId: departmentId,
-            entityName: `Skip reason: ${ec.name}`,
-            metadata: {
-              department_id: departmentId,
-              period,
-              source: 'customer_feature_matrix',
-              skip_reason: reason,
-            },
-          });
-        }
+      if (emptyCustomers.length > 0 && generalSkipReason.trim()) {
+        const customerNames = emptyCustomers.map(c => c.name).join(', ');
+        await logActivity({
+          action: 'update',
+          entityType: 'department',
+          entityId: departmentId,
+          entityName: `Skip reason for: ${customerNames}`,
+          metadata: {
+            department_id: departmentId,
+            period,
+            source: 'customer_feature_matrix',
+            skip_reason: generalSkipReason.trim(),
+            skipped_customers: emptyCustomers.map(c => ({ id: c.id, name: c.name })),
+          },
+        });
       }
 
       toast.success(`Saved ${upserts.length} score(s) and updated KPI values`);
       setOriginalScores({ ...scores });
-      setSkipReasons({});
+      setSavedCustomers(new Set());
+      setGeneralSkipReason('');
       queryClient.invalidateQueries({ queryKey: ['csm-matrix', departmentId, period] });
 
       // Notify admins of completion
@@ -702,28 +778,27 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         },
       });
 
-      // Log skip reasons for empty customers
+      // Log general skip reason for empty customers
       const emptyCustomers = getEmptyCustomers();
-      for (const ec of emptyCustomers) {
-        const reason = skipReasons[ec.id]?.trim();
-        if (reason) {
-          await logActivity({
-            action: 'update',
-            entityType: 'department',
-            entityId: departmentId,
-            entityName: `Skip reason: ${ec.name}`,
-            metadata: {
-              department_id: departmentId,
-              period,
-              source: 'customer_feature_matrix',
-              skip_reason: reason,
-            },
-          });
-        }
+      if (emptyCustomers.length > 0 && generalSkipReason.trim()) {
+        const customerNames = emptyCustomers.map(c => c.name).join(', ');
+        await logActivity({
+          action: 'update',
+          entityType: 'department',
+          entityId: departmentId,
+          entityName: `Skip reason for: ${customerNames}`,
+          metadata: {
+            department_id: departmentId,
+            period,
+            source: 'customer_feature_matrix',
+            skip_reason: generalSkipReason.trim(),
+            skipped_customers: emptyCustomers.map(c => ({ id: c.id, name: c.name })),
+          },
+        });
       }
 
       toast.success('Checked in — no updates for this period.');
-      setSkipReasons({});
+      setGeneralSkipReason('');
     } catch (err) {
       console.error('Error during no-update check-in:', err);
       toast.error('Failed to check in');
@@ -878,33 +953,45 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           getCustomerOverallAvg={getCustomerOverallAvg}
           departmentId={departmentId}
           period={period}
+          isSaved={savedCustomers.has(section.id)}
+          isSaving={savingCustomerId === section.id}
+          onSaveCustomer={doSaveCustomer}
         />
       ))}
 
-      {/* Skip Reason Dialog */}
+      {/* Skip Reason Dialog — single general reason for all empty customers */}
       <Dialog open={skipReasonDialogOpen} onOpenChange={setSkipReasonDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-rag-amber" />
-              Reason Required for Empty Customers
+              Reason for Customers Without Data
             </DialogTitle>
             <DialogDescription>
-              The following customers have no scores entered. Please provide a reason for each before checking in.
+              {getEmptyCustomers().length} customer{getEmptyCustomers().length !== 1 ? 's have' : ' has'} no scores entered.
+              Please provide a general reason that applies to all of them.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {getEmptyCustomers().map(c => (
-              <div key={c.id} className="space-y-1.5">
-                <label className="text-sm font-medium">{c.name}</label>
-                <Textarea
-                  placeholder="e.g. Customer on hold, No meeting this week, Data not available..."
-                  value={skipReasons[c.id] || ''}
-                  onChange={e => setSkipReasons(prev => ({ ...prev, [c.id]: e.target.value }))}
-                  className="min-h-[60px] text-sm"
-                />
-              </div>
-            ))}
+          <div className="space-y-3 py-2">
+            <div className="flex flex-wrap gap-1.5">
+              {getEmptyCustomers().map(c => (
+                <Badge key={c.id} variant="outline" className="text-xs">{c.name}</Badge>
+              ))}
+            </div>
+            <Textarea
+              placeholder="e.g. No data available this period, Customers on hold, Awaiting responses..."
+              value={generalSkipReason}
+              onChange={e => setGeneralSkipReason(e.target.value)}
+              className="min-h-[80px] text-sm"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setGeneralSkipReason('No data available this period')}
+            >
+              Use "No data available this period"
+            </Button>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSkipReasonDialogOpen(false)}>
@@ -992,6 +1079,9 @@ interface CustomerSectionCardProps {
   getCustomerOverallAvg: (section: CustomerSection) => number | null;
   departmentId: string;
   period: string;
+  isSaved: boolean;
+  isSaving: boolean;
+  onSaveCustomer: (customerId: string) => Promise<void>;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1001,7 +1091,7 @@ const isCMDirectMode = (section: CustomerSection) =>
 function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
-  departmentId, period,
+  departmentId, period, isSaved, isSaving, onSaveCustomer,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
@@ -1050,7 +1140,13 @@ function CustomerSectionCard({
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {isSaved && (
+                  <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
+                    <Check className="h-3 w-3" />
+                    Saved
+                  </Badge>
+                )}
                 {custAvg != null && custRag ? (
                   <Badge className={cn(RAG_BADGE_STYLES[custRag], 'text-xs')}>
                     {Math.round(custAvg)}%
@@ -1185,6 +1281,19 @@ function CustomerSectionCard({
                   >
                     <X className="h-3 w-3 mr-1" />
                     Clear All
+                  </Button>
+                </div>
+                {/* Per-customer Save button */}
+                <div className="flex justify-end pt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    disabled={isSaving}
+                    onClick={() => onSaveCustomer(section.id)}
+                  >
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save {section.name}
                   </Button>
                 </div>
                 <CustomerAttachments
@@ -1409,6 +1518,19 @@ function CustomerSectionCard({
                       })}
                     </tbody>
                   </table>
+                </div>
+                {/* Per-customer Save button */}
+                <div className="flex justify-end pt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    disabled={isSaving}
+                    onClick={() => onSaveCustomer(section.id)}
+                  >
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save {section.name}
+                  </Button>
                 </div>
                 <CustomerAttachments
                   customerId={section.id}
