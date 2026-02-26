@@ -229,8 +229,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           .eq('managed_services', true)
           .order('name');
 
-        // Use a single placeholder feature so the matrix grid still works
-        const placeholderFeatureId = '__cm_direct__';
+        // Use a deterministic UUID placeholder so the matrix grid works and DB accepts it
+        const placeholderFeatureId = '00000000-0000-0000-0000-000000000000';
         const placeholderFeature = { id: placeholderFeatureId, name: 'Score', description: null, category: null };
 
         const { data: existingScoresDirect } = await supabase
@@ -1085,8 +1085,9 @@ interface CustomerSectionCardProps {
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
+const CM_DIRECT_FEATURE_ID = '00000000-0000-0000-0000-000000000000';
 const isCMDirectMode = (section: CustomerSection) =>
-  section.features.length === 1 && section.features[0].id === '__cm_direct__';
+  section.features.length === 1 && section.features[0].id === CM_DIRECT_FEATURE_ID;
 
 function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
@@ -1104,7 +1105,7 @@ function CustomerSectionCard({
   };
 
   const directMode = isCMDirectMode(section);
-  const placeholderFeatId = '__cm_direct__';
+  const placeholderFeatId = CM_DIRECT_FEATURE_ID;
 
   // For CM direct mode: compute score total (count greens, ambers, reds)
   const getScoreSummary = () => {
