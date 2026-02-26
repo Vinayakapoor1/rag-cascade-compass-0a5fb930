@@ -218,6 +218,41 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
       const allLinkedFeatureIds = new Set<string>();
       Object.values(indFeatureMap).forEach(s => s.forEach(id => allLinkedFeatureIds.add(id)));
+
+      // === CM direct mode: no feature links, show all managed services customers with all indicators ===
+      if (managedServicesOnly && allLinkedFeatureIds.size === 0) {
+        const { data: managedCusts } = await supabase
+          .from('customers')
+          .select('id, name')
+          .eq('managed_services', true)
+          .order('name');
+
+        // Use a single placeholder feature so the matrix grid still works
+        const placeholderFeatureId = '__cm_direct__';
+        const placeholderFeature = { id: placeholderFeatureId, name: 'Score', description: null, category: null };
+
+        const { data: existingScoresDirect } = await supabase
+          .from('csm_customer_feature_scores' as any)
+          .select('*')
+          .in('indicator_id', indIds)
+          .eq('period', period);
+
+        const directSections: CustomerSection[] = (managedCusts || []).map(c => ({
+          id: c.id,
+          name: c.name,
+          features: [placeholderFeature],
+          indicators: indicatorInfos,
+          indicatorFeatureMap: Object.fromEntries(indicatorInfos.map(ind => [ind.id, new Set([placeholderFeatureId])])),
+        }));
+
+        const directScoreMap: ScoreMap = {};
+        (existingScoresDirect || []).forEach((s: any) => {
+          directScoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+        });
+
+        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap };
+      }
+
       if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {} };
 
       const { data: customerFeatures } = await supabase
