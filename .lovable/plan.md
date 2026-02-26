@@ -1,51 +1,44 @@
 
 
-# Per-Customer Save with Final Check-In
+# Animated Save Buttons Across All Data Entry Dashboards
 
-## Problem
-Currently, the entire matrix has a single "Update & Check In" button that saves ALL customers at once, and requires individual skip reasons for every empty customer -- tedious when dealing with many customers.
+## Current State
+The `CSMDataEntryMatrix` component is already shared between both the CSM Data Entry (`/csm/data-entry`) and Content Management Data Entry (`/content-management/data-entry`) pages. The per-customer save functionality is already implemented in the shared component, so **both dashboards already have per-customer saves**.
 
-## Solution
+The remaining request is to make save buttons visually "alive" with animation to draw attention.
 
-### 1. Add a "Save" button inside each customer accordion
-- Each `CustomerSectionCard` gets its own **Save** button (bottom of the expanded card)
-- Clicking it saves only that customer's scores to the database immediately
-- Shows a green checkmark/badge on the customer header once saved for this session
-- No skip reason required at this stage
+## Changes
 
-### 2. Track per-customer save status
-- New state: `savedCustomers: Set<string>` -- tracks which customers have been individually saved in this session
-- When a customer is saved, their ID is added to this set
-- The customer header shows a saved indicator (checkmark icon + "Saved" badge)
+### 1. Add pulse animation to per-customer Save buttons
+**File:** `src/components/user/CSMDataEntryMatrix.tsx`
 
-### 3. Simplify the final "Update & Check In"
-- The global "Update & Check In" button remains at the top
-- When clicked, it aggregates all saved scores, updates KPI indicators, and logs the activity
-- For customers with NO scores and NOT individually saved, instead of asking a reason per customer, show a **single textarea** with a general reason (e.g., "No data available this period") that applies to all skipped customers
-- Option to mark all unsaved/empty customers as "No Change" with one click
+- Detect if a customer has **unsaved changes** (scores differ from originalScores for that customer)
+- When unsaved changes exist and the customer is NOT yet saved, apply a pulse/glow animation to the Save button
+- Once saved (green "Saved" badge appears), stop the animation
 
-### 4. Per-customer save logic
-- The individual save only upserts/deletes scores for that one customer to `csm_customer_feature_scores`
-- It does NOT update indicator aggregates (that happens only on final check-in)
-- Shows a toast: "Saved scores for [Customer Name]"
+### 2. Add pulse animation to the global "Update & Check In" button
+**File:** `src/components/user/CSMDataEntryMatrix.tsx`
 
-## Technical Changes
+- When `hasChanges` is true OR any customers have been individually saved (ready for final check-in), pulse the "Update & Check In" button
+- Use the same animation style for visual consistency
 
-**File: `src/components/user/CSMDataEntryMatrix.tsx`**
+### 3. Add the animation CSS
+**File:** `src/index.css`
 
-- Add `savedCustomers` state and `onSaveCustomer` callback to `CSMDataEntryMatrix`
-- New function `doSaveCustomer(customerId)` -- upserts only that customer's scores
-- Pass `onSaveCustomer` and `isSaved` props to `CustomerSectionCard`
-- Add a Save button at the bottom of each customer's expanded content
-- Show a saved badge on the customer header when saved
-- Simplify skip reason dialog: replace per-customer textareas with a single "General reason for customers without data" textarea that applies to all empty/unsaved customers
-- Keep "Update & Check In" as the final action that does indicator aggregation + compliance check-in
+- Add a `@keyframes save-pulse` animation with a subtle glow effect using the primary color
+- Create a `.animate-save-pulse` utility class
 
-## UX Flow
-1. User expands a customer, fills in scores, clicks "Save" inside that card
-2. Card header shows a green "Saved" badge
-3. Repeat for other customers
-4. Click "Update & Check In" at the top
-5. If any customers have no scores, a single dialog asks for one general reason (not per-customer)
-6. Final save aggregates indicators and logs activity
+### Technical Details
+
+**New helper in CSMDataEntryMatrix:**
+- `customerHasUnsavedChanges(section)` -- compares current scores vs originalScores for that customer's cells, returns true if any differ
+
+**Button styling when active:**
+- Per-customer Save: `animate-pulse ring-2 ring-primary/50 bg-primary text-primary-foreground` (switches from outline to filled + pulse)
+- Update & Check In: `animate-pulse ring-2 ring-primary/50` when savedCustomers.size > 0 or hasChanges
+
+**Props update for CustomerSectionCard:**
+- Add `hasUnsavedChanges: boolean` prop so the card knows whether to animate its Save button
+
+This approach uses Tailwind's built-in `animate-pulse` class combined with ring styling for a clean, attention-grabbing effect without custom CSS.
 
