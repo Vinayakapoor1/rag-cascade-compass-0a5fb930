@@ -955,32 +955,19 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         </div>
       </div>
 
-      {/* Audit Warning Banner */}
-      <div className="relative overflow-hidden rounded-lg border-2 border-destructive/60 bg-gradient-to-r from-destructive/15 via-destructive/10 to-destructive/15 dark:from-destructive/25 dark:via-destructive/15 dark:to-destructive/25 p-4">
-        <div className="flex gap-3">
-          <ShieldAlert className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="font-bold text-destructive text-sm">Legitimate Reason Required for Every Check-In</p>
-            <p className="text-xs text-foreground leading-relaxed">
-              All check-in submissions are audited. You must provide an accurate, verifiable reason when updating or skipping customer data.
-              Generic, vague, or incorrect reasons (e.g. "N/A", "no reason", "test") will be <strong className="text-destructive">flagged for review and escalated to your manager</strong>.
-              Repeated violations may result in restricted platform access.
-            </p>
-          </div>
+      {/* Compact Warning Banners */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 dark:bg-destructive/20 px-3 py-2 flex items-center gap-2.5">
+          <ShieldAlert className="h-4 w-4 text-destructive shrink-0" />
+          <p className="text-xs text-foreground">
+            <strong className="text-destructive">Legit reasons required</strong> — All check-ins are audited. Vague or incorrect reasons will be flagged &amp; escalated.
+          </p>
         </div>
-      </div>
-
-      {/* Save ≠ Check-In Reminder */}
-      <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/15 p-3">
-        <div className="flex gap-2.5 items-start">
-          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-0.5">
-            <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Saving Per Customer Is Not Enough</p>
-            <p className="text-xs text-foreground leading-relaxed">
-              Saving individual customer data only stores your progress locally — <strong>it does not complete your check-in.</strong>{' '}
-              You <strong>must</strong> click <strong>"Update &amp; Check In"</strong> to officially submit your data for the period. Until you do, your check-in is considered incomplete and will be flagged.
-            </p>
-          </div>
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 dark:bg-amber-500/15 px-3 py-2 flex items-center gap-2.5">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-xs text-foreground">
+            <strong className="text-amber-700 dark:text-amber-300">Save ≠ Check-In</strong> — Saving stores progress only. You must click <strong>"Update &amp; Check In"</strong> to submit.
+          </p>
         </div>
       </div>
 

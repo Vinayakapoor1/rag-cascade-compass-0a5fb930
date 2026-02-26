@@ -197,16 +197,12 @@ export default function ContentManagementDataEntry() {
       </div>
 
       {/* Mandatory Check-In Banner */}
-      <div className="banner-shine rounded-xl bg-gradient-to-r from-amber-400 to-yellow-300 dark:from-amber-600 dark:to-yellow-500 px-6 py-4 flex items-start gap-4 shadow-lg">
-        <AlertTriangle className="h-7 w-7 text-amber-900 dark:text-amber-100 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-lg font-extrabold text-amber-950 dark:text-amber-50">
-            Weekly Check-In Required Every Friday
-          </p>
-          <p className="text-sm font-medium text-amber-900/80 dark:text-amber-100/80 mt-1">
-            All team members must complete their data entry and submit a check-in before end of day Friday. Incomplete check-ins will be flagged.
-          </p>
-        </div>
+      <div className="banner-shine rounded-lg bg-gradient-to-r from-amber-400 to-yellow-300 dark:from-amber-600 dark:to-yellow-500 px-4 py-2.5 flex items-center gap-3 shadow-md">
+        <AlertTriangle className="h-5 w-5 text-amber-900 dark:text-amber-100 shrink-0" />
+        <p className="text-sm font-extrabold text-amber-950 dark:text-amber-50">
+          Weekly Check-In Required Every Friday
+          <span className="font-medium ml-2 text-amber-900/80 dark:text-amber-100/80">— Complete data entry &amp; submit before EOD. Incomplete check-ins will be flagged.</span>
+        </p>
       </div>
 
       {/* Instructions Card */}
