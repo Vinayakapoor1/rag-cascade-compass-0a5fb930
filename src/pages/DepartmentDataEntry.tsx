@@ -15,7 +15,7 @@ import { useActivityLog } from '@/hooks/useActivityLog';
 import {
     Save, Loader2, ChevronDown, ChevronRight, Paperclip,
     TrendingUp, Target, Calendar, Filter, CheckCircle2, AlertCircle,
-    History, Upload, Link as LinkIcon, Info, ClipboardCheck
+    History, Upload, Link as LinkIcon, Info, ClipboardCheck, AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
@@ -630,6 +630,14 @@ export default function DepartmentDataEntry() {
                 <Button onClick={() => navigate(`/department/${departmentId}`)} variant="outline">
                     Back to Department
                 </Button>
+            </div>
+
+            {/* Mandatory Check-In Banner */}
+            <div className="rounded-lg border-2 border-destructive/60 bg-destructive/10 px-5 py-3 flex items-center gap-3">
+              <AlertTriangle className="h-6 w-6 text-destructive shrink-0" />
+              <p className="text-sm font-bold text-destructive">
+                Check in Every Friday is mandatory.
+              </p>
             </div>
 
             {/* Tab Switcher */}

@@ -11,7 +11,7 @@ import { CSMDataEntryMatrix } from '@/components/user/CSMDataEntryMatrix';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ClipboardCheck, Calendar as CalendarIcon, Info, ToggleLeft, ToggleRight, HelpCircle, BookOpen } from 'lucide-react';
+import { ClipboardCheck, Calendar as CalendarIcon, Info, ToggleLeft, ToggleRight, HelpCircle, BookOpen, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfWeek, getISOWeek, getYear } from 'date-fns';
 
@@ -276,6 +276,14 @@ export default function CSMDataEntry() {
         </div>
       </div>
 
+      {/* Mandatory Check-In Banner */}
+      <div className="rounded-lg border-2 border-destructive/60 bg-destructive/10 px-5 py-3 flex items-center gap-3">
+        <AlertTriangle className="h-6 w-6 text-destructive shrink-0" />
+        <p className="text-sm font-bold text-destructive">
+          Check in Every Friday is mandatory.
+        </p>
+      </div>
+
       {/* CSM Instructions Card */}
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="p-4">
@@ -289,12 +297,12 @@ export default function CSMDataEntry() {
                 <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month or week using the dropdown or calendar picker.</li>
                 <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their feature × KPI matrix.</li>
                 <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band (e.g. "76-100%" for Adoption).</li>
-                <li><span className="font-medium text-foreground">Use "Apply to Column"</span> — select a band in the column header and click the <strong>copy icon (✓)</strong> to fill all cells in that KPI column at once.</li>
-                <li><span className="font-medium text-foreground">Use "Apply to Row"</span> — select a band in the row's rightmost cell and click the <strong>copy icon (✓)</strong> to fill all KPIs for that feature at once.</li>
-                <li><span className="font-medium text-foreground">Save your entries</span> — click the <strong>Save</strong> button. Your data will be recorded with a timestamp and audit trail.</li>
+                <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the <strong>copy icon (✓)</strong> to bulk-fill cells.</li>
+                <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
+                <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
               </ol>
               <p className="text-xs text-muted-foreground/80 pt-1">
-                💡 <strong>Tip:</strong> A green dot next to a period in the dropdown means data has already been submitted for that period.
+                💡 <strong>Tip:</strong> A green dot next to a period means data has been submitted. A pulsing Save button means you have unsaved changes.
               </p>
             </div>
           </div>
