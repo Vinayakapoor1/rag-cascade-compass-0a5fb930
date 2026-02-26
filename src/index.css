@@ -528,13 +528,51 @@
   }
 }
 
+/* Shining Banner Effect */
+.banner-shine {
+  @apply relative overflow-hidden;
+}
+
+.banner-shine::after {
+  content: '';
+  @apply absolute inset-0 pointer-events-none;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    hsla(0, 0%, 100%, 0.5) 45%,
+    hsla(0, 0%, 100%, 0.7) 50%,
+    hsla(0, 0%, 100%, 0.5) 55%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: banner-shine 3s ease-in-out infinite;
+}
+
+.dark .banner-shine::after {
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    hsla(0, 0%, 100%, 0.2) 45%,
+    hsla(0, 0%, 100%, 0.35) 50%,
+    hsla(0, 0%, 100%, 0.2) 55%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes banner-shine {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .gradient-orb,
   .animate-glow,
   .animate-save-pulse,
-  .shimmer {
+  .shimmer,
+  .banner-shine::after {
     animation: none !important;
   }
 }
