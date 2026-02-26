@@ -186,71 +186,21 @@ export default function Portfolio() {
       .filter(obj => obj.departments.length > 0);
   }, [rawOrgObjectives, isAdmin, isDepartmentHead, user, accessibleDepartments]);
 
-  // Derive feature IDs from the scoped orgObjectives hierarchy
-  const scopedFeatureIds = useMemo(() => {
-    if (!orgObjectives) return new Set<string>();
-    const featureIds = new Set<string>();
-    orgObjectives.forEach(org => {
-      org.departments.forEach(dept => {
-        dept.functional_objectives.forEach(fo => {
-          fo.key_results.forEach(kr => {
-            kr.indicators.forEach(ind => {
-              ind.linkedFeatureIds?.forEach(id => featureIds.add(id));
-            });
-          });
-        });
-      });
-    });
-    return featureIds;
-  }, [orgObjectives]);
-
-  // Fetch customers linked to scoped features via customer_features
-  // For CSMs, further filter to only their assigned customers
-  const [scopedCustomerCount, setScopedCustomerCount] = useState(0);
-  const [csmScopedFeatureCount, setCsmScopedFeatureCount] = useState<number | null>(null);
+  // Fetch accurate customer and feature counts from the database
+  const [scopedCounts, setScopedCounts] = useState({ customers: 0, features: 0 });
   useEffect(() => {
-    if (scopedFeatureIds.size === 0) {
-      setScopedCustomerCount(0);
-      setCsmScopedFeatureCount(null);
-      return;
-    }
-    const fetchScopedCustomers = async () => {
-      const featureIdArr = Array.from(scopedFeatureIds);
-
-      // CSM users: filter by their assigned customers (csm_id)
-      const isCsmScoped = isCSM && !isAdmin && !isDepartmentHead && !!csmId;
-
-      if (isCsmScoped) {
-        const { data } = await supabase
-          .from('customer_features')
-          .select('customer_id, feature_id, customers!inner(csm_id)')
-          .in('feature_id', featureIdArr)
-          .eq('customers.csm_id', csmId);
-        if (data) {
-          const uniqueCustomers = new Set(data.map(r => r.customer_id));
-          const uniqueFeatures = new Set(data.map(r => r.feature_id));
-          setScopedCustomerCount(uniqueCustomers.size);
-          setCsmScopedFeatureCount(uniqueFeatures.size);
-        }
-      } else {
-        const { data } = await supabase
-          .from('customer_features')
-          .select('customer_id')
-          .in('feature_id', featureIdArr);
-        if (data) {
-          const uniqueCustomers = new Set(data.map(r => r.customer_id));
-          setScopedCustomerCount(uniqueCustomers.size);
-        }
-        setCsmScopedFeatureCount(null);
-      }
+    const fetchCounts = async () => {
+      const [customersRes, featuresRes] = await Promise.all([
+        supabase.from('customers').select('id', { count: 'exact', head: true }),
+        supabase.from('features').select('id', { count: 'exact', head: true }),
+      ]);
+      setScopedCounts({
+        customers: customersRes.count ?? 0,
+        features: featuresRes.count ?? 0,
+      });
     };
-    fetchScopedCustomers();
-  }, [scopedFeatureIds, isCSM, isAdmin, isDepartmentHead, csmId]);
-
-  const scopedCounts = useMemo(() => ({
-    customers: scopedCustomerCount,
-    features: csmScopedFeatureCount !== null ? csmScopedFeatureCount : scopedFeatureIds.size,
-  }), [scopedCustomerCount, scopedFeatureIds]);
+    fetchCounts();
+  }, []);
 
   // Calculate portfolio-level stats from ALL indicators across all org objectives
   const portfolioStats = orgObjectives?.reduce((stats, org) => {
