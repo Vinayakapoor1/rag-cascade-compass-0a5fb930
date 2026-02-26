@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CustomerAttachments } from './CustomerAttachments';
@@ -955,6 +955,21 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         </div>
       </div>
 
+      {/* Audit Warning Banner */}
+      <div className="relative overflow-hidden rounded-lg border-2 border-destructive/60 bg-gradient-to-r from-destructive/15 via-destructive/10 to-destructive/15 dark:from-destructive/25 dark:via-destructive/15 dark:to-destructive/25 p-4">
+        <div className="flex gap-3">
+          <ShieldAlert className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold text-destructive text-sm">Legitimate Reason Required for Every Check-In</p>
+            <p className="text-xs text-destructive/80 dark:text-destructive/90 leading-relaxed">
+              All check-in submissions are audited. You must provide an accurate, verifiable reason when updating or skipping customer data.
+              Generic, vague, or incorrect reasons (e.g. "N/A", "no reason", "test") will be <strong>flagged for review and escalated to your manager</strong>.
+              Repeated violations may result in restricted platform access.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Customer sections */}
       {filteredCustomers.map(section => (
           <CustomerSectionCard
@@ -985,40 +1000,49 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-rag-amber" />
-              Reason for Customers Without Data
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              Mandatory: Provide a Legitimate Reason
             </DialogTitle>
             <DialogDescription>
               {getEmptyCustomers().length} customer{getEmptyCustomers().length !== 1 ? 's have' : ' has'} no scores entered.
-              Please provide a general reason that applies to all of them.
+              Provide a genuine, specific reason that applies to all of them.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3">
+              <p className="text-xs font-semibold text-destructive flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                This reason is logged and audited
+              </p>
+              <p className="text-xs text-destructive/80 mt-1">
+                Inaccurate or placeholder reasons will be flagged and escalated to your manager.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {getEmptyCustomers().map(c => (
                 <Badge key={c.id} variant="outline" className="text-xs">{c.name}</Badge>
               ))}
             </div>
-            <Textarea
-              placeholder="e.g. No data available this period, Customers on hold, Awaiting responses..."
-              value={generalSkipReason}
-              onChange={e => setGeneralSkipReason(e.target.value)}
-              className="min-h-[80px] text-sm"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              onClick={() => setGeneralSkipReason('No data available this period')}
-            >
-              Use "No data available this period"
-            </Button>
+            <div className="space-y-1">
+              <Textarea
+                placeholder="Provide a specific, verifiable reason (minimum 10 characters)..."
+                value={generalSkipReason}
+                onChange={e => setGeneralSkipReason(e.target.value)}
+                className="min-h-[80px] text-sm"
+              />
+              <p className={cn(
+                "text-xs text-right",
+                generalSkipReason.trim().length < 10 ? "text-destructive" : "text-muted-foreground"
+              )}>
+                {generalSkipReason.trim().length}/10 characters minimum
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSkipReasonDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={confirmSkipAndSave}>
+            <Button onClick={confirmSkipAndSave} disabled={generalSkipReason.trim().length < 10}>
               Confirm & Continue
             </Button>
           </DialogFooter>
