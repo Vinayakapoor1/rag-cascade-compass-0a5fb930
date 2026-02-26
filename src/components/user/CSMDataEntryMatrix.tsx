@@ -1414,7 +1414,7 @@ function CustomerSectionCard({
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-base">{section.name}</CardTitle>
                     {cmIndicators.length > 0 && (
-                      <Badge variant="outline" className="text-xs border-primary/40 bg-primary/10 text-primary">CM</Badge>
+                      <Badge className="text-xs bg-primary/15 text-primary border-none">CM</Badge>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -1887,7 +1887,7 @@ function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellCh
   return (
     <Collapsible open={cmOpen} onOpenChange={setCmOpen} className="mt-4">
       <CollapsibleTrigger asChild>
-        <Button variant="outline" className="w-full justify-between gap-2 text-sm font-semibold border-l-4 border-l-primary bg-primary/5 hover:bg-primary/10">
+        <Button variant="ghost" className="w-full justify-between gap-2 text-sm font-semibold border-l-4 border-l-primary bg-primary/5 hover:bg-primary/10">
           <span className="flex items-center gap-2">
             {cmOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             Content Management Indicators
