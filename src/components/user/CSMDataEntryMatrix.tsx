@@ -1452,12 +1452,12 @@ function CustomerSectionCard({
             {directMode ? (
               /* ===== CM Direct Mode: Simple KPI list with dropdowns and score total ===== */
               <div className="space-y-4">
-                <div className="overflow-x-auto border rounded-md">
+                <div className="overflow-x-auto border border-border/20 rounded-md">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
-                        <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
+                        <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r border-border/20">KPI</th>
+                        <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r border-border/20">Score</th>
                         <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
                       </tr>
                     </thead>
@@ -1469,8 +1469,8 @@ function CustomerSectionCard({
                         const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
 
                         return (
-                          <tr key={ind.id} className="border-t hover:bg-muted/20 transition-colors">
-                            <td className="px-3 py-2 font-medium text-xs border-r">
+                          <tr key={ind.id} className="border-t border-border/20 hover:bg-muted/20 transition-colors">
+                            <td className="px-3 py-2 font-medium text-xs border-r border-border/20">
                               <TooltipProvider>
                                 <Tooltip delayDuration={0}>
                                   <TooltipTrigger asChild>
@@ -1485,7 +1485,7 @@ function CustomerSectionCard({
                                 </Tooltip>
                               </TooltipProvider>
                             </td>
-                            <td className={cn('px-2 py-1.5 text-center border-r', cellBg)}>
+                            <td className={cn('px-2 py-1.5 text-center border-r border-border/20', cellBg)}>
                               <BandDropdown
                                 value={val}
                                 bands={getBandsForIndicator(ind.id)}
@@ -1504,9 +1504,9 @@ function CustomerSectionCard({
                       })}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t-2 bg-muted/30 font-semibold">
-                        <td className="px-3 py-2 text-sm border-r">Score Total</td>
-                        <td className="px-3 py-2 text-center text-xs border-r" colSpan={2}>
+                      <tr className="border-t-2 border-border/30 bg-muted/30 font-semibold">
+                        <td className="px-3 py-2 text-sm border-r border-border/20">Score Total</td>
+                        <td className="px-3 py-2 text-center text-xs border-r border-border/20" colSpan={2}>
                           {(() => {
                             const { greens, ambers, reds, total } = getScoreSummary();
                             if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
@@ -1596,33 +1596,33 @@ function CustomerSectionCard({
             ) : (
               /* ===== Standard Feature × KPI Matrix ===== */
               <div>
-                <div className="overflow-x-auto border rounded-md">
+                <div className="overflow-x-auto border border-border/20 rounded-md">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r">
+                        <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r border-border/20">
                           Feature
                         </th>
                         {section.indicators.map(ind => (
-                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
+                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={`${ind.fo_name} → ${ind.kr_name}`}>
                             <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
                           </th>
                         ))}
                         <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
                           Avg
                         </th>
-                        <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l">
+                        <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l border-border/20">
                           <span className="text-xs text-muted-foreground">Apply to Row</span>
                         </th>
                       </tr>
-                      <tr className="bg-muted/20 border-t">
-                        <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r">
+                      <tr className="bg-muted/20 border-t border-border/20">
+                        <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r border-border/20">
                           Apply to Column ↓
                         </td>
                         {section.indicators.map(ind => {
                           const bands = getBandsForIndicator(ind.id);
                           return (
-                            <td key={ind.id} className="px-1 py-1 text-center border-r">
+                            <td key={ind.id} className="px-1 py-1 text-center border-r border-border/20">
                               <div className="flex items-center gap-0.5 justify-center">
                                 <Select
                                   value={applyColBand[ind.id] || 'unset'}
@@ -1683,7 +1683,7 @@ function CustomerSectionCard({
                           );
                         })}
                         <td className="bg-muted/10" />
-                        <td className="bg-muted/10 border-l" />
+                        <td className="bg-muted/10 border-l border-border/20" />
                       </tr>
                     </thead>
                     <tbody>
@@ -1692,8 +1692,8 @@ function CustomerSectionCard({
                         const rowRag = rowAvg != null ? percentToRAG(Math.round(rowAvg)) : null;
 
                         return (
-                          <tr key={feat.id} className="border-t hover:bg-muted/20 transition-colors">
-                            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium text-xs border-r">
+                          <tr key={feat.id} className="border-t border-border/20 hover:bg-muted/20 transition-colors">
+                            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium text-xs border-r border-border/20">
                               <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
                                   <span className="cursor-help border-b border-dotted border-muted-foreground/40">
@@ -1714,7 +1714,7 @@ function CustomerSectionCard({
 
                               if (!canEdit) {
                                 return (
-                                  <td key={ind.id} className="px-2 py-1.5 text-center border-r">
+                                  <td key={ind.id} className="px-2 py-1.5 text-center border-r border-border/20">
                                     <span className="text-muted-foreground/30 text-xs">—</span>
                                   </td>
                                 );
@@ -1724,7 +1724,7 @@ function CustomerSectionCard({
                               const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
 
                               return (
-                                <td key={ind.id} className={cn('px-1 py-1 text-center border-r', cellBg)}>
+                                <td key={ind.id} className={cn('px-1 py-1 text-center border-r border-border/20', cellBg)}>
                                   <BandDropdown
                                     value={val ?? null}
                                     bands={getBandsForIndicator(ind.id)}
@@ -1742,7 +1742,7 @@ function CustomerSectionCard({
                                 <span className="text-muted-foreground/40 text-xs">—</span>
                               )}
                             </td>
-                            <td className="px-1 py-1 text-center border-l">
+                            <td className="px-1 py-1 text-center border-l border-border/20">
                               <div className="flex items-center gap-0.5 justify-center">
                                 {/* Apply to Row uses the first indicator's bands as representative */}
                                 <Select
