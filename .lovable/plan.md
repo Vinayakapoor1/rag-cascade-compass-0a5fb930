@@ -1,43 +1,41 @@
 
 
-# Clear Content Management Indicator Data
+# Fix: CSM Data Entry Not Showing All Scores (1000-Row Limit)
 
 ## Problem
-The Content Management department's indicators have pre-filled `current_value` and `rag_status` values (e.g., 100/green, 50/red) that are not based on actual CSM-entered scores. These show up on the Content Management department detail page as filled data.
+The CSM Data Entry matrix is not displaying previously entered scores for some customers (e.g., DCB Bank). The data exists in the database (2,451 rows for period 2026-02), but the queries fetching existing scores are hitting the default 1,000-row limit, causing scores to be silently dropped.
 
-## What Will Be Done
+## Root Cause
+The database has a default query limit of 1,000 rows. The score-fetching queries in `CSMDataEntryMatrix.tsx` do not override this limit, so only the first 1,000 score rows are returned. Customers whose scores fall beyond row 1,000 appear as if they have no data.
 
-### Database: Reset CM indicator values
-Run a single SQL migration to set all Content Management indicators back to their default/empty state:
+## Fix
 
-- Set `current_value` to `0` (or `NULL`) for all 10 CM indicators
-- Set `rag_status` to `'grey'` (no data) for all 10 CM indicators
+### File: `src/components/user/CSMDataEntryMatrix.tsx`
 
-The affected indicators:
-- Expansion Pipeline Influence (currently 100/green)
-- Release Timeliness Rate (currently 100/green)
-- Asset Launch Count vs Target (currently 100/green)
-- Completion Depth within 30 days (currently 100/green)
-- Avg. Production Cycle Time (currently 100/green)
-- Content Engagement Coverage (currently 50/red)
-- Pack Launch Count vs Target (currently 50/red)
-- Rights Management Compliance (currently 50/red)
-- Production Cost per Asset (currently 50/red)
-- Version Control Enforcement (currently 50/red)
+Add `.limit(10000)` to all queries that fetch from `csm_customer_feature_scores` to ensure all rows are returned. There are 3 locations:
 
-### SQL Statement
-```sql
-UPDATE indicators
-SET current_value = 0, rag_status = 'grey'
-WHERE id IN (
-  SELECT i.id
-  FROM indicators i
-  JOIN key_results kr ON kr.id = i.key_result_id
-  JOIN functional_objectives fo ON fo.id = kr.functional_objective_id
-  JOIN departments d ON d.id = fo.department_id
-  WHERE d.name = 'Content Management'
-);
-```
+1. **Line ~248-252** (Content Management direct scores query):
+   ```typescript
+   const { data: existingScoresDirect } = await supabase
+     .from('csm_customer_feature_scores' as any)
+     .select('*')
+     .in('indicator_id', indIds)
+     .eq('period', period)
+     .limit(10000);  // <-- ADD
+   ```
 
-No code changes needed -- this is a data-only fix.
+2. **Line ~302-306** (Main feature matrix scores query):
+   ```typescript
+   const { data: existingScores } = await supabase
+     .from('csm_customer_feature_scores' as any)
+     .select('*')
+     .in('indicator_id', indIds)
+     .eq('period', period)
+     .limit(10000);  // <-- ADD
+   ```
+
+3. **Line ~407-412** (CM sub-section scores query -- need to verify exact location):
+   Same pattern -- add `.limit(10000)` to any remaining `csm_customer_feature_scores` fetch queries.
+
+This is a one-file fix. No database changes needed. The data is intact; it just needs to be fully loaded.
 
