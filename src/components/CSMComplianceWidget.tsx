@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, CheckCircle2, Clock, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Users, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -165,6 +166,14 @@ export function CSMComplianceWidget() {
                   ))}
                 </div>
               )}
+              <div className="pt-2">
+                <Button asChild variant="outline" size="sm" className="w-full gap-1.5">
+                  <Link to="/compliance-report">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View Full Compliance Report
+                  </Link>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </CollapsibleContent>
