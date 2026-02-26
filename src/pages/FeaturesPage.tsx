@@ -16,35 +16,49 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function FeaturesPage() {
-  const { isAdmin, isDepartmentHead, isCSM, csmId } = useAuth();
+  const { isAdmin, isDepartmentHead, isCSM, isContentManager, csmId } = useAuth();
   const { data: allFeatures, isLoading, refetch } = useFeaturesWithImpact();
 
-  // For CSMs, fetch their assigned customer feature IDs to scope the list
-  const [csmFeatureIds, setCsmFeatureIds] = useState<Set<string> | null>(null);
+  // For CSMs or Content Managers, fetch scoped feature IDs
+  const [scopedFeatureIds, setScopedFeatureIds] = useState<Set<string> | null>(null);
+  const isCMScoped = isContentManager && !isAdmin;
+  const isCsmScoped = isCSM && !isAdmin && !isDepartmentHead && !!csmId;
+
   useEffect(() => {
-    if (!isCSM || isAdmin || isDepartmentHead || !csmId) {
-      setCsmFeatureIds(null);
+    if (!isCMScoped && !isCsmScoped) {
+      setScopedFeatureIds(null);
       return;
     }
-    const fetchCsmFeatures = async () => {
-      const { data } = await supabase
-        .from('customer_features')
-        .select('feature_id, customers!inner(csm_id)')
-        .eq('customers.csm_id', csmId);
-      if (data) {
-        setCsmFeatureIds(new Set(data.map(r => r.feature_id)));
+    const fetchScopedFeatures = async () => {
+      if (isCMScoped) {
+        // Content managers: features linked to managed_services customers
+        const { data } = await supabase
+          .from('customer_features')
+          .select('feature_id, customers!inner(managed_services)')
+          .eq('customers.managed_services', true);
+        if (data) {
+          setScopedFeatureIds(new Set(data.map(r => r.feature_id)));
+        }
+      } else if (isCsmScoped) {
+        const { data } = await supabase
+          .from('customer_features')
+          .select('feature_id, customers!inner(csm_id)')
+          .eq('customers.csm_id', csmId);
+        if (data) {
+          setScopedFeatureIds(new Set(data.map(r => r.feature_id)));
+        }
       }
     };
-    fetchCsmFeatures();
-  }, [isCSM, isAdmin, isDepartmentHead, csmId]);
+    fetchScopedFeatures();
+  }, [isCMScoped, isCsmScoped, csmId]);
 
   const features = useMemo(() => {
     if (!allFeatures) return allFeatures;
-    if (csmFeatureIds) {
-      return allFeatures.filter(f => csmFeatureIds.has(f.id));
+    if (scopedFeatureIds) {
+      return allFeatures.filter(f => scopedFeatureIds.has(f.id));
     }
     return allFeatures;
-  }, [allFeatures, csmFeatureIds]);
+  }, [allFeatures, scopedFeatureIds]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');

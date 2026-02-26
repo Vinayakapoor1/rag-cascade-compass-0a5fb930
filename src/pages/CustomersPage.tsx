@@ -85,17 +85,22 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
 }
 
 export default function CustomersPage() {
-  const { isAdmin, isDepartmentHead, isCSM, csmId } = useAuth();
+  const { isAdmin, isDepartmentHead, isCSM, isContentManager, csmId } = useAuth();
   const { data: allCustomers, isLoading, refetch } = useCustomersWithImpact();
 
-  // CSM users see only their assigned customers
+  // Scope customers by role:
+  // - Content managers (non-admin): only managed_services customers
+  // - CSMs (non-admin): only their assigned customers
   const customers = useMemo(() => {
     if (!allCustomers) return allCustomers;
+    if (isContentManager && !isAdmin) {
+      return allCustomers.filter(c => c.managedServices === true);
+    }
     if (isCSM && !isAdmin && !isDepartmentHead && csmId) {
       return allCustomers.filter(c => c.csmId === csmId);
     }
     return allCustomers;
-  }, [allCustomers, isCSM, isAdmin, isDepartmentHead, csmId]);
+  }, [allCustomers, isCSM, isAdmin, isDepartmentHead, isContentManager, csmId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
