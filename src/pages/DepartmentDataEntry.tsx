@@ -106,6 +106,7 @@ export default function DepartmentDataEntry() {
     const { logActivity } = useActivityLog();
 
     const [department, setDepartment] = useState<{ id: string; name: string } | null>(null);
+    const isContentManagementDept = department?.name === 'Content Management';
     const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [updates, setUpdates] = useState<Record<string, IndicatorUpdate>>({});
     const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
@@ -645,11 +646,11 @@ export default function DepartmentDataEntry() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
                     <TabsTrigger value="per-indicator">Per Indicator</TabsTrigger>
-                    <TabsTrigger value="feature-matrix">Feature Matrix</TabsTrigger>
+                    <TabsTrigger value="feature-matrix">{isContentManagementDept ? 'Indicator Matrix' : 'Feature Matrix'}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="feature-matrix">
-                    <CSMDataEntryMatrix departmentId={departmentId!} period={period} />
+                    <CSMDataEntryMatrix departmentId={departmentId!} period={period} managedServicesOnly={isContentManagementDept} />
                 </TabsContent>
 
                 <TabsContent value="per-indicator">
