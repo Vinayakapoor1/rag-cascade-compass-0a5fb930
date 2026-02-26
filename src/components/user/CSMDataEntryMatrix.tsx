@@ -961,10 +961,24 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           <ShieldAlert className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="font-bold text-destructive text-sm">Legitimate Reason Required for Every Check-In</p>
-            <p className="text-xs text-destructive/80 dark:text-destructive/90 leading-relaxed">
+            <p className="text-xs text-foreground leading-relaxed">
               All check-in submissions are audited. You must provide an accurate, verifiable reason when updating or skipping customer data.
-              Generic, vague, or incorrect reasons (e.g. "N/A", "no reason", "test") will be <strong>flagged for review and escalated to your manager</strong>.
+              Generic, vague, or incorrect reasons (e.g. "N/A", "no reason", "test") will be <strong className="text-destructive">flagged for review and escalated to your manager</strong>.
               Repeated violations may result in restricted platform access.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Save ≠ Check-In Reminder */}
+      <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/15 p-3">
+        <div className="flex gap-2.5 items-start">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Saving Per Customer Is Not Enough</p>
+            <p className="text-xs text-foreground leading-relaxed">
+              Saving individual customer data only stores your progress locally — <strong>it does not complete your check-in.</strong>{' '}
+              You <strong>must</strong> click <strong>"Update &amp; Check In"</strong> to officially submit your data for the period. Until you do, your check-in is considered incomplete and will be flagged.
             </p>
           </div>
         </div>
