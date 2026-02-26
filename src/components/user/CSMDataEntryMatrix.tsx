@@ -150,23 +150,35 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         if (csmRow) csmId = csmRow.id;
       }
 
+      // Fetch Content Management department ID (for CM sub-section)
+      let cmDeptId: string | null = null;
+      {
+        const { data: cmDept } = await supabase
+          .from('departments')
+          .select('id')
+          .eq('name', 'Content Management')
+          .maybeSingle();
+        if (cmDept) cmDeptId = cmDept.id;
+      }
+      const isCMDepartment = cmDeptId === departmentId;
+
       const { data: fos } = await supabase
         .from('functional_objectives')
         .select('id, name')
         .eq('department_id', departmentId);
-      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {} };
+      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
 
       const { data: krs } = await supabase
         .from('key_results')
         .select('id, name, functional_objective_id')
         .in('functional_objective_id', fos.map(f => f.id));
-      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {} };
+      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
 
       const { data: indicators } = await supabase
         .from('indicators')
         .select('id, name, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
-      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {} };
+      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
 
       const indIds = indicators.map(i => i.id);
       const krMap = new Map(krs.map(k => [k.id, k]));
@@ -252,10 +264,10 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           directScoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
         });
 
-        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap };
+        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
       }
 
-      if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {} };
+      if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
 
       const { data: customerFeatures } = await supabase
         .from('customer_features')
@@ -335,7 +347,91 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
       });
 
-      return { sections, indicators: indicatorInfos, bands: bandsMap, scores: scoreMap };
+      // Fetch CM department data for sub-section (skip if current dept IS CM or managedServicesOnly)
+      let cmIndicatorInfos: IndicatorInfo[] = [];
+      let cmBandsMap: BandMap = {};
+
+      if (cmDeptId && !isCMDepartment && !managedServicesOnly) {
+        const { data: cmFos } = await supabase
+          .from('functional_objectives')
+          .select('id, name')
+          .eq('department_id', cmDeptId);
+
+        if (cmFos?.length) {
+          const { data: cmKrs } = await supabase
+            .from('key_results')
+            .select('id, name, functional_objective_id')
+            .in('functional_objective_id', cmFos.map(f => f.id));
+
+          if (cmKrs?.length) {
+            const cmKrMap = new Map(cmKrs.map(k => [k.id, k]));
+            const cmFoMap = new Map(cmFos.map(f => [f.id, f]));
+
+            const { data: cmInds } = await supabase
+              .from('indicators')
+              .select('id, name, current_value, target_value, key_result_id')
+              .in('key_result_id', cmKrs.map(k => k.id));
+
+            if (cmInds?.length) {
+              cmIndicatorInfos = cmInds.map(ind => {
+                const kr = cmKrMap.get(ind.key_result_id!);
+                const fo = kr ? cmFoMap.get(kr.functional_objective_id!) : undefined;
+                return {
+                  id: ind.id,
+                  name: ind.name,
+                  current_value: ind.current_value != null ? Number(ind.current_value) : null,
+                  target_value: ind.target_value != null ? Number(ind.target_value) : null,
+                  kr_name: kr?.name || '',
+                  fo_name: fo?.name || '',
+                };
+              });
+
+              const cmIndIds = cmInds.map(i => i.id);
+
+              const { data: cmBandsData } = await supabase
+                .from('kpi_rag_bands')
+                .select('indicator_id, band_label, rag_color, rag_numeric, sort_order')
+                .in('indicator_id', cmIndIds)
+                .order('sort_order');
+
+              (cmBandsData || []).forEach((b: any) => {
+                if (!cmBandsMap[b.indicator_id]) cmBandsMap[b.indicator_id] = [];
+                cmBandsMap[b.indicator_id].push({
+                  band_label: b.band_label,
+                  rag_color: b.rag_color,
+                  rag_numeric: Number(b.rag_numeric),
+                  sort_order: b.sort_order,
+                });
+              });
+
+              // Fetch existing CM scores for customers in this matrix
+              const custIds = sections.map(s => s.id);
+              if (custIds.length > 0) {
+                const { data: cmScores } = await supabase
+                  .from('csm_customer_feature_scores' as any)
+                  .select('*')
+                  .in('indicator_id', cmIndIds)
+                  .in('customer_id', custIds)
+                  .eq('period', period);
+
+                (cmScores || []).forEach((s: any) => {
+                  scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+                });
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        sections,
+        indicators: indicatorInfos,
+        bands: bandsMap,
+        scores: scoreMap,
+        cmIndicators: cmIndicatorInfos,
+        cmBands: cmBandsMap,
+        cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly ? cmDeptId : null,
+      };
     },
     enabled: !!departmentId && !!user,
     staleTime: 30 * 1000,
@@ -346,6 +442,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const customerSections = matrixData?.sections ?? [];
   const allIndicators = matrixData?.indicators ?? [];
   const kpiBands = matrixData?.bands ?? {};
+  const cmIndicators = matrixData?.cmIndicators ?? [];
+  const cmBands = matrixData?.cmBands ?? {};
+  const cmDepartmentId = matrixData?.cmDepartmentId ?? null;
 
   // Initialize scores from query data only once per query result
   useEffect(() => {
@@ -507,6 +606,28 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         }
       }
 
+      // Also collect CM indicator scores
+      if (cmIndicators.length > 0) {
+        const placeholderFeatureId = CM_DIRECT_FEATURE_ID;
+        for (const ind of cmIndicators) {
+          const key = cellKey(ind.id, section.id, placeholderFeatureId);
+          const val = scores[key];
+          const origVal = originalScores[key];
+          if (val != null) {
+            upserts.push({
+              indicator_id: ind.id,
+              customer_id: section.id,
+              feature_id: placeholderFeatureId,
+              value: val,
+              period,
+              created_by: user.id,
+            });
+          } else if (origVal != null && val === undefined) {
+            deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: placeholderFeatureId });
+          }
+        }
+      }
+
       for (const del of deletes) {
         await supabase
           .from('csm_customer_feature_scores' as any)
@@ -535,6 +656,15 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
             const feats = section.indicatorFeatureMap[ind.id];
             if (!feats?.has(feat.id)) continue;
             const key = cellKey(ind.id, section.id, feat.id);
+            if (scores[key] != null) next[key] = scores[key];
+            else delete next[key];
+          }
+        }
+        // Also update CM original scores
+        if (cmIndicators.length > 0) {
+          const placeholderFeatureId = CM_DIRECT_FEATURE_ID;
+          for (const ind of cmIndicators) {
+            const key = cellKey(ind.id, section.id, placeholderFeatureId);
             if (scores[key] != null) next[key] = scores[key];
             else delete next[key];
           }
@@ -602,8 +732,28 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 created_by: user.id,
               });
             } else if (origVal != null && val === undefined) {
-              // Was set before, now cleared → delete from DB
               deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: feat.id });
+            }
+          }
+        }
+        // Also collect CM indicator scores for this customer
+        if (cmIndicators.length > 0) {
+          const placeholderFeatureId = CM_DIRECT_FEATURE_ID;
+          for (const ind of cmIndicators) {
+            const key = cellKey(ind.id, section.id, placeholderFeatureId);
+            const val = scores[key];
+            const origVal = originalScores[key];
+            if (val != null) {
+              upserts.push({
+                indicator_id: ind.id,
+                customer_id: section.id,
+                feature_id: placeholderFeatureId,
+                value: val,
+                period,
+                created_by: user.id,
+              });
+            } else if (origVal != null && val === undefined) {
+              deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: placeholderFeatureId });
             }
           }
         }
@@ -644,8 +794,20 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
             }
           }
         }
+        // Also aggregate CM indicator scores
+        if (cmIndicators.length > 0) {
+          const placeholderFeatureId = CM_DIRECT_FEATURE_ID;
+          for (const ind of cmIndicators) {
+            const v = scores[cellKey(ind.id, section.id, placeholderFeatureId)];
+            if (v != null) {
+              if (!indicatorAggregates.has(ind.id)) indicatorAggregates.set(ind.id, []);
+              indicatorAggregates.get(ind.id)!.push(v);
+            }
+          }
+        }
       }
 
+      // Update main department indicators
       for (const ind of allIndicators) {
         const vals = indicatorAggregates.get(ind.id);
         if (!vals?.length) continue;
@@ -679,6 +841,46 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
             department_id: departmentId,
             period,
             source: 'customer_feature_matrix',
+            aggregate_percentage: aggPercentage,
+            rag_status: ragStatus,
+          },
+        });
+      }
+
+      // Update CM indicators
+      for (const ind of cmIndicators) {
+        const vals = indicatorAggregates.get(ind.id);
+        if (!vals?.length) continue;
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const aggPercentage = Math.round(avg * 100 * 100) / 100;
+        const ragStatus = percentToRAG(aggPercentage);
+
+        await supabase
+          .from('indicators')
+          .update({ current_value: aggPercentage, target_value: 100, rag_status: ragStatus })
+          .eq('id', ind.id);
+
+        await supabase
+          .from('indicator_history')
+          .insert({
+            indicator_id: ind.id,
+            value: aggPercentage,
+            period,
+            notes: 'Updated via CSM Matrix — Content Management sub-section',
+            created_by: user.id,
+          });
+
+        await logActivity({
+          action: 'update',
+          entityType: 'indicator',
+          entityId: ind.id,
+          entityName: ind.name,
+          oldValue: { current_value: ind.current_value },
+          newValue: { current_value: aggPercentage },
+          metadata: {
+            department_id: cmDepartmentId,
+            period,
+            source: 'customer_feature_matrix_cm_subsection',
             aggregate_percentage: aggPercentage,
             rag_status: ragStatus,
           },
@@ -744,6 +946,23 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 indicator_id: ind.id,
                 customer_id: section.id,
                 feature_id: fid,
+                value: val,
+                period,
+                created_by: user.id,
+              });
+            }
+          }
+        }
+        // Also include CM indicator scores
+        if (cmIndicators.length > 0) {
+          const placeholderFeatureId = CM_DIRECT_FEATURE_ID;
+          for (const ind of cmIndicators) {
+            const val = scores[cellKey(ind.id, section.id, placeholderFeatureId)];
+            if (val != null) {
+              existingUpserts.push({
+                indicator_id: ind.id,
+                customer_id: section.id,
+                feature_id: placeholderFeatureId,
                 value: val,
                 period,
                 created_by: user.id,
@@ -853,8 +1072,16 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         if (scores[key] !== originalScores[key]) return true;
       }
     }
+    // Also check CM indicator keys
+    if (cmIndicators.length > 0) {
+      const placeholderFeatureId = CM_DIRECT_FEATURE_ID;
+      for (const ind of cmIndicators) {
+        const key = cellKey(ind.id, section.id, placeholderFeatureId);
+        if (scores[key] !== originalScores[key]) return true;
+      }
+    }
     return false;
-  }, [scores, originalScores]);
+  }, [scores, originalScores, cmIndicators]);
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm) return customerSections;
@@ -993,6 +1220,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           isSaving={savingCustomerId === section.id}
           onSaveCustomer={doSaveCustomer}
           hasUnsavedChanges={customerHasUnsavedChanges(section)}
+          cmIndicators={cmIndicators}
+          cmBands={cmBands}
         />
       ))}
 
@@ -1129,6 +1358,8 @@ interface CustomerSectionCardProps {
   isSaving: boolean;
   onSaveCustomer: (customerId: string) => Promise<void>;
   hasUnsavedChanges: boolean;
+  cmIndicators: IndicatorInfo[];
+  cmBands: BandMap;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1140,6 +1371,7 @@ function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
   departmentId, period, isSaved, isSaving, onSaveCustomer, hasUnsavedChanges,
+  cmIndicators, cmBands,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
@@ -1570,6 +1802,18 @@ function CustomerSectionCard({
                     </tbody>
                   </table>
                 </div>
+
+                {/* ===== Content Management Indicators Sub-Section ===== */}
+                {cmIndicators.length > 0 && (
+                  <CMSubSectionBlock
+                    customerId={section.id}
+                    cmIndicators={cmIndicators}
+                    cmBands={cmBands}
+                    scores={scores}
+                    onCellChange={onCellChange}
+                  />
+                )}
+
                 {/* Per-customer Save button */}
                 <div className="flex justify-end pt-2">
                   <Button
@@ -1597,5 +1841,184 @@ function CustomerSectionCard({
         </CollapsibleContent>
       </Collapsible>
     </Card>
+  );
+}
+
+// ============= CM Sub-Section Block =============
+
+interface CMSubSectionBlockProps {
+  customerId: string;
+  cmIndicators: IndicatorInfo[];
+  cmBands: BandMap;
+  scores: ScoreMap;
+  onCellChange: (indicatorId: string, customerId: string, featureId: string, value: string) => void;
+}
+
+function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellChange }: CMSubSectionBlockProps) {
+  const [cmOpen, setCmOpen] = useState(false);
+  const placeholderFeatId = CM_DIRECT_FEATURE_ID;
+
+  const getBandsForIndicator = (indId: string): KPIBand[] => {
+    return cmBands[indId] || DEFAULT_BANDS;
+  };
+
+  const getScoreSummary = () => {
+    let greens = 0, ambers = 0, reds = 0, total = 0;
+    for (const ind of cmIndicators) {
+      const key = cellKey(ind.id, customerId, placeholderFeatId);
+      const val = scores[key];
+      if (val != null) {
+        total++;
+        if (val === 1) greens++;
+        else if (val === 0.5) ambers++;
+        else if (val === 0) reds++;
+      }
+    }
+    return { greens, ambers, reds, total };
+  };
+
+  const { total } = getScoreSummary();
+
+  return (
+    <Collapsible open={cmOpen} onOpenChange={setCmOpen} className="mt-4">
+      <CollapsibleTrigger asChild>
+        <Button variant="outline" className="w-full justify-between gap-2 text-sm font-semibold">
+          <span className="flex items-center gap-2">
+            {cmOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            Content Management Indicators
+          </span>
+          <Badge variant="secondary" className="text-xs">
+            {total}/{cmIndicators.length} scored
+          </Badge>
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3">
+        <div className="space-y-3">
+          <div className="overflow-x-auto border rounded-md">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
+                  <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
+                  <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cmIndicators.map(ind => {
+                  const key = cellKey(ind.id, customerId, placeholderFeatId);
+                  const val = scores[key] ?? null;
+                  const ragColor = val != null ? weightToRAGColor(val) : '';
+                  const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
+
+                  return (
+                    <tr key={ind.id} className="border-t hover:bg-muted/20 transition-colors">
+                      <td className="px-3 py-2 font-medium text-xs border-r">
+                        <TooltipProvider>
+                          <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help border-b border-dotted border-muted-foreground/40">
+                                {ind.name}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="font-semibold text-sm">{ind.name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{ind.fo_name} → {ind.kr_name}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </td>
+                      <td className={cn('px-2 py-1.5 text-center border-r', cellBg)}>
+                        <BandDropdown
+                          value={val}
+                          bands={getBandsForIndicator(ind.id)}
+                          onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-center">
+                        {val != null ? (
+                          <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
+                        ) : (
+                          <span className="text-muted-foreground/40 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 bg-muted/30 font-semibold">
+                  <td className="px-3 py-2 text-sm border-r">Score Total</td>
+                  <td className="px-3 py-2 text-center text-xs border-r" colSpan={2}>
+                    {(() => {
+                      const { greens, ambers, reds, total } = getScoreSummary();
+                      if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
+                      const score = ((greens * 1 + ambers * 0.5 + reds * 0) / cmIndicators.length) * 100;
+                      return (
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="flex items-center gap-1">
+                            <span className={cn('h-2.5 w-2.5 rounded-full', RAG_DOT_CLASS.green)} />
+                            {greens}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className={cn('h-2.5 w-2.5 rounded-full', RAG_DOT_CLASS.amber)} />
+                            {ambers}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className={cn('h-2.5 w-2.5 rounded-full', RAG_DOT_CLASS.red)} />
+                            {reds}
+                          </span>
+                          <Badge className={cn(RAG_BADGE_STYLES[percentToRAG(Math.round(score))], 'text-[10px] ml-2')}>
+                            {Math.round(score)}%
+                          </Badge>
+                        </div>
+                      );
+                    })()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {/* Apply All row for CM sub-section */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-medium">Apply to all CM KPIs:</span>
+            {[
+              { label: 'Green', value: 1, color: 'green' },
+              { label: 'Amber', value: 0.5, color: 'amber' },
+              { label: 'Red', value: 0, color: 'red' },
+            ].map(opt => (
+              <Button
+                key={opt.label}
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs gap-1"
+                onClick={() => {
+                  for (const ind of cmIndicators) {
+                    onCellChange(ind.id, customerId, placeholderFeatId, String(opt.value));
+                  }
+                  toast.success(`Applied ${opt.label} to all CM KPIs`);
+                }}
+              >
+                <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[opt.color])} />
+                {opt.label}
+              </Button>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+              onClick={() => {
+                for (const ind of cmIndicators) {
+                  onCellChange(ind.id, customerId, placeholderFeatId, 'unset');
+                }
+                toast.success('Cleared all CM KPIs');
+              }}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear All
+            </Button>
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
