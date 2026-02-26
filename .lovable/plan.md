@@ -1,38 +1,48 @@
 
 
-# Prominent "Legit Reason Required" Warning for Check-In
+# Add Content Management Indicators as Sub-Section in CSM Data Entry
+
+## Overview
+Add a collapsible "Content Management Indicators" sub-section inside each customer accordion in the CSM Feature Matrix. This section will appear for **all customers assigned to the CSM** (based on existing `csm_id` mapping), NOT filtered by `managed_services`. Every customer the CSM manages will have CM indicator scoring available.
 
 ## What Changes
 
-Add a highly visible warning banner/callout near the "Update & Check In" and "No Update & Check In" buttons, plus enhance the skip reason dialog to make it crystal clear that reasons are audited and incorrect/lazy reasons will be flagged.
+### File: `src/components/user/CSMDataEntryMatrix.tsx`
 
-## Changes
+**1. Fetch Content Management department data alongside main query**
+- In the `queryFn`, after fetching the main department's indicators, also fetch the "Content Management" department by name
+- Fetch its full chain: `functional_objectives` -> `key_results` -> `indicators`
+- Fetch `kpi_rag_bands` for the CM indicators
+- Fetch existing `csm_customer_feature_scores` for CM indicators in the current period
+- Return this as additional fields: `cmIndicators`, `cmBands`, `cmExistingScores`
+- Skip this fetch entirely if the current department IS Content Management (avoid duplication)
 
-### 1. Add a prominent warning banner above the check-in buttons (CSMDataEntryMatrix.tsx)
+**2. Extend each `CustomerSection` with CM data**
+- For every customer in the main matrix (regardless of `managed_services` status), attach the full set of CM indicators
+- Use the existing nil UUID placeholder (`00000000-0000-0000-0000-000000000000`) as `feature_id` for CM scores (same pattern as CM direct mode)
+- Load existing CM scores into the same `scores` state map using `cellKey(cmIndicatorId, customerId, placeholderFeatureId)`
 
-Insert a bold, eye-catching callout box directly above the "No Update & Check In" / "Update & Check In" button row. This banner will use a red/destructive gradient style to stand out:
+**3. Add CM sub-section UI in `CustomerSectionCard`**
+- After the main Feature x KPI matrix table and before the Save button / attachments area
+- Render a `Collapsible` section with header "Content Management Indicators"
+- Inside: a simplified KPI-only scoring grid (same as CM direct mode) with columns: KPI Name | Score Dropdown | RAG dot
+- Include a "Score Total" aggregate footer row showing the average across all CM indicators
+- Include "Apply to all" quick-fill buttons
 
-**Copy:**
-- **Headline:** "Legitimate Reason Required for Every Check-In"
-- **Body:** "All check-in submissions are audited. You must provide an accurate, verifiable reason when updating or skipping customer data. Generic, vague, or incorrect reasons (e.g. 'N/A', 'no reason', 'test') will be flagged for review and escalated to your manager. Repeated violations may result in restricted platform access."
+**4. Integrate CM scores into save flows**
+- `doSaveCustomer`: also upsert CM indicator scores (using placeholder feature ID) when saving a customer
+- `doSaveAll` (Update & Check In): also aggregate CM indicator scores and update CM indicators' `current_value` and `rag_status`
 
-Styled with a prominent red-tinted card with a `ShieldAlert` icon.
+**5. Conditional visibility**
+- Do NOT show the CM sub-section when `managedServicesOnly` prop is true (standalone CM data entry page)
+- Do NOT show when the current `departmentId` IS the Content Management department
+- Show for ALL customers in the CSM view, not just managed services ones
 
-### 2. Enhance the Skip Reason Dialog (CSMDataEntryMatrix.tsx)
+## Key Clarification
+The customer-to-CSM assignment (`csm_id` on the `customers` table) controls which customers appear in the CSM data entry. The CM sub-section will appear for all of those customers -- the `managed_services` flag is NOT used as a filter here.
 
-Update the existing skip reason dialog to include a stronger warning:
-- Change the dialog title to: "Mandatory: Provide a Legitimate Reason"
-- Add a warning note inside the dialog: "This reason is logged and audited. Inaccurate or placeholder reasons will be flagged and escalated."
-- Add a minimum character requirement (at least 10 characters) before the "Confirm & Continue" button is enabled
-- Show character count feedback
-
-### 3. Files to Update
-
-Only **one file** needs changes: `src/components/user/CSMDataEntryMatrix.tsx`
-
-- Lines ~930-955: Insert a warning callout div above the button row
-- Lines ~983-1026: Enhance the skip reason dialog with stronger copy and validation
-- Add `ShieldAlert` to the lucide-react imports (line 13)
-
-Since `CSMDataEntryMatrix` is the shared component used by all three data entry pages (CSM, Content Management, Department), this change automatically applies everywhere.
+## Technical Notes
+- The CM department ID is fetched once via `supabase.from('departments').select('id').eq('name', 'Content Management').maybeSingle()`
+- CM indicator cell keys use a different indicator ID namespace so they won't collide with main department indicator keys
+- No database changes needed -- uses existing `csm_customer_feature_scores` table with the nil UUID placeholder pattern
 
