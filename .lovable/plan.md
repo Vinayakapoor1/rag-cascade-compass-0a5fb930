@@ -1,43 +1,38 @@
 
 
-# Shining Yellow "Friday Check-In" Banner
+# Prominent "Legit Reason Required" Warning for Check-In
 
 ## What Changes
 
-Replace the current small red/destructive banner across all 3 data entry pages with a prominent, animated yellow/amber banner that shines to grab attention.
+Add a highly visible warning banner/callout near the "Update & Check In" and "No Update & Check In" buttons, plus enhance the skip reason dialog to make it crystal clear that reasons are audited and incorrect/lazy reasons will be flagged.
 
-## Banner Design
+## Changes
 
-- **Background**: Amber/yellow gradient (`from-amber-400 to-yellow-300`, dark mode: `from-amber-600 to-yellow-500`)
-- **Text**: Bold, larger copy with a better write-up:
-  - Headline: "Weekly Check-In Required Every Friday"
-  - Subtext: "All team members must complete their data entry and submit a check-in before end of day Friday. Incomplete check-ins will be flagged."
-- **Animation**: A subtle shimmer/shine effect sweeping across the banner using a CSS keyframe animation
-- **Icon**: Keep `AlertTriangle` but in a darker amber tone for contrast
+### 1. Add a prominent warning banner above the check-in buttons (CSMDataEntryMatrix.tsx)
 
-## CSS Animation (src/index.css)
+Insert a bold, eye-catching callout box directly above the "No Update & Check In" / "Update & Check In" button row. This banner will use a red/destructive gradient style to stand out:
 
-Add a `@keyframes banner-shine` animation that creates a diagonal light sweep across the banner, giving it a "shining" effect. Apply via `.animate-banner-shine` class.
+**Copy:**
+- **Headline:** "Legitimate Reason Required for Every Check-In"
+- **Body:** "All check-in submissions are audited. You must provide an accurate, verifiable reason when updating or skipping customer data. Generic, vague, or incorrect reasons (e.g. 'N/A', 'no reason', 'test') will be flagged for review and escalated to your manager. Repeated violations may result in restricted platform access."
 
-## Files to Update
+Styled with a prominent red-tinted card with a `ShieldAlert` icon.
 
-1. **src/index.css** -- Add `banner-shine` keyframe and utility class
-2. **src/pages/CSMDataEntry.tsx** (lines 279-285) -- Replace destructive banner with yellow shining banner
-3. **src/pages/ContentManagementDataEntry.tsx** (lines 199-205) -- Same replacement
-4. **src/pages/DepartmentDataEntry.tsx** (lines 635-641) -- Same replacement
+### 2. Enhance the Skip Reason Dialog (CSMDataEntryMatrix.tsx)
 
-## Banner Markup (applied identically in all 3 files)
+Update the existing skip reason dialog to include a stronger warning:
+- Change the dialog title to: "Mandatory: Provide a Legitimate Reason"
+- Add a warning note inside the dialog: "This reason is logged and audited. Inaccurate or placeholder reasons will be flagged and escalated."
+- Add a minimum character requirement (at least 10 characters) before the "Confirm & Continue" button is enabled
+- Show character count feedback
 
-```text
-+--------------------------------------------------------------+
-| [!] Weekly Check-In Required Every Friday                     |
-|     All team members must complete their data entry and       |
-|     submit before end of day Friday.                          |
-+--------------------------------------------------------------+
-```
+### 3. Files to Update
 
-Styled with:
-- `bg-gradient-to-r from-amber-400 to-yellow-300` (light), `dark:from-amber-600 dark:to-yellow-500`
-- `text-amber-950 dark:text-amber-50`
-- Overflow hidden + pseudo-element shimmer via the CSS class
-- Rounded corners, padding, bold text
+Only **one file** needs changes: `src/components/user/CSMDataEntryMatrix.tsx`
+
+- Lines ~930-955: Insert a warning callout div above the button row
+- Lines ~983-1026: Enhance the skip reason dialog with stronger copy and validation
+- Add `ShieldAlert` to the lucide-react imports (line 13)
+
+Since `CSMDataEntryMatrix` is the shared component used by all three data entry pages (CSM, Content Management, Department), this change automatically applies everywhere.
+
