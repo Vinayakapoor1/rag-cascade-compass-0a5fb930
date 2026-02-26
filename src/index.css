@@ -504,15 +504,28 @@
 
 @keyframes save-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 hsla(var(--primary) / 0.5);
+    box-shadow: 0 0 0 0 hsla(var(--primary) / 0.7);
   }
   50% {
-    box-shadow: 0 0 12px 4px hsla(var(--primary) / 0.3);
+    box-shadow: 0 0 20px 6px hsla(var(--primary) / 0.5);
   }
 }
 
 .animate-save-pulse {
-  animation: save-pulse 1.5s ease-in-out infinite;
+  animation: save-pulse 1.2s ease-in-out infinite;
+}
+
+.dark .animate-save-pulse {
+  animation: save-pulse-dark 1.2s ease-in-out infinite;
+}
+
+@keyframes save-pulse-dark {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsla(0, 72%, 60%, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 24px 8px hsla(0, 72%, 60%, 0.55);
+  }
 }
 
 /* Respect user's motion preferences */
