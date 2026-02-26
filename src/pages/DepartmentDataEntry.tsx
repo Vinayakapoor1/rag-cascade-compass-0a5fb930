@@ -15,7 +15,7 @@ import { useActivityLog } from '@/hooks/useActivityLog';
 import {
     Save, Loader2, ChevronDown, ChevronRight, Paperclip,
     TrendingUp, Target, Calendar, Filter, CheckCircle2, AlertCircle,
-    History, Upload, Link as LinkIcon, Info, ClipboardCheck, AlertTriangle
+    History, Upload, Link as LinkIcon, Info, ClipboardCheck, AlertTriangle, BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
@@ -649,7 +649,36 @@ export default function DepartmentDataEntry() {
                     <TabsTrigger value="feature-matrix">{isContentManagementDept ? 'Indicator Matrix' : 'Feature Matrix'}</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="feature-matrix">
+                <TabsContent value="feature-matrix" className="space-y-4">
+                    {/* Matrix-specific Instructions Card */}
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+                                    <BookOpen className="h-5 w-5 text-primary" />
+                                </div>
+                                <div className="space-y-2 text-sm">
+                                    <h3 className="font-semibold text-base">
+                                        {isContentManagementDept ? 'Content Management Indicator Matrix Guide' : 'CSM Feature Matrix Guide'}
+                                    </h3>
+                                    <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
+                                        <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month using the date picker above.</li>
+                                        <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their {isContentManagementDept ? 'KPI scoring grid' : 'feature × KPI matrix'}.</li>
+                                        <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band.</li>
+                                        <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the copy icon to bulk-fill cells.</li>
+                                        <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
+                                        <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
+                                    </ol>
+                                    <p className="text-xs text-muted-foreground/80 pt-1">
+                                        💡 <strong>Tip:</strong> {isContentManagementDept
+                                            ? 'Only managed services customers are shown. A pulsing Save button means you have unsaved changes for that customer.'
+                                            : 'A green dot next to a period means data has been submitted. A pulsing Save button means you have unsaved changes.'}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <CSMDataEntryMatrix departmentId={departmentId!} period={period} managedServicesOnly={isContentManagementDept} />
                 </TabsContent>
 
