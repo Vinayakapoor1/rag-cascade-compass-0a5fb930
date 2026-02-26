@@ -156,7 +156,7 @@ export default function Portfolio() {
   const [filterStatus, setFilterStatus] = useState<RAGStatus | null>(null);
   const { data: ventures } = useVentures();
   const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
-  const { user, isAdmin, isCSM, csmId, accessibleDepartments } = useAuth();
+  const { user, isAdmin, isCSM, isContentManager, csmId, accessibleDepartments } = useAuth();
 
   // Auto-select HumanFirewall on first load
   useEffect(() => {
@@ -186,21 +186,43 @@ export default function Portfolio() {
       .filter(obj => obj.departments.length > 0);
   }, [rawOrgObjectives, isAdmin, isDepartmentHead, user, accessibleDepartments]);
 
-  // Fetch accurate customer and feature counts from the database
+  // Fetch accurate customer and feature counts, scoped by role
+  // Content managers see only managed_services customers and their linked features
   const [scopedCounts, setScopedCounts] = useState({ customers: 0, features: 0 });
+  const isCMScoped = isContentManager && !isAdmin;
   useEffect(() => {
     const fetchCounts = async () => {
-      const [customersRes, featuresRes] = await Promise.all([
-        supabase.from('customers').select('id', { count: 'exact', head: true }),
-        supabase.from('features').select('id', { count: 'exact', head: true }),
-      ]);
-      setScopedCounts({
-        customers: customersRes.count ?? 0,
-        features: featuresRes.count ?? 0,
-      });
+      if (isCMScoped) {
+        // Managed services customers only
+        const { count: customerCount } = await supabase
+          .from('customers')
+          .select('id', { count: 'exact', head: true })
+          .eq('managed_services', true);
+
+        // Features linked to those managed services customers
+        const { data: cfData } = await supabase
+          .from('customer_features')
+          .select('feature_id, customers!inner(managed_services)')
+          .eq('customers.managed_services', true);
+        const uniqueFeatures = new Set(cfData?.map(r => r.feature_id) || []);
+
+        setScopedCounts({
+          customers: customerCount ?? 0,
+          features: uniqueFeatures.size,
+        });
+      } else {
+        const [customersRes, featuresRes] = await Promise.all([
+          supabase.from('customers').select('id', { count: 'exact', head: true }),
+          supabase.from('features').select('id', { count: 'exact', head: true }),
+        ]);
+        setScopedCounts({
+          customers: customersRes.count ?? 0,
+          features: featuresRes.count ?? 0,
+        });
+      }
     };
     fetchCounts();
-  }, []);
+  }, [isCMScoped]);
 
   // Calculate portfolio-level stats from ALL indicators across all org objectives
   const portfolioStats = orgObjectives?.reduce((stats, org) => {
