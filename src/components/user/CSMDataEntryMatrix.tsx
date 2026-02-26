@@ -993,6 +993,10 @@ interface CustomerSectionCardProps {
   period: string;
 }
 
+// Check if this is CM direct mode (no real features, just placeholder)
+const isCMDirectMode = (section: CustomerSection) =>
+  section.features.length === 1 && section.features[0].id === '__cm_direct__';
+
 function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
@@ -1008,6 +1012,25 @@ function CustomerSectionCard({
     return kpiBands[indId] || DEFAULT_BANDS;
   };
 
+  const directMode = isCMDirectMode(section);
+  const placeholderFeatId = '__cm_direct__';
+
+  // For CM direct mode: compute score total (count greens, ambers, reds)
+  const getScoreSummary = () => {
+    let greens = 0, ambers = 0, reds = 0, total = 0;
+    for (const ind of section.indicators) {
+      const key = cellKey(ind.id, section.id, placeholderFeatId);
+      const val = scores[key];
+      if (val != null) {
+        total++;
+        if (val === 1) greens++;
+        else if (val === 0.5) ambers++;
+        else if (val === 0) reds++;
+      }
+    }
+    return { greens, ambers, reds, total };
+  };
+
   return (
     <Card>
       <Collapsible open={isOpen} onOpenChange={onToggle}>
@@ -1019,7 +1042,10 @@ function CustomerSectionCard({
                 <div>
                   <CardTitle className="text-base">{section.name}</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {section.features.length} feature{section.features.length !== 1 ? 's' : ''} × {section.indicators.length} KPI{section.indicators.length !== 1 ? 's' : ''}
+                    {directMode
+                      ? `${section.indicators.length} KPI${section.indicators.length !== 1 ? 's' : ''}`
+                      : `${section.features.length} feature${section.features.length !== 1 ? 's' : ''} × ${section.indicators.length} KPI${section.indicators.length !== 1 ? 's' : ''}`
+                    }
                   </p>
                 </div>
               </div>
@@ -1038,225 +1064,358 @@ function CustomerSectionCard({
 
         <CollapsibleContent>
           <CardContent className="pt-0 pb-4">
-            <div className="overflow-x-auto border rounded-md">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r">
-                      Feature
-                    </th>
-                    {section.indicators.map(ind => (
-                      <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
-                        <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
-                      </th>
-                    ))}
-                    <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
-                      Avg
-                    </th>
-                    <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l">
-                      <span className="text-xs text-muted-foreground">Apply to Row</span>
-                    </th>
-                  </tr>
-                  <tr className="bg-muted/20 border-t">
-                    <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r">
-                      Apply to Column ↓
-                    </td>
-                    {section.indicators.map(ind => {
-                      const bands = getBandsForIndicator(ind.id);
-                      return (
-                        <td key={ind.id} className="px-1 py-1 text-center border-r">
-                          <div className="flex items-center gap-0.5 justify-center">
-                            <Select
-                              value={applyColBand[ind.id] || 'unset'}
-                              onValueChange={(val) => setApplyColBand(prev => ({ ...prev, [ind.id]: val === 'unset' ? '' : val }))}
-                            >
-                              <SelectTrigger className="h-6 w-full max-w-[100px] px-1 text-xs border-muted">
-                                <SelectValue placeholder="—" />
-                              </SelectTrigger>
-                              <SelectContent className="z-50 bg-popover">
-                                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                                {bands.map(b => (
-                                  <SelectItem key={`${b.rag_color}-${b.sort_order}`} value={String(b.rag_numeric)}>
-                                    <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color] || 'bg-muted')} />{b.band_label}</span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 shrink-0"
-                                    disabled={!applyColBand[ind.id]}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const weight = parseFloat(applyColBand[ind.id]);
-                                      if (isNaN(weight)) return;
-                                      applyToColumn(section.id, ind.id, weight, section.features, section.indicatorFeatureMap);
-                                      const band = bands.find(b => b.rag_numeric === weight);
-                                      toast.success(`Applied "${band?.band_label || weight}" to all ${ind.name} cells`);
-                                    }}
-                                  >
-                                    <CopyCheck className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  <p>Apply selected band to all customers for this KPI</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
-                              title="Clear column"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                clearColumn(section.id, ind.id, section.features, section.indicatorFeatureMap);
-                                toast.success(`Cleared all ${ind.name} cells`);
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </td>
-                      );
-                    })}
-                    <td className="bg-muted/10" />
-                    <td className="bg-muted/10 border-l" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {section.features.map(feat => {
-                    const rowAvg = getFeatureRowAvg(section.id, feat.id, section.indicators, section.indicatorFeatureMap);
-                    const rowRag = rowAvg != null ? percentToRAG(Math.round(rowAvg)) : null;
+            {directMode ? (
+              /* ===== CM Direct Mode: Simple KPI list with dropdowns and score total ===== */
+              <div className="space-y-4">
+                <div className="overflow-x-auto border rounded-md">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
+                        <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
+                        <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {section.indicators.map(ind => {
+                        const key = cellKey(ind.id, section.id, placeholderFeatId);
+                        const val = scores[key] ?? null;
+                        const ragColor = val != null ? weightToRAGColor(val) : '';
+                        const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
 
-                    return (
-                      <tr key={feat.id} className="border-t hover:bg-muted/20 transition-colors">
-                        <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium text-xs border-r">
-                          <Tooltip delayDuration={0}>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help border-b border-dotted border-muted-foreground/40">
-                                {feat.name}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs">
-                              <p className="font-semibold text-sm">{feat.name}</p>
-                              {feat.category && <p className="text-xs text-muted-foreground mt-0.5">Category: {feat.category}</p>}
-                              <p className="text-xs mt-1">{feat.description || 'No description available'}</p>
-                            </TooltipContent>
-                          </Tooltip>
+                        return (
+                          <tr key={ind.id} className="border-t hover:bg-muted/20 transition-colors">
+                            <td className="px-3 py-2 font-medium text-xs border-r">
+                              <TooltipProvider>
+                                <Tooltip delayDuration={0}>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help border-b border-dotted border-muted-foreground/40">
+                                      {ind.name}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" className="max-w-xs">
+                                    <p className="font-semibold text-sm">{ind.name}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{ind.fo_name} → {ind.kr_name}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </td>
+                            <td className={cn('px-2 py-1.5 text-center border-r', cellBg)}>
+                              <BandDropdown
+                                value={val}
+                                bands={getBandsForIndicator(ind.id)}
+                                onChange={(b) => onCellChange(ind.id, section.id, placeholderFeatId, b)}
+                              />
+                            </td>
+                            <td className="px-3 py-1.5 text-center">
+                              {val != null ? (
+                                <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
+                              ) : (
+                                <span className="text-muted-foreground/40 text-xs">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 bg-muted/30 font-semibold">
+                        <td className="px-3 py-2 text-sm border-r">Score Total</td>
+                        <td className="px-3 py-2 text-center text-xs border-r" colSpan={2}>
+                          {(() => {
+                            const { greens, ambers, reds, total } = getScoreSummary();
+                            if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
+                            const score = ((greens * 1 + ambers * 0.5 + reds * 0) / section.indicators.length) * 100;
+                            return (
+                              <div className="flex items-center justify-center gap-3">
+                                <span className="flex items-center gap-1">
+                                  <span className={cn('h-2.5 w-2.5 rounded-full', RAG_DOT_CLASS.green)} />
+                                  {greens}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <span className={cn('h-2.5 w-2.5 rounded-full', RAG_DOT_CLASS.amber)} />
+                                  {ambers}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <span className={cn('h-2.5 w-2.5 rounded-full', RAG_DOT_CLASS.red)} />
+                                  {reds}
+                                </span>
+                                <Badge className={cn(RAG_BADGE_STYLES[percentToRAG(Math.round(score))], 'text-[10px] ml-2')}>
+                                  {Math.round(score)}%
+                                </Badge>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {/* Apply All row for CM direct mode */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium">Apply to all KPIs:</span>
+                  {[
+                    { label: 'Green', value: 1, color: 'green' },
+                    { label: 'Amber', value: 0.5, color: 'amber' },
+                    { label: 'Red', value: 0, color: 'red' },
+                  ].map(opt => (
+                    <Button
+                      key={opt.label}
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs gap-1"
+                      onClick={() => {
+                        applyToRow(section.id, placeholderFeatId, opt.value, section.indicators, section.indicatorFeatureMap);
+                        toast.success(`Applied ${opt.label} to all KPIs`);
+                      }}
+                    >
+                      <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[opt.color])} />
+                      {opt.label}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                    onClick={() => {
+                      clearRow(section.id, placeholderFeatId, section.indicators, section.indicatorFeatureMap);
+                      toast.success('Cleared all KPIs');
+                    }}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear All
+                  </Button>
+                </div>
+                <CustomerAttachments
+                  customerId={section.id}
+                  departmentId={departmentId}
+                  period={period}
+                />
+              </div>
+            ) : (
+              /* ===== Standard Feature × KPI Matrix ===== */
+              <div>
+                <div className="overflow-x-auto border rounded-md">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r">
+                          Feature
+                        </th>
+                        {section.indicators.map(ind => (
+                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r" title={`${ind.fo_name} → ${ind.kr_name}`}>
+                            <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
+                          </th>
+                        ))}
+                        <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
+                          Avg
+                        </th>
+                        <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l">
+                          <span className="text-xs text-muted-foreground">Apply to Row</span>
+                        </th>
+                      </tr>
+                      <tr className="bg-muted/20 border-t">
+                        <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r">
+                          Apply to Column ↓
                         </td>
                         {section.indicators.map(ind => {
-                          const canEdit = section.indicatorFeatureMap[ind.id]?.has(feat.id) ?? false;
-                          const key = cellKey(ind.id, section.id, feat.id);
-                          const val = scores[key];
-
-                          if (!canEdit) {
-                            return (
-                              <td key={ind.id} className="px-2 py-1.5 text-center border-r">
-                                <span className="text-muted-foreground/30 text-xs">—</span>
-                              </td>
-                            );
-                          }
-
-                          const ragColor = val != null ? weightToRAGColor(val) : '';
-                          const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
-
+                          const bands = getBandsForIndicator(ind.id);
                           return (
-                            <td key={ind.id} className={cn('px-1 py-1 text-center border-r', cellBg)}>
-                              <BandDropdown
-                                value={val ?? null}
-                                bands={getBandsForIndicator(ind.id)}
-                                onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
-                              />
+                            <td key={ind.id} className="px-1 py-1 text-center border-r">
+                              <div className="flex items-center gap-0.5 justify-center">
+                                <Select
+                                  value={applyColBand[ind.id] || 'unset'}
+                                  onValueChange={(val) => setApplyColBand(prev => ({ ...prev, [ind.id]: val === 'unset' ? '' : val }))}
+                                >
+                                  <SelectTrigger className="h-6 w-full max-w-[100px] px-1 text-xs border-muted">
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                  <SelectContent className="z-50 bg-popover">
+                                    <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                                    {bands.map(b => (
+                                      <SelectItem key={`${b.rag_color}-${b.sort_order}`} value={String(b.rag_numeric)}>
+                                        <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color] || 'bg-muted')} />{b.band_label}</span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 shrink-0"
+                                        disabled={!applyColBand[ind.id]}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const weight = parseFloat(applyColBand[ind.id]);
+                                          if (isNaN(weight)) return;
+                                          applyToColumn(section.id, ind.id, weight, section.features, section.indicatorFeatureMap);
+                                          const band = bands.find(b => b.rag_numeric === weight);
+                                          toast.success(`Applied "${band?.band_label || weight}" to all ${ind.name} cells`);
+                                        }}
+                                      >
+                                        <CopyCheck className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p>Apply selected band to all customers for this KPI</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                                  title="Clear column"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    clearColumn(section.id, ind.id, section.features, section.indicatorFeatureMap);
+                                    toast.success(`Cleared all ${ind.name} cells`);
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                           );
                         })}
-                        <td className="px-3 py-1.5 text-center bg-muted/10">
-                          {rowAvg != null && rowRag ? (
-                            <Badge className={cn(RAG_BADGE_STYLES[rowRag], 'text-[10px] px-1.5 py-0.5')}>
-                              {Math.round(rowAvg)}%
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground/40 text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-1 py-1 text-center border-l">
-                          <div className="flex items-center gap-0.5 justify-center">
-                            {/* Apply to Row uses the first indicator's bands as representative */}
-                            <Select
-                              value={applyRowBand[feat.id] || 'unset'}
-                              onValueChange={(val) => setApplyRowBand(prev => ({ ...prev, [feat.id]: val === 'unset' ? '' : val }))}
-                            >
-                              <SelectTrigger className="h-6 w-full max-w-[100px] px-1 text-xs border-muted">
-                                <SelectValue placeholder="—" />
-                              </SelectTrigger>
-                              <SelectContent className="z-50 bg-popover">
-                                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                                {/* Generic weight options for row apply since KPIs may differ */}
-                                <SelectItem value="1">
-                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.green)} />Green (1)</span>
-                                </SelectItem>
-                                <SelectItem value="0.5">
-                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.amber)} />Amber (0.5)</span>
-                                </SelectItem>
-                                <SelectItem value="0">
-                                  <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.red)} />Red (0)</span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <TooltipProvider>
-                              <Tooltip>
+                        <td className="bg-muted/10" />
+                        <td className="bg-muted/10 border-l" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {section.features.map(feat => {
+                        const rowAvg = getFeatureRowAvg(section.id, feat.id, section.indicators, section.indicatorFeatureMap);
+                        const rowRag = rowAvg != null ? percentToRAG(Math.round(rowAvg)) : null;
+
+                        return (
+                          <tr key={feat.id} className="border-t hover:bg-muted/20 transition-colors">
+                            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium text-xs border-r">
+                              <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 shrink-0"
-                                    disabled={!applyRowBand[feat.id]}
-                                    onClick={() => {
-                                      const weight = parseFloat(applyRowBand[feat.id]);
-                                      if (isNaN(weight)) return;
-                                      applyToRow(section.id, feat.id, weight, section.indicators, section.indicatorFeatureMap);
-                                      const label = weight === 1 ? 'Green' : weight === 0.5 ? 'Amber' : 'Red';
-                                      toast.success(`Applied ${label} to all KPIs for ${feat.name}`);
-                                    }}
-                                  >
-                                    <CopyCheck className="h-3 w-3" />
-                                  </Button>
+                                  <span className="cursor-help border-b border-dotted border-muted-foreground/40">
+                                    {feat.name}
+                                  </span>
                                 </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  <p>Apply selected band to all KPIs for this feature</p>
+                                <TooltipContent side="right" className="max-w-xs">
+                                  <p className="font-semibold text-sm">{feat.name}</p>
+                                  {feat.category && <p className="text-xs text-muted-foreground mt-0.5">Category: {feat.category}</p>}
+                                  <p className="text-xs mt-1">{feat.description || 'No description available'}</p>
                                 </TooltipContent>
                               </Tooltip>
-                            </TooltipProvider>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
-                              title="Clear row"
-                              onClick={() => {
-                                clearRow(section.id, feat.id, section.indicators, section.indicatorFeatureMap);
-                                toast.success(`Cleared all KPIs for ${feat.name}`);
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <CustomerAttachments
-              customerId={section.id}
-              departmentId={departmentId}
-              period={period}
-            />
+                            </td>
+                            {section.indicators.map(ind => {
+                              const canEdit = section.indicatorFeatureMap[ind.id]?.has(feat.id) ?? false;
+                              const key = cellKey(ind.id, section.id, feat.id);
+                              const val = scores[key];
+
+                              if (!canEdit) {
+                                return (
+                                  <td key={ind.id} className="px-2 py-1.5 text-center border-r">
+                                    <span className="text-muted-foreground/30 text-xs">—</span>
+                                  </td>
+                                );
+                              }
+
+                              const ragColor = val != null ? weightToRAGColor(val) : '';
+                              const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
+
+                              return (
+                                <td key={ind.id} className={cn('px-1 py-1 text-center border-r', cellBg)}>
+                                  <BandDropdown
+                                    value={val ?? null}
+                                    bands={getBandsForIndicator(ind.id)}
+                                    onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
+                                  />
+                                </td>
+                              );
+                            })}
+                            <td className="px-3 py-1.5 text-center bg-muted/10">
+                              {rowAvg != null && rowRag ? (
+                                <Badge className={cn(RAG_BADGE_STYLES[rowRag], 'text-[10px] px-1.5 py-0.5')}>
+                                  {Math.round(rowAvg)}%
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground/40 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="px-1 py-1 text-center border-l">
+                              <div className="flex items-center gap-0.5 justify-center">
+                                {/* Apply to Row uses the first indicator's bands as representative */}
+                                <Select
+                                  value={applyRowBand[feat.id] || 'unset'}
+                                  onValueChange={(val) => setApplyRowBand(prev => ({ ...prev, [feat.id]: val === 'unset' ? '' : val }))}
+                                >
+                                  <SelectTrigger className="h-6 w-full max-w-[100px] px-1 text-xs border-muted">
+                                    <SelectValue placeholder="—" />
+                                  </SelectTrigger>
+                                  <SelectContent className="z-50 bg-popover">
+                                    <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                                    {/* Generic weight options for row apply since KPIs may differ */}
+                                    <SelectItem value="1">
+                                      <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.green)} />Green (1)</span>
+                                    </SelectItem>
+                                    <SelectItem value="0.5">
+                                      <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.amber)} />Amber (0.5)</span>
+                                    </SelectItem>
+                                    <SelectItem value="0">
+                                      <span className="flex items-center gap-1"><span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS.red)} />Red (0)</span>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 shrink-0"
+                                        disabled={!applyRowBand[feat.id]}
+                                        onClick={() => {
+                                          const weight = parseFloat(applyRowBand[feat.id]);
+                                          if (isNaN(weight)) return;
+                                          applyToRow(section.id, feat.id, weight, section.indicators, section.indicatorFeatureMap);
+                                          const label = weight === 1 ? 'Green' : weight === 0.5 ? 'Amber' : 'Red';
+                                          toast.success(`Applied ${label} to all KPIs for ${feat.name}`);
+                                        }}
+                                      >
+                                        <CopyCheck className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p>Apply selected band to all KPIs for this feature</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                                  title="Clear row"
+                                  onClick={() => {
+                                    clearRow(section.id, feat.id, section.indicators, section.indicatorFeatureMap);
+                                    toast.success(`Cleared all KPIs for ${feat.name}`);
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <CustomerAttachments
+                  customerId={section.id}
+                  departmentId={departmentId}
+                  period={period}
+                />
+              </div>
+            )}
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
