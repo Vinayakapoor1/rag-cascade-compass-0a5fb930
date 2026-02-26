@@ -1,44 +1,43 @@
 
 
-# Animated Save Buttons Across All Data Entry Dashboards
+# Shining Yellow "Friday Check-In" Banner
 
-## Current State
-The `CSMDataEntryMatrix` component is already shared between both the CSM Data Entry (`/csm/data-entry`) and Content Management Data Entry (`/content-management/data-entry`) pages. The per-customer save functionality is already implemented in the shared component, so **both dashboards already have per-customer saves**.
+## What Changes
 
-The remaining request is to make save buttons visually "alive" with animation to draw attention.
+Replace the current small red/destructive banner across all 3 data entry pages with a prominent, animated yellow/amber banner that shines to grab attention.
 
-## Changes
+## Banner Design
 
-### 1. Add pulse animation to per-customer Save buttons
-**File:** `src/components/user/CSMDataEntryMatrix.tsx`
+- **Background**: Amber/yellow gradient (`from-amber-400 to-yellow-300`, dark mode: `from-amber-600 to-yellow-500`)
+- **Text**: Bold, larger copy with a better write-up:
+  - Headline: "Weekly Check-In Required Every Friday"
+  - Subtext: "All team members must complete their data entry and submit a check-in before end of day Friday. Incomplete check-ins will be flagged."
+- **Animation**: A subtle shimmer/shine effect sweeping across the banner using a CSS keyframe animation
+- **Icon**: Keep `AlertTriangle` but in a darker amber tone for contrast
 
-- Detect if a customer has **unsaved changes** (scores differ from originalScores for that customer)
-- When unsaved changes exist and the customer is NOT yet saved, apply a pulse/glow animation to the Save button
-- Once saved (green "Saved" badge appears), stop the animation
+## CSS Animation (src/index.css)
 
-### 2. Add pulse animation to the global "Update & Check In" button
-**File:** `src/components/user/CSMDataEntryMatrix.tsx`
+Add a `@keyframes banner-shine` animation that creates a diagonal light sweep across the banner, giving it a "shining" effect. Apply via `.animate-banner-shine` class.
 
-- When `hasChanges` is true OR any customers have been individually saved (ready for final check-in), pulse the "Update & Check In" button
-- Use the same animation style for visual consistency
+## Files to Update
 
-### 3. Add the animation CSS
-**File:** `src/index.css`
+1. **src/index.css** -- Add `banner-shine` keyframe and utility class
+2. **src/pages/CSMDataEntry.tsx** (lines 279-285) -- Replace destructive banner with yellow shining banner
+3. **src/pages/ContentManagementDataEntry.tsx** (lines 199-205) -- Same replacement
+4. **src/pages/DepartmentDataEntry.tsx** (lines 635-641) -- Same replacement
 
-- Add a `@keyframes save-pulse` animation with a subtle glow effect using the primary color
-- Create a `.animate-save-pulse` utility class
+## Banner Markup (applied identically in all 3 files)
 
-### Technical Details
+```text
++--------------------------------------------------------------+
+| [!] Weekly Check-In Required Every Friday                     |
+|     All team members must complete their data entry and       |
+|     submit before end of day Friday.                          |
++--------------------------------------------------------------+
+```
 
-**New helper in CSMDataEntryMatrix:**
-- `customerHasUnsavedChanges(section)` -- compares current scores vs originalScores for that customer's cells, returns true if any differ
-
-**Button styling when active:**
-- Per-customer Save: `animate-pulse ring-2 ring-primary/50 bg-primary text-primary-foreground` (switches from outline to filled + pulse)
-- Update & Check In: `animate-pulse ring-2 ring-primary/50` when savedCustomers.size > 0 or hasChanges
-
-**Props update for CustomerSectionCard:**
-- Add `hasUnsavedChanges: boolean` prop so the card knows whether to animate its Save button
-
-This approach uses Tailwind's built-in `animate-pulse` class combined with ring styling for a clean, attention-grabbing effect without custom CSS.
-
+Styled with:
+- `bg-gradient-to-r from-amber-400 to-yellow-300` (light), `dark:from-amber-600 dark:to-yellow-500`
+- `text-amber-950 dark:text-amber-50`
+- Overflow hidden + pseudo-element shimmer via the CSS class
+- Rounded corners, padding, bold text
