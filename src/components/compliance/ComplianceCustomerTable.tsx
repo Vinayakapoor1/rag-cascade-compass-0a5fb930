@@ -3,11 +3,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, ArrowUpDown, ChevronRight } from 'lucide-react';
+import { Search, ArrowUpDown, ChevronRight, TrendingUp, TrendingDown, Minus, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ComplianceCustomerDetail, type ScoreRecord } from './ComplianceCustomerDetail';
+import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export interface CustomerRow {
   customerId: string;
@@ -18,17 +26,32 @@ export interface CustomerRow {
   totalExpected: number;
   lastEverSubmission: string | null;
   status: 'complete' | 'partial' | 'pending';
+  currentAvg: number | null;
+  previousAvg: number | null;
+  isManagedServices: boolean;
 }
 
-type SortField = 'customerName' | 'csmName' | 'status' | 'scoresThisPeriod';
+type SortField = 'customerName' | 'csmName' | 'status' | 'scoresThisPeriod' | 'currentAvg';
 type SortDir = 'asc' | 'desc';
+type TypeFilter = 'all' | 'csm' | 'cm';
+
+function percentToRAG(pct: number): 'green' | 'amber' | 'red' {
+  if (pct >= 76) return 'green';
+  if (pct >= 51) return 'amber';
+  return 'red';
+}
+
+const RAG_BADGE_STYLES: Record<string, string> = {
+  green: 'bg-rag-green/15 text-rag-green border-rag-green/30',
+  amber: 'bg-rag-amber/15 text-rag-amber border-rag-amber/30',
+  red: 'bg-rag-red/15 text-rag-red border-rag-red/30',
+};
 
 interface ComplianceCustomerTableProps {
   rows: CustomerRow[];
   periodLabel: string;
-  // Detail data for expandable rows
-  customerFeaturesMap: Map<string, string[]>; // customer_id -> feature_ids
-  featureNameMap: Map<string, string>; // feature_id -> feature_name
+  customerFeaturesMap: Map<string, string[]>;
+  featureNameMap: Map<string, string>;
   indicatorFeatureLinks: { indicator_id: string; feature_id: string }[];
   detailedScores: ScoreRecord[];
   period: string;
@@ -42,6 +65,7 @@ export function ComplianceCustomerTable({
   const [sortField, setSortField] = useState<SortField>('status');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -66,6 +90,9 @@ export function ComplianceCustomerTable({
       r => r.customerName.toLowerCase().includes(q) || r.csmName.toLowerCase().includes(q)
     );
 
+    if (typeFilter === 'cm') result = result.filter(r => r.isManagedServices);
+    else if (typeFilter === 'csm') result = result.filter(r => !r.isManagedServices);
+
     const statusOrder = { pending: 0, partial: 1, complete: 2 };
     result.sort((a, b) => {
       let cmp = 0;
@@ -73,13 +100,17 @@ export function ComplianceCustomerTable({
         cmp = statusOrder[a.status] - statusOrder[b.status];
       } else if (sortField === 'scoresThisPeriod') {
         cmp = a.scoresThisPeriod - b.scoresThisPeriod;
+      } else if (sortField === 'currentAvg') {
+        cmp = (a.currentAvg ?? -1) - (b.currentAvg ?? -1);
       } else {
         cmp = a[sortField].localeCompare(b[sortField]);
       }
       return sortDir === 'desc' ? -cmp : cmp;
     });
     return result;
-  }, [rows, search, sortField, sortDir]);
+  }, [rows, search, sortField, sortDir, typeFilter]);
+
+  const hasCM = rows.some(r => r.isManagedServices);
 
   const SortButton = ({ field, label }: { field: SortField; label: string }) => (
     <Button variant="ghost" size="sm" className="h-auto p-0 font-medium text-muted-foreground hover:text-foreground" onClick={() => toggleSort(field)}>
@@ -93,14 +124,29 @@ export function ComplianceCustomerTable({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <CardTitle className="text-lg">Per-Customer Breakdown — {periodLabel}</CardTitle>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search customer or CSM..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-9"
-            />
+          <div className="flex items-center gap-2">
+            {hasCM && (
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <Filter className="h-3.5 w-3.5 mr-1.5" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
+                  <SelectItem value="csm">CSM Only</SelectItem>
+                  <SelectItem value="cm">CM Only</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search customer or CSM..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -113,6 +159,7 @@ export function ComplianceCustomerTable({
                 <TableHead><SortButton field="customerName" label="Customer" /></TableHead>
                 <TableHead><SortButton field="csmName" label="CSM" /></TableHead>
                 <TableHead className="text-center"><SortButton field="scoresThisPeriod" label="Scores" /></TableHead>
+                <TableHead className="text-center"><SortButton field="currentAvg" label="Trend" /></TableHead>
                 <TableHead>Last Submission</TableHead>
                 <TableHead className="text-center"><SortButton field="status" label="Status" /></TableHead>
               </TableRow>
@@ -120,7 +167,7 @@ export function ComplianceCustomerTable({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     {search ? 'No results match your search' : 'No data available'}
                   </TableCell>
                 </TableRow>
@@ -128,6 +175,8 @@ export function ComplianceCustomerTable({
                 filtered.map(row => {
                   const isExpanded = expandedIds.has(row.customerId);
                   const customerFeatureIds = customerFeaturesMap.get(row.customerId) || [];
+                  const currRag = row.currentAvg != null ? percentToRAG(row.currentAvg) : null;
+                  const prevRag = row.previousAvg != null ? percentToRAG(row.previousAvg) : null;
                   return (
                     <Collapsible key={row.customerId} open={isExpanded} onOpenChange={() => toggleExpand(row.customerId)} asChild>
                       <>
@@ -136,7 +185,14 @@ export function ComplianceCustomerTable({
                             <TableCell className="w-8 px-2">
                               <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                             </TableCell>
-                            <TableCell className="font-medium">{row.customerName}</TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-1.5">
+                                {row.customerName}
+                                {row.isManagedServices && (
+                                  <Badge className="text-[9px] bg-primary/15 text-primary border-none px-1.5">CM</Badge>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <div>
                                 <span className="text-sm">{row.csmName}</span>
@@ -147,6 +203,39 @@ export function ComplianceCustomerTable({
                               <span className="text-sm font-mono">
                                 {row.scoresThisPeriod}/{row.totalExpected}
                               </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {row.previousAvg != null && row.currentAvg != null && prevRag && currRag ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <Badge variant="outline" className={cn(RAG_BADGE_STYLES[prevRag], 'text-[9px] opacity-60 px-1.5')}>
+                                    {row.previousAvg}%
+                                  </Badge>
+                                  <span className="text-muted-foreground text-[10px]">→</span>
+                                  <Badge variant="outline" className={cn(RAG_BADGE_STYLES[currRag], 'text-[9px] px-1.5')}>
+                                    {row.currentAvg}%
+                                  </Badge>
+                                  {row.currentAvg > row.previousAvg ? (
+                                    <TrendingUp className="h-3.5 w-3.5 text-rag-green" />
+                                  ) : row.currentAvg < row.previousAvg ? (
+                                    <TrendingDown className="h-3.5 w-3.5 text-rag-red" />
+                                  ) : (
+                                    <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+                                  )}
+                                </div>
+                              ) : row.currentAvg != null && currRag ? (
+                                <Badge variant="outline" className={cn(RAG_BADGE_STYLES[currRag], 'text-[9px] px-1.5')}>
+                                  {row.currentAvg}%
+                                </Badge>
+                              ) : row.previousAvg != null && prevRag ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-[9px] text-muted-foreground">Last:</span>
+                                  <Badge variant="outline" className={cn(RAG_BADGE_STYLES[prevRag], 'text-[9px] opacity-60 px-1.5')}>
+                                    {row.previousAvg}%
+                                  </Badge>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               {row.lastEverSubmission
@@ -174,7 +263,7 @@ export function ComplianceCustomerTable({
                         </CollapsibleTrigger>
                         <CollapsibleContent asChild>
                           <tr>
-                            <td colSpan={6} className="p-0 border-b">
+                            <td colSpan={7} className="p-0 border-b">
                               <ComplianceCustomerDetail
                                 customerId={row.customerId}
                                 customerFeatureIds={customerFeatureIds}

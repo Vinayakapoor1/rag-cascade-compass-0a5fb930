@@ -40,7 +40,7 @@ export default function ComplianceReport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, name, csm_id')
+        .select('id, name, csm_id, managed_services')
         .not('csm_id', 'is', null);
       if (error) throw error;
       return data || [];
@@ -70,13 +70,13 @@ export default function ComplianceReport() {
     },
   });
 
-  // Current period scores (detailed with feature_id, indicator_id)
+  // Current period scores (detailed with feature_id, indicator_id, value)
   const { data: currentScores = [], isLoading: scoresLoading, isFetching: scoresFetching, dataUpdatedAt: scoresUpdatedAt, refetch: refetchScores } = useQuery({
     queryKey: ['compliance-scores-current', currentPeriod],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('csm_customer_feature_scores')
-        .select('customer_id, feature_id, indicator_id, period, created_at')
+        .select('customer_id, feature_id, indicator_id, period, created_at, value, updated_at')
         .eq('period', currentPeriod)
         .limit(50000);
       if (error) throw error;
@@ -90,7 +90,7 @@ export default function ComplianceReport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('csm_customer_feature_scores')
-        .select('customer_id, feature_id, indicator_id, period, created_at')
+        .select('customer_id, feature_id, indicator_id, period, created_at, value, updated_at')
         .limit(50000);
       if (error) throw error;
       return (data || []) as ScoreRecord[];
@@ -158,8 +158,47 @@ export default function ComplianceReport() {
     return map;
   }, [customerFeaturesMap, featureLinks]);
 
-  // Build customer rows
-  const buildRows = (scores: ScoreRecord[]): CustomerRow[] => {
+  // Compute previous period string
+  const previousPeriod = useMemo(() => {
+    const [y, m] = currentPeriod.split('-').map(Number);
+    const prev = new Date(y, m - 2, 1);
+    return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+  }, [currentPeriod]);
+
+  // Previous period scores for trend
+  const { data: prevPeriodScores = [] } = useQuery({
+    queryKey: ['compliance-scores-prev', previousPeriod],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('csm_customer_feature_scores')
+        .select('customer_id, feature_id, indicator_id, period, created_at, value, updated_at')
+        .eq('period', previousPeriod)
+        .limit(50000);
+      if (error) throw error;
+      return (data || []) as ScoreRecord[];
+    },
+  });
+
+  // Compute per-customer average score for a given set of scores
+  const computeCustomerAvgs = (scores: ScoreRecord[]): Map<string, number> => {
+    const map = new Map<string, { sum: number; count: number }>();
+    scores.forEach(s => {
+      if (s.value == null) return;
+      const existing = map.get(s.customer_id);
+      if (!existing) map.set(s.customer_id, { sum: Number(s.value), count: 1 });
+      else { existing.sum += Number(s.value); existing.count++; }
+    });
+    const result = new Map<string, number>();
+    map.forEach((v, k) => result.set(k, Math.round((v.sum / v.count) * 100)));
+    return result;
+  };
+
+  const currentAvgs = useMemo(() => computeCustomerAvgs(currentScores), [currentScores]);
+  const prevAvgs = useMemo(() => computeCustomerAvgs(prevPeriodScores), [prevPeriodScores]);
+  const allTimeAvgs = useMemo(() => computeCustomerAvgs(allTimeScores), [allTimeScores]);
+
+  // Build customer rows with trend data
+  const buildRows = (scores: ScoreRecord[], avgMap: Map<string, number>, prevAvgMap: Map<string, number>): CustomerRow[] => {
     const scoresByCustomer = new Map<string, { count: number; latest: string }>();
     scores.forEach(s => {
       const existing = scoresByCustomer.get(s.customer_id);
@@ -198,12 +237,15 @@ export default function ComplianceReport() {
         totalExpected,
         lastEverSubmission: lastEver.get(cust.id) || null,
         status,
+        currentAvg: avgMap.get(cust.id) ?? null,
+        previousAvg: prevAvgMap.get(cust.id) ?? null,
+        isManagedServices: cust.managed_services ?? false,
       };
     });
   };
 
-  const currentRows = useMemo(() => buildRows(currentScores), [currentScores, allTimeScores, customers, csms, customerExpectedMap]);
-  const allTimeRows = useMemo(() => buildRows(allTimeScores), [allTimeScores, customers, csms, customerExpectedMap]);
+  const currentRows = useMemo(() => buildRows(currentScores, currentAvgs, prevAvgs), [currentScores, allTimeScores, customers, csms, customerExpectedMap, currentAvgs, prevAvgs]);
+  const allTimeRows = useMemo(() => buildRows(allTimeScores, allTimeAvgs, prevAvgs), [allTimeScores, customers, csms, customerExpectedMap, allTimeAvgs, prevAvgs]);
 
   const computeStats = (rows: CustomerRow[]) => {
     const completed = rows.filter(r => r.status !== 'pending').length;
@@ -486,7 +528,7 @@ export default function ComplianceReport() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">📋 CSM Compliance Report</h1>
+          <h1 className="text-2xl font-bold">📋 Compliance Report</h1>
           <p className="text-sm text-muted-foreground">
             Period: {currentPeriod} • Deadline: {deadlineLabel}
             {lastUpdatedLabel && ` • Updated ${lastUpdatedLabel}`}
