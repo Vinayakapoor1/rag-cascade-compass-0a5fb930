@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ComplianceSummaryCards } from '@/components/compliance/ComplianceSummaryCards';
 import { ComplianceCustomerTable, type CustomerRow } from '@/components/compliance/ComplianceCustomerTable';
 import type { ScoreRecord } from '@/components/compliance/ComplianceCustomerDetail';
-import ExcelJS from 'exceljs';
+import PptxGenJS from 'pptxgenjs';
 import { toast } from 'sonner';
 
 export default function ComplianceReport() {
@@ -238,61 +238,187 @@ export default function ComplianceReport() {
       const periodLabel = tab === 'current' ? currentPeriod : 'All Time';
       const stats = tab === 'current' ? currentStats : allTimeStats;
 
-      const wb = new ExcelJS.Workbook();
+      const pptx = new PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE';
+      pptx.author = 'Klarity Compliance';
+      pptx.title = `CSM Compliance Report — ${periodLabel}`;
 
-      // Sheet 1: Summary
-      const summarySheet = wb.addWorksheet('Summary');
-      summarySheet.columns = [
-        { header: 'Metric', key: 'metric', width: 30 },
-        { header: 'Value', key: 'value', width: 20 },
-      ];
-      summarySheet.addRows([
-        { metric: 'Period', value: periodLabel },
-        { metric: 'Total CSMs', value: stats.totalCsms },
-        { metric: 'CSMs Submitted', value: stats.compliantCount },
-        { metric: 'CSMs Pending', value: stats.pendingCsmCount },
-        { metric: 'Completion %', value: `${stats.completionPct}%` },
-        { metric: 'Total Customers', value: stats.totalCustomers },
-        { metric: 'Customers Completed', value: stats.completedCustomers },
-        { metric: 'Customers Pending', value: stats.pendingCustomers },
-      ]);
-      summarySheet.getRow(1).font = { bold: true };
+      const COLORS = {
+        bg: '1A1F2C',
+        card: '222738',
+        text: 'FFFFFF',
+        muted: '9CA3AF',
+        green: '22C55E',
+        amber: 'F59E0B',
+        red: 'EF4444',
+        primary: '8B5CF6',
+        border: '374151',
+      };
 
-      // Sheet 2: Customer Breakdown
-      const custSheet = wb.addWorksheet('Customer Breakdown');
-      custSheet.columns = [
-        { header: 'Customer', key: 'customer', width: 30 },
-        { header: 'CSM', key: 'csm', width: 25 },
-        { header: 'CSM Email', key: 'csmEmail', width: 30 },
-        { header: 'Scores Filled', key: 'filled', width: 15 },
-        { header: 'Total Expected', key: 'expected', width: 15 },
-        { header: 'Last Submission', key: 'lastSub', width: 25 },
-        { header: 'Status', key: 'status', width: 15 },
+      // --- Slide 1: Title ---
+      const titleSlide = pptx.addSlide();
+      titleSlide.background = { color: COLORS.bg };
+      titleSlide.addText('📋 CSM Compliance Report', {
+        x: 0.8, y: 1.5, w: 11, h: 1.2,
+        fontSize: 36, fontFace: 'Arial', color: COLORS.text, bold: true,
+      });
+      titleSlide.addText(`Period: ${periodLabel}`, {
+        x: 0.8, y: 2.8, w: 11, h: 0.5,
+        fontSize: 18, fontFace: 'Arial', color: COLORS.muted,
+      });
+      titleSlide.addText(`Generated: ${new Date().toLocaleDateString()}`, {
+        x: 0.8, y: 3.4, w: 11, h: 0.5,
+        fontSize: 14, fontFace: 'Arial', color: COLORS.muted,
+      });
+
+      // --- Slide 2: Summary Stats ---
+      const summarySlide = pptx.addSlide();
+      summarySlide.background = { color: COLORS.bg };
+      summarySlide.addText('Summary', {
+        x: 0.5, y: 0.3, w: 12, h: 0.6,
+        fontSize: 28, fontFace: 'Arial', color: COLORS.text, bold: true,
+      });
+
+      const statItems = [
+        { label: 'Total CSMs', value: String(stats.totalCsms), color: COLORS.text },
+        { label: 'CSMs Submitted', value: String(stats.compliantCount), color: COLORS.green },
+        { label: 'CSMs Pending', value: String(stats.pendingCsmCount), color: COLORS.red },
+        { label: 'Completion', value: `${stats.completionPct}%`, color: COLORS.primary },
+        { label: 'Customers', value: String(stats.totalCustomers), color: COLORS.text },
+        { label: 'Completed', value: String(stats.completedCustomers), color: COLORS.green },
+        { label: 'Pending', value: String(stats.pendingCustomers), color: COLORS.red },
       ];
-      rows.forEach(r => {
-        custSheet.addRow({
-          customer: r.customerName,
-          csm: r.csmName,
-          csmEmail: r.csmEmail || '',
-          filled: r.scoresThisPeriod,
-          expected: r.totalExpected,
-          lastSub: r.lastEverSubmission ? new Date(r.lastEverSubmission).toLocaleDateString() : 'Never',
-          status: r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending',
+      statItems.forEach((item, i) => {
+        const col = i % 4;
+        const row = Math.floor(i / 4);
+        const x = 0.5 + col * 3.1;
+        const y = 1.2 + row * 1.8;
+        summarySlide.addShape(pptx.ShapeType.roundRect, {
+          x, y, w: 2.8, h: 1.4,
+          fill: { color: COLORS.card },
+          line: { color: COLORS.border, width: 1 },
+          rectRadius: 0.1,
+        });
+        summarySlide.addText(item.value, {
+          x, y: y + 0.15, w: 2.8, h: 0.7,
+          fontSize: 32, fontFace: 'Arial', color: item.color, bold: true, align: 'center',
+        });
+        summarySlide.addText(item.label, {
+          x, y: y + 0.8, w: 2.8, h: 0.4,
+          fontSize: 12, fontFace: 'Arial', color: COLORS.muted, align: 'center',
         });
       });
-      custSheet.getRow(1).font = { bold: true };
 
-      // Sheet 3: Feature Detail
-      const detailSheet = wb.addWorksheet('Feature Detail');
-      detailSheet.columns = [
-        { header: 'Customer', key: 'customer', width: 30 },
-        { header: 'Feature', key: 'feature', width: 35 },
-        { header: 'Indicators Filled', key: 'filled', width: 18 },
-        { header: 'Indicators Expected', key: 'expected', width: 18 },
-        { header: 'Status', key: 'status', width: 15 },
+      // --- Slide 3: Customer Overview Table ---
+      const overviewSlide = pptx.addSlide();
+      overviewSlide.background = { color: COLORS.bg };
+      overviewSlide.addText('Customer Overview', {
+        x: 0.5, y: 0.3, w: 12, h: 0.6,
+        fontSize: 24, fontFace: 'Arial', color: COLORS.text, bold: true,
+      });
+
+      const tableHeader = [
+        { text: 'Customer', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+        { text: 'CSM', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+        { text: 'Filled', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        { text: 'Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        { text: 'Rate', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        { text: 'Last Check-in', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+        { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
       ];
+
+      // Split into pages of 12 rows
+      const PAGE_SIZE = 12;
+      for (let page = 0; page < Math.ceil(rows.length / PAGE_SIZE); page++) {
+        const slide = page === 0 ? overviewSlide : pptx.addSlide();
+        if (page > 0) {
+          slide.background = { color: COLORS.bg };
+          slide.addText(`Customer Overview (${page + 1})`, {
+            x: 0.5, y: 0.3, w: 12, h: 0.6,
+            fontSize: 24, fontFace: 'Arial', color: COLORS.text, bold: true,
+          });
+        }
+        const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+        const tableRows: any[][] = [tableHeader];
+        pageRows.forEach(r => {
+          const rate = r.totalExpected > 0 ? Math.round((r.scoresThisPeriod / r.totalExpected) * 100) : 0;
+          const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
+          const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
+          tableRows.push([
+            { text: r.customerName, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
+            { text: r.csmName, options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg } } },
+            { text: String(r.scoresThisPeriod), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: String(r.totalExpected), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: `${rate}%`, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+            { text: r.lastEverSubmission ? new Date(r.lastEverSubmission).toLocaleDateString() : 'Never', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg } } },
+            { text: statusLabel, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+          ]);
+        });
+        slide.addTable(tableRows, {
+          x: 0.3, y: 1.0, w: 12.5,
+          border: { type: 'solid', color: COLORS.border, pt: 0.5 },
+          colW: [2.5, 2, 1.2, 1.2, 1, 2.2, 1.2],
+          rowH: 0.35,
+        });
+      }
+
+      // --- Per-Customer Detail Slides ---
       rows.forEach(r => {
         const custFeatureIds = customerFeaturesMap.get(r.customerId) || [];
+        if (custFeatureIds.length === 0) return;
+
+        const slide = pptx.addSlide();
+        slide.background = { color: COLORS.bg };
+
+        // Customer header
+        const rate = r.totalExpected > 0 ? Math.round((r.scoresThisPeriod / r.totalExpected) * 100) : 0;
+        const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
+        const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
+
+        slide.addText(r.customerName, {
+          x: 0.5, y: 0.25, w: 8, h: 0.5,
+          fontSize: 24, fontFace: 'Arial', color: COLORS.text, bold: true,
+        });
+        slide.addText(`CSM: ${r.csmName}${r.csmEmail ? ` (${r.csmEmail})` : ''}`, {
+          x: 0.5, y: 0.75, w: 8, h: 0.35,
+          fontSize: 12, fontFace: 'Arial', color: COLORS.muted,
+        });
+
+        // Stats row
+        const custStats = [
+          { label: 'Completion', value: `${rate}%`, color: statusColor },
+          { label: 'Filled', value: `${r.scoresThisPeriod}/${r.totalExpected}`, color: COLORS.text },
+          { label: 'Status', value: statusLabel, color: statusColor },
+          { label: 'Last Check-in', value: r.lastEverSubmission ? new Date(r.lastEverSubmission).toLocaleDateString() : 'Never', color: COLORS.muted },
+        ];
+        custStats.forEach((s, i) => {
+          const x = 0.5 + i * 3.1;
+          slide.addShape(pptx.ShapeType.roundRect, {
+            x, y: 1.2, w: 2.8, h: 0.9,
+            fill: { color: COLORS.card },
+            line: { color: COLORS.border, width: 1 },
+            rectRadius: 0.08,
+          });
+          slide.addText(s.value, {
+            x, y: 1.2, w: 2.8, h: 0.5,
+            fontSize: 18, fontFace: 'Arial', color: s.color, bold: true, align: 'center',
+          });
+          slide.addText(s.label, {
+            x, y: 1.65, w: 2.8, h: 0.35,
+            fontSize: 10, fontFace: 'Arial', color: COLORS.muted, align: 'center',
+          });
+        });
+
+        // Feature table
+        const featureHeader = [
+          { text: 'Feature', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+          { text: 'Filled', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Rate', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        ];
+
+        const featureRows: any[][] = [featureHeader];
         custFeatureIds.forEach(fid => {
           const fname = featureNameMap.get(fid) || 'Unknown';
           const expectedIndicators = featureLinks.filter(l => l.feature_id === fid).map(l => l.indicator_id);
@@ -302,28 +428,30 @@ export default function ComplianceReport() {
               .map(s => s.indicator_id)
           );
           const filledCount = expectedIndicators.filter(id => filledSet.has(id)).length;
-          const status = filledCount >= expectedIndicators.length && expectedIndicators.length > 0
+          const fRate = expectedIndicators.length > 0 ? Math.round((filledCount / expectedIndicators.length) * 100) : 0;
+          const fStatus = filledCount >= expectedIndicators.length && expectedIndicators.length > 0
             ? 'Filled' : filledCount > 0 ? 'Partial' : 'Pending';
-          detailSheet.addRow({
-            customer: r.customerName,
-            feature: fname,
-            filled: filledCount,
-            expected: expectedIndicators.length,
-            status,
-          });
+          const fColor = fStatus === 'Filled' ? COLORS.green : fStatus === 'Partial' ? COLORS.amber : COLORS.red;
+
+          featureRows.push([
+            { text: fname, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
+            { text: String(filledCount), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: String(expectedIndicators.length), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: `${fRate}%`, options: { fontSize: 9, color: fColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+            { text: fStatus, options: { fontSize: 9, color: fColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+          ]);
+        });
+
+        slide.addTable(featureRows, {
+          x: 0.3, y: 2.3, w: 12.5,
+          border: { type: 'solid', color: COLORS.border, pt: 0.5 },
+          colW: [5, 1.8, 1.8, 1.8, 1.8],
+          rowH: 0.32,
         });
       });
-      detailSheet.getRow(1).font = { bold: true };
 
-      const buffer = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `CSM_Compliance_Report_${periodLabel.replace(/\s/g, '_')}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Report downloaded');
+      await pptx.writeFile({ fileName: `CSM_Compliance_Report_${periodLabel.replace(/\s/g, '_')}.pptx` });
+      toast.success('PowerPoint report downloaded');
     } catch (err) {
       console.error(err);
       toast.error('Failed to generate report');
