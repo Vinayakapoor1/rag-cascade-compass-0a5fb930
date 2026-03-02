@@ -315,99 +315,12 @@ export default function ComplianceReport() {
         x: 0.8, y: 3.4, w: 11, h: 0.5,
         fontSize: 14, fontFace: 'Arial', color: COLORS.muted,
       });
+      titleSlide.addText(
+        `${stats.totalCsms} CSMs • ${stats.totalCustomers} Customers • ${stats.completionPct}% Overall Completion`,
+        { x: 0.8, y: 4.2, w: 11, h: 0.5, fontSize: 14, fontFace: 'Arial', color: COLORS.primary }
+      );
 
-      // --- Slide 2: Summary Stats ---
-      const summarySlide = pptx.addSlide();
-      summarySlide.background = { color: COLORS.bg };
-      summarySlide.addText('Summary', {
-        x: 0.5, y: 0.3, w: 12, h: 0.6,
-        fontSize: 28, fontFace: 'Arial', color: COLORS.text, bold: true,
-      });
-
-      const statItems = [
-        { label: 'Total CSMs', value: String(stats.totalCsms), color: COLORS.text },
-        { label: 'CSMs Submitted', value: String(stats.compliantCount), color: COLORS.green },
-        { label: 'CSMs Pending', value: String(stats.pendingCsmCount), color: COLORS.red },
-        { label: 'Completion', value: `${stats.completionPct}%`, color: COLORS.primary },
-        { label: 'Customers', value: String(stats.totalCustomers), color: COLORS.text },
-        { label: 'Completed', value: String(stats.completedCustomers), color: COLORS.green },
-        { label: 'Pending', value: String(stats.pendingCustomers), color: COLORS.red },
-      ];
-      statItems.forEach((item, i) => {
-        const col = i % 4;
-        const row = Math.floor(i / 4);
-        const x = 0.5 + col * 3.1;
-        const y = 1.2 + row * 1.8;
-        summarySlide.addShape(pptx.ShapeType.roundRect, {
-          x, y, w: 2.8, h: 1.4,
-          fill: { color: COLORS.card },
-          line: { color: COLORS.border, width: 1 },
-          rectRadius: 0.1,
-        });
-        summarySlide.addText(item.value, {
-          x, y: y + 0.15, w: 2.8, h: 0.7,
-          fontSize: 32, fontFace: 'Arial', color: item.color, bold: true, align: 'center',
-        });
-        summarySlide.addText(item.label, {
-          x, y: y + 0.8, w: 2.8, h: 0.4,
-          fontSize: 12, fontFace: 'Arial', color: COLORS.muted, align: 'center',
-        });
-      });
-
-      // --- Slide 3: Customer Overview Table ---
-      const overviewSlide = pptx.addSlide();
-      overviewSlide.background = { color: COLORS.bg };
-      overviewSlide.addText('Customer Overview', {
-        x: 0.5, y: 0.3, w: 12, h: 0.6,
-        fontSize: 24, fontFace: 'Arial', color: COLORS.text, bold: true,
-      });
-
-      const tableHeader = [
-        { text: 'Customer', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
-        { text: 'CSM', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
-        { text: 'Filled', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-        { text: 'Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-        { text: 'Rate', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-        { text: 'Last Check-in', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
-        { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-      ];
-
-      // Split into pages of 12 rows
-      const PAGE_SIZE = 12;
-      for (let page = 0; page < Math.ceil(rows.length / PAGE_SIZE); page++) {
-        const slide = page === 0 ? overviewSlide : pptx.addSlide();
-        if (page > 0) {
-          slide.background = { color: COLORS.bg };
-          slide.addText(`Customer Overview (${page + 1})`, {
-            x: 0.5, y: 0.3, w: 12, h: 0.6,
-            fontSize: 24, fontFace: 'Arial', color: COLORS.text, bold: true,
-          });
-        }
-        const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-        const tableRows: any[][] = [tableHeader];
-        pageRows.forEach(r => {
-          const rate = r.totalExpected > 0 ? Math.round((r.scoresThisPeriod / r.totalExpected) * 100) : 0;
-          const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
-          const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
-          tableRows.push([
-            { text: r.customerName, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
-            { text: r.csmName, options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg } } },
-            { text: String(r.scoresThisPeriod), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: String(r.totalExpected), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: `${rate}%`, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
-            { text: r.lastEverSubmission ? new Date(r.lastEverSubmission).toLocaleDateString() : 'Never', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg } } },
-            { text: statusLabel, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
-          ]);
-        });
-        slide.addTable(tableRows, {
-          x: 0.3, y: 1.0, w: 12.5,
-          border: { type: 'solid', color: COLORS.border, pt: 0.5 },
-          colW: [2.5, 2, 1.2, 1.2, 1, 2.2, 1.2],
-          rowH: 0.35,
-        });
-      }
-
-      // --- Per-CSM Breakdown Slides ---
+      // --- Group rows by CSM ---
       const csmGrouped = new Map<string, CustomerRow[]>();
       rows.forEach(r => {
         const list = csmGrouped.get(r.csmName) || [];
@@ -415,178 +328,174 @@ export default function ComplianceReport() {
         csmGrouped.set(r.csmName, list);
       });
 
-      csmGrouped.forEach((csmRows, csmName) => {
-        const csmSlide = pptx.addSlide();
-        csmSlide.background = { color: COLORS.bg };
+      // Build CSM summary data sorted by completion % ascending (worst first)
+      const csmSummaries = [...csmGrouped.entries()].map(([csmName, csmRows]) => {
+        const email = csmRows[0]?.csmEmail || '';
+        const totalCustomers = csmRows.length;
+        const filledTotal = csmRows.reduce((s, r) => s + r.scoresThisPeriod, 0);
+        const expectedTotal = csmRows.reduce((s, r) => s + r.totalExpected, 0);
+        const completionPct = expectedTotal > 0 ? Math.round((filledTotal / expectedTotal) * 100) : 0;
+        const submitted = csmRows.filter(r => r.status !== 'pending').length;
+        const pending = csmRows.filter(r => r.status === 'pending').length;
+        const status = pending === 0 ? 'Complete' : submitted === 0 ? 'Pending' : 'Partial';
+        return { csmName, email, totalCustomers, filledTotal, expectedTotal, completionPct, submitted, pending, status, csmRows };
+      }).sort((a, b) => a.completionPct - b.completionPct);
 
-        const csmEmail = csmRows[0]?.csmEmail || '';
-        const csmCompleted = csmRows.filter(r => r.status !== 'pending').length;
-        const csmPending = csmRows.filter(r => r.status === 'pending').length;
-        const csmPct = csmRows.length > 0 ? Math.round((csmCompleted / csmRows.length) * 100) : 0;
-        const csmPctColor = csmPct >= 80 ? COLORS.green : csmPct >= 50 ? COLORS.amber : COLORS.red;
-
-        csmSlide.addText(`👤 ${csmName}`, {
-          x: 0.5, y: 0.2, w: 10, h: 0.5,
-          fontSize: 26, fontFace: 'Arial', color: COLORS.text, bold: true,
-        });
-        if (csmEmail) {
-          csmSlide.addText(csmEmail, {
-            x: 0.5, y: 0.7, w: 10, h: 0.3,
-            fontSize: 11, fontFace: 'Arial', color: COLORS.muted,
-          });
-        }
-
-        // CSM stats
-        const csmStatItems = [
-          { label: 'Customers', value: String(csmRows.length), color: COLORS.text },
-          { label: 'Submitted', value: String(csmCompleted), color: COLORS.green },
-          { label: 'Pending', value: String(csmPending), color: COLORS.red },
-          { label: 'Completion', value: `${csmPct}%`, color: csmPctColor },
-        ];
-        csmStatItems.forEach((item, i) => {
-          const x = 0.5 + i * 3.1;
-          csmSlide.addShape(pptx.ShapeType.roundRect, {
-            x, y: 1.1, w: 2.8, h: 0.9,
-            fill: { color: COLORS.card },
-            line: { color: COLORS.border, width: 1 },
-            rectRadius: 0.08,
-          });
-          csmSlide.addText(item.value, {
-            x, y: 1.1, w: 2.8, h: 0.5,
-            fontSize: 22, fontFace: 'Arial', color: item.color, bold: true, align: 'center',
-          });
-          csmSlide.addText(item.label, {
-            x, y: 1.55, w: 2.8, h: 0.35,
-            fontSize: 10, fontFace: 'Arial', color: COLORS.muted, align: 'center',
-          });
-        });
-
-        // Customer table for this CSM
-        const csmTableHeader = [
-          { text: 'Customer', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
-          { text: 'Type', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Filled', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Prev %', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Current %', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Trend', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-        ];
-        const csmTableRows: any[][] = [csmTableHeader];
-        csmRows.forEach(r => {
-          const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
-          const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
-          const prevStr = r.previousAvg != null ? `${r.previousAvg}%` : '—';
-          const currStr = r.currentAvg != null ? `${r.currentAvg}%` : '—';
-          let trendStr = '—';
-          let trendColor = COLORS.muted;
-          if (r.previousAvg != null && r.currentAvg != null) {
-            const diff = r.currentAvg - r.previousAvg;
-            trendStr = diff > 0 ? `▲ +${diff}` : diff < 0 ? `▼ ${diff}` : '— 0';
-            trendColor = diff > 0 ? COLORS.green : diff < 0 ? COLORS.red : COLORS.muted;
-          }
-          csmTableRows.push([
-            { text: r.customerName, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
-            { text: r.isManagedServices ? 'CM' : 'CSM', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: String(r.scoresThisPeriod), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: String(r.totalExpected), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: prevStr, options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: currStr, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
-            { text: trendStr, options: { fontSize: 9, color: trendColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
-            { text: statusLabel, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
-          ]);
-        });
-        csmSlide.addTable(csmTableRows, {
-          x: 0.3, y: 2.2, w: 12.5,
-          border: { type: 'solid', color: COLORS.border, pt: 0.5 },
-          colW: [3, 0.8, 1, 1, 1.3, 1.3, 1.3, 1.3],
-          rowH: 0.32,
-        });
+      // --- Slide 2: CSM Leaderboard ---
+      const leaderSlide = pptx.addSlide();
+      leaderSlide.background = { color: COLORS.bg };
+      leaderSlide.addText('📊 CSM Leaderboard', {
+        x: 0.5, y: 0.3, w: 12, h: 0.6,
+        fontSize: 28, fontFace: 'Arial', color: COLORS.text, bold: true,
+      });
+      leaderSlide.addText(`Ranked by completion % (lowest first) — ${csmSummaries.length} CSMs`, {
+        x: 0.5, y: 0.85, w: 12, h: 0.3,
+        fontSize: 11, fontFace: 'Arial', color: COLORS.muted,
       });
 
-      // --- Per-Customer Detail Slides ---
-      rows.forEach(r => {
-        const custFeatureIds = customerFeaturesMap.get(r.customerId) || [];
-        if (custFeatureIds.length === 0) return;
+      const lbHeader = [
+        { text: 'CSM Name', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+        { text: 'Email', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+        { text: 'Customers', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        { text: 'Filled / Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        { text: 'Completion %', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+      ];
 
-        const slide = pptx.addSlide();
-        slide.background = { color: COLORS.bg };
-
-        const rate = r.totalExpected > 0 ? Math.round((r.scoresThisPeriod / r.totalExpected) * 100) : 0;
-        const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
-        const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
-
-        slide.addText(r.customerName, {
-          x: 0.5, y: 0.25, w: 8, h: 0.5,
-          fontSize: 24, fontFace: 'Arial', color: COLORS.text, bold: true,
-        });
-        slide.addText(`CSM: ${r.csmName}${r.csmEmail ? ` (${r.csmEmail})` : ''}`, {
-          x: 0.5, y: 0.75, w: 8, h: 0.35,
-          fontSize: 12, fontFace: 'Arial', color: COLORS.muted,
-        });
-
-        const custStats = [
-          { label: 'Completion', value: `${rate}%`, color: statusColor },
-          { label: 'Filled', value: `${r.scoresThisPeriod}/${r.totalExpected}`, color: COLORS.text },
-          { label: 'Status', value: statusLabel, color: statusColor },
-          { label: 'Trend', value: r.previousAvg != null && r.currentAvg != null ? `${r.previousAvg}% → ${r.currentAvg}%` : r.currentAvg != null ? `${r.currentAvg}%` : '—', color: r.currentAvg != null && r.previousAvg != null && r.currentAvg > r.previousAvg ? COLORS.green : r.currentAvg != null && r.previousAvg != null && r.currentAvg < r.previousAvg ? COLORS.red : COLORS.muted },
-        ];
-        custStats.forEach((s, i) => {
-          const x = 0.5 + i * 3.1;
-          slide.addShape(pptx.ShapeType.roundRect, {
-            x, y: 1.2, w: 2.8, h: 0.9,
-            fill: { color: COLORS.card },
-            line: { color: COLORS.border, width: 1 },
-            rectRadius: 0.08,
+      const LB_PAGE = 14;
+      for (let page = 0; page < Math.ceil(csmSummaries.length / LB_PAGE); page++) {
+        const slide = page === 0 ? leaderSlide : pptx.addSlide();
+        if (page > 0) {
+          slide.background = { color: COLORS.bg };
+          slide.addText(`📊 CSM Leaderboard (${page + 1})`, {
+            x: 0.5, y: 0.3, w: 12, h: 0.6,
+            fontSize: 28, fontFace: 'Arial', color: COLORS.text, bold: true,
           });
-          slide.addText(s.value, {
-            x, y: 1.2, w: 2.8, h: 0.5,
-            fontSize: 18, fontFace: 'Arial', color: s.color, bold: true, align: 'center',
-          });
-          slide.addText(s.label, {
-            x, y: 1.65, w: 2.8, h: 0.35,
-            fontSize: 10, fontFace: 'Arial', color: COLORS.muted, align: 'center',
-          });
-        });
-
-        const featureHeader = [
-          { text: 'Feature', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
-          { text: 'Filled', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Rate', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-          { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
-        ];
-
-        const featureRows: any[][] = [featureHeader];
-        custFeatureIds.forEach(fid => {
-          const fname = featureNameMap.get(fid) || 'Unknown';
-          const expectedIndicators = featureLinks.filter(l => l.feature_id === fid).map(l => l.indicator_id);
-          const filledSet = new Set(
-            scores
-              .filter(s => s.customer_id === r.customerId && s.feature_id === fid)
-              .map(s => s.indicator_id)
-          );
-          const filledCount = expectedIndicators.filter(id => filledSet.has(id)).length;
-          const fRate = expectedIndicators.length > 0 ? Math.round((filledCount / expectedIndicators.length) * 100) : 0;
-          const fStatus = filledCount >= expectedIndicators.length && expectedIndicators.length > 0
-            ? 'Filled' : filledCount > 0 ? 'Partial' : 'Pending';
-          const fColor = fStatus === 'Filled' ? COLORS.green : fStatus === 'Partial' ? COLORS.amber : COLORS.red;
-
-          featureRows.push([
-            { text: fname, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
-            { text: String(filledCount), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: String(expectedIndicators.length), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
-            { text: `${fRate}%`, options: { fontSize: 9, color: fColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
-            { text: fStatus, options: { fontSize: 9, color: fColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+        }
+        const pageSummaries = csmSummaries.slice(page * LB_PAGE, (page + 1) * LB_PAGE);
+        const lbRows: any[][] = [lbHeader];
+        pageSummaries.forEach(csm => {
+          const pctColor = csm.completionPct >= 80 ? COLORS.green : csm.completionPct >= 50 ? COLORS.amber : COLORS.red;
+          const statusColor = csm.status === 'Complete' ? COLORS.green : csm.status === 'Partial' ? COLORS.amber : COLORS.red;
+          lbRows.push([
+            { text: csm.csmName, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, bold: true } },
+            { text: csm.email || '—', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg } } },
+            { text: String(csm.totalCustomers), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: `${csm.filledTotal} / ${csm.expectedTotal}`, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: `${csm.completionPct}%`, options: { fontSize: 9, color: pctColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+            { text: csm.status, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
           ]);
         });
-
-        slide.addTable(featureRows, {
-          x: 0.3, y: 2.3, w: 12.5,
+        slide.addTable(lbRows, {
+          x: 0.3, y: page === 0 ? 1.3 : 1.0, w: 12.5,
           border: { type: 'solid', color: COLORS.border, pt: 0.5 },
-          colW: [5, 1.8, 1.8, 1.8, 1.8],
-          rowH: 0.32,
+          colW: [2.5, 3, 1.3, 1.8, 1.8, 1.5],
+          rowH: 0.33,
         });
+      }
+
+      // --- Slides 3+: Per-CSM Detail ---
+      const CSM_PAGE = 10;
+      csmSummaries.forEach(csm => {
+        const { csmName, email, csmRows: cRows, totalCustomers, submitted, pending, completionPct } = csm;
+        const pctColor = completionPct >= 80 ? COLORS.green : completionPct >= 50 ? COLORS.amber : COLORS.red;
+
+        // Paginate customers
+        const totalPages = Math.ceil(cRows.length / CSM_PAGE);
+        for (let page = 0; page < totalPages; page++) {
+          const csmSlide = pptx.addSlide();
+          csmSlide.background = { color: COLORS.bg };
+
+          const pageLabel = totalPages > 1 ? ` (${page + 1}/${totalPages})` : '';
+          csmSlide.addText(`👤 ${csmName}${pageLabel}`, {
+            x: 0.5, y: 0.2, w: 10, h: 0.5,
+            fontSize: 26, fontFace: 'Arial', color: COLORS.text, bold: true,
+          });
+          if (email) {
+            csmSlide.addText(email, {
+              x: 0.5, y: 0.65, w: 10, h: 0.3,
+              fontSize: 11, fontFace: 'Arial', color: COLORS.muted,
+            });
+          }
+
+          // Stats row (only on first page)
+          if (page === 0) {
+            const csmStatItems = [
+              { label: 'Customers', value: String(totalCustomers), color: COLORS.text },
+              { label: 'Submitted', value: String(submitted), color: COLORS.green },
+              { label: 'Pending', value: String(pending), color: COLORS.red },
+              { label: 'Completion', value: `${completionPct}%`, color: pctColor },
+            ];
+            csmStatItems.forEach((item, i) => {
+              const x = 0.5 + i * 3.1;
+              csmSlide.addShape(pptx.ShapeType.roundRect, {
+                x, y: 1.0, w: 2.8, h: 0.85,
+                fill: { color: COLORS.card },
+                line: { color: COLORS.border, width: 1 },
+                rectRadius: 0.08,
+              });
+              csmSlide.addText(item.value, {
+                x, y: 1.0, w: 2.8, h: 0.48,
+                fontSize: 22, fontFace: 'Arial', color: item.color, bold: true, align: 'center',
+              });
+              csmSlide.addText(item.label, {
+                x, y: 1.45, w: 2.8, h: 0.3,
+                fontSize: 10, fontFace: 'Arial', color: COLORS.muted, align: 'center',
+              });
+            });
+          }
+
+          const tableY = page === 0 ? 2.05 : 1.1;
+          const pageRows = cRows.slice(page * CSM_PAGE, (page + 1) * CSM_PAGE);
+
+          // Customer table
+          const csmTableHeader = [
+            { text: 'Customer', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+            { text: 'Type', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+            { text: 'Filled / Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+            { text: 'Completion %', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+            { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          ];
+          const csmTableRows: any[][] = [csmTableHeader];
+          pageRows.forEach(r => {
+            const custPct = r.totalExpected > 0 ? Math.round((r.scoresThisPeriod / r.totalExpected) * 100) : 0;
+            const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
+            const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
+            csmTableRows.push([
+              { text: r.customerName, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
+              { text: r.isManagedServices ? 'CM' : 'CSM', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg }, align: 'center' } },
+              { text: `${r.scoresThisPeriod} / ${r.totalExpected}`, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+              { text: `${custPct}%`, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+              { text: statusLabel, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+            ]);
+          });
+          csmSlide.addTable(csmTableRows, {
+            x: 0.3, y: tableY, w: 12.5,
+            border: { type: 'solid', color: COLORS.border, pt: 0.5 },
+            colW: [4, 1, 2.5, 2.5, 2],
+            rowH: 0.32,
+          });
+
+          // "Not Filled" section — only on last page
+          if (page === totalPages - 1) {
+            const missingCustomers = cRows.filter(r => r.status !== 'complete');
+            if (missingCustomers.length > 0) {
+              const missingY = tableY + (pageRows.length + 1) * 0.32 + 0.3;
+              csmSlide.addText('⚠️ Not Filled:', {
+                x: 0.5, y: missingY, w: 12, h: 0.35,
+                fontSize: 12, fontFace: 'Arial', color: COLORS.amber, bold: true,
+              });
+              const missingLines = missingCustomers.map(r => {
+                const gap = r.totalExpected - r.scoresThisPeriod;
+                return `• ${r.customerName} — ${r.scoresThisPeriod}/${r.totalExpected} filled, missing ${gap} indicator${gap !== 1 ? 's' : ''}`;
+              });
+              csmSlide.addText(missingLines.join('\n'), {
+                x: 0.5, y: missingY + 0.35, w: 12, h: Math.min(missingLines.length * 0.22 + 0.2, 2.5),
+                fontSize: 9, fontFace: 'Arial', color: COLORS.muted, valign: 'top',
+              });
+            }
+          }
+        }
       });
 
       await pptx.writeFile({ fileName: `CSM_Compliance_Report_${periodLabel.replace(/\s/g, '_')}.pptx` });
