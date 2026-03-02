@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ComplianceSummaryCards } from '@/components/compliance/ComplianceSummaryCards';
+import { ComplianceSummaryCards, type ComplianceFilter } from '@/components/compliance/ComplianceSummaryCards';
 import { ComplianceCustomerTable, type CustomerRow } from '@/components/compliance/ComplianceCustomerTable';
 import type { ScoreRecord } from '@/components/compliance/ComplianceCustomerDetail';
 import PptxGenJS from 'pptxgenjs';
@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 export default function ComplianceReport() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<string>('current');
+  const [cardFilter, setCardFilter] = useState<ComplianceFilter>(null);
 
   const currentPeriod = useMemo(() => {
     const now = new Date();
@@ -262,6 +263,8 @@ export default function ComplianceReport() {
       totalCustomers: rows.length,
       completedCustomers: completed,
       pendingCustomers: pending,
+      submittedCsmNames: [...csmWithSubmissions],
+      pendingCsmNames: [...csmWithCustomers].filter(n => !csmWithSubmissions.has(n)),
     };
   };
 
@@ -404,6 +407,103 @@ export default function ComplianceReport() {
         });
       }
 
+      // --- Per-CSM Breakdown Slides ---
+      const csmGrouped = new Map<string, CustomerRow[]>();
+      rows.forEach(r => {
+        const list = csmGrouped.get(r.csmName) || [];
+        list.push(r);
+        csmGrouped.set(r.csmName, list);
+      });
+
+      csmGrouped.forEach((csmRows, csmName) => {
+        const csmSlide = pptx.addSlide();
+        csmSlide.background = { color: COLORS.bg };
+
+        const csmEmail = csmRows[0]?.csmEmail || '';
+        const csmCompleted = csmRows.filter(r => r.status !== 'pending').length;
+        const csmPending = csmRows.filter(r => r.status === 'pending').length;
+        const csmPct = csmRows.length > 0 ? Math.round((csmCompleted / csmRows.length) * 100) : 0;
+        const csmPctColor = csmPct >= 80 ? COLORS.green : csmPct >= 50 ? COLORS.amber : COLORS.red;
+
+        csmSlide.addText(`👤 ${csmName}`, {
+          x: 0.5, y: 0.2, w: 10, h: 0.5,
+          fontSize: 26, fontFace: 'Arial', color: COLORS.text, bold: true,
+        });
+        if (csmEmail) {
+          csmSlide.addText(csmEmail, {
+            x: 0.5, y: 0.7, w: 10, h: 0.3,
+            fontSize: 11, fontFace: 'Arial', color: COLORS.muted,
+          });
+        }
+
+        // CSM stats
+        const csmStatItems = [
+          { label: 'Customers', value: String(csmRows.length), color: COLORS.text },
+          { label: 'Submitted', value: String(csmCompleted), color: COLORS.green },
+          { label: 'Pending', value: String(csmPending), color: COLORS.red },
+          { label: 'Completion', value: `${csmPct}%`, color: csmPctColor },
+        ];
+        csmStatItems.forEach((item, i) => {
+          const x = 0.5 + i * 3.1;
+          csmSlide.addShape(pptx.ShapeType.roundRect, {
+            x, y: 1.1, w: 2.8, h: 0.9,
+            fill: { color: COLORS.card },
+            line: { color: COLORS.border, width: 1 },
+            rectRadius: 0.08,
+          });
+          csmSlide.addText(item.value, {
+            x, y: 1.1, w: 2.8, h: 0.5,
+            fontSize: 22, fontFace: 'Arial', color: item.color, bold: true, align: 'center',
+          });
+          csmSlide.addText(item.label, {
+            x, y: 1.55, w: 2.8, h: 0.35,
+            fontSize: 10, fontFace: 'Arial', color: COLORS.muted, align: 'center',
+          });
+        });
+
+        // Customer table for this CSM
+        const csmTableHeader = [
+          { text: 'Customer', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
+          { text: 'Type', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Filled', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Prev %', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Current %', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Trend', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+          { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+        ];
+        const csmTableRows: any[][] = [csmTableHeader];
+        csmRows.forEach(r => {
+          const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
+          const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
+          const prevStr = r.previousAvg != null ? `${r.previousAvg}%` : '—';
+          const currStr = r.currentAvg != null ? `${r.currentAvg}%` : '—';
+          let trendStr = '—';
+          let trendColor = COLORS.muted;
+          if (r.previousAvg != null && r.currentAvg != null) {
+            const diff = r.currentAvg - r.previousAvg;
+            trendStr = diff > 0 ? `▲ +${diff}` : diff < 0 ? `▼ ${diff}` : '— 0';
+            trendColor = diff > 0 ? COLORS.green : diff < 0 ? COLORS.red : COLORS.muted;
+          }
+          csmTableRows.push([
+            { text: r.customerName, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
+            { text: r.isManagedServices ? 'CM' : 'CSM', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: String(r.scoresThisPeriod), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: String(r.totalExpected), options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: prevStr, options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg }, align: 'center' } },
+            { text: currStr, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+            { text: trendStr, options: { fontSize: 9, color: trendColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+            { text: statusLabel, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
+          ]);
+        });
+        csmSlide.addTable(csmTableRows, {
+          x: 0.3, y: 2.2, w: 12.5,
+          border: { type: 'solid', color: COLORS.border, pt: 0.5 },
+          colW: [3, 0.8, 1, 1, 1.3, 1.3, 1.3, 1.3],
+          rowH: 0.32,
+        });
+      });
+
       // --- Per-Customer Detail Slides ---
       rows.forEach(r => {
         const custFeatureIds = customerFeaturesMap.get(r.customerId) || [];
@@ -412,7 +512,6 @@ export default function ComplianceReport() {
         const slide = pptx.addSlide();
         slide.background = { color: COLORS.bg };
 
-        // Customer header
         const rate = r.totalExpected > 0 ? Math.round((r.scoresThisPeriod / r.totalExpected) * 100) : 0;
         const statusColor = r.status === 'complete' ? COLORS.green : r.status === 'partial' ? COLORS.amber : COLORS.red;
         const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
@@ -426,12 +525,11 @@ export default function ComplianceReport() {
           fontSize: 12, fontFace: 'Arial', color: COLORS.muted,
         });
 
-        // Stats row
         const custStats = [
           { label: 'Completion', value: `${rate}%`, color: statusColor },
           { label: 'Filled', value: `${r.scoresThisPeriod}/${r.totalExpected}`, color: COLORS.text },
           { label: 'Status', value: statusLabel, color: statusColor },
-          { label: 'Last Check-in', value: r.lastEverSubmission ? new Date(r.lastEverSubmission).toLocaleDateString() : 'Never', color: COLORS.muted },
+          { label: 'Trend', value: r.previousAvg != null && r.currentAvg != null ? `${r.previousAvg}% → ${r.currentAvg}%` : r.currentAvg != null ? `${r.currentAvg}%` : '—', color: r.currentAvg != null && r.previousAvg != null && r.currentAvg > r.previousAvg ? COLORS.green : r.currentAvg != null && r.previousAvg != null && r.currentAvg < r.previousAvg ? COLORS.red : COLORS.muted },
         ];
         custStats.forEach((s, i) => {
           const x = 0.5 + i * 3.1;
@@ -451,7 +549,6 @@ export default function ComplianceReport() {
           });
         });
 
-        // Feature table
         const featureHeader = [
           { text: 'Feature', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
           { text: 'Filled', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
@@ -565,6 +662,9 @@ export default function ComplianceReport() {
               totalCustomers={currentStats.totalCustomers}
               completedCustomers={currentStats.completedCustomers}
               pendingCustomers={currentStats.pendingCustomers}
+              activeFilter={cardFilter}
+              onFilterChange={setCardFilter}
+              csmNames={{ submitted: currentStats.submittedCsmNames, pending: currentStats.pendingCsmNames }}
             />
             <ComplianceCustomerTable
               rows={currentRows}
@@ -574,6 +674,7 @@ export default function ComplianceReport() {
               indicatorFeatureLinks={featureLinks}
               detailedScores={currentScores}
               period={currentPeriod}
+              externalFilter={cardFilter}
             />
           </TabsContent>
 
@@ -586,6 +687,9 @@ export default function ComplianceReport() {
               totalCustomers={allTimeStats.totalCustomers}
               completedCustomers={allTimeStats.completedCustomers}
               pendingCustomers={allTimeStats.pendingCustomers}
+              activeFilter={cardFilter}
+              onFilterChange={setCardFilter}
+              csmNames={{ submitted: allTimeStats.submittedCsmNames, pending: allTimeStats.pendingCsmNames }}
             />
             <ComplianceCustomerTable
               rows={allTimeRows}
@@ -595,6 +699,7 @@ export default function ComplianceReport() {
               indicatorFeatureLinks={featureLinks}
               detailedScores={allTimeScores}
               period="all"
+              externalFilter={cardFilter}
             />
           </TabsContent>
         </Tabs>

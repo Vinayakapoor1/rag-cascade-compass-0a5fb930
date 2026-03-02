@@ -9,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ComplianceCustomerDetail, type ScoreRecord } from './ComplianceCustomerDetail';
 import { cn } from '@/lib/utils';
+import type { ComplianceFilter } from './ComplianceSummaryCards';
 import {
   Select,
   SelectContent,
@@ -55,11 +56,13 @@ interface ComplianceCustomerTableProps {
   indicatorFeatureLinks: { indicator_id: string; feature_id: string }[];
   detailedScores: ScoreRecord[];
   period: string;
+  externalFilter?: ComplianceFilter;
 }
 
 export function ComplianceCustomerTable({
   rows, periodLabel,
   customerFeaturesMap, featureNameMap, indicatorFeatureLinks, detailedScores, period,
+  externalFilter,
 }: ComplianceCustomerTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('status');
@@ -84,6 +87,13 @@ export function ComplianceCustomerTable({
     });
   };
 
+  // Compute which CSMs have submitted vs pending for external filter
+  const csmSubmittedSet = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach(r => { if (r.status !== 'pending') set.add(r.csmName); });
+    return set;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     let result = rows.filter(
@@ -92,6 +102,17 @@ export function ComplianceCustomerTable({
 
     if (typeFilter === 'cm') result = result.filter(r => r.isManagedServices);
     else if (typeFilter === 'csm') result = result.filter(r => !r.isManagedServices);
+
+    // Apply external card filter
+    if (externalFilter === 'csm-submitted') {
+      result = result.filter(r => csmSubmittedSet.has(r.csmName));
+    } else if (externalFilter === 'csm-pending') {
+      result = result.filter(r => !csmSubmittedSet.has(r.csmName));
+    } else if (externalFilter === 'customer-complete') {
+      result = result.filter(r => r.status !== 'pending');
+    } else if (externalFilter === 'customer-pending') {
+      result = result.filter(r => r.status === 'pending');
+    }
 
     const statusOrder = { pending: 0, partial: 1, complete: 2 };
     result.sort((a, b) => {
@@ -108,7 +129,7 @@ export function ComplianceCustomerTable({
       return sortDir === 'desc' ? -cmp : cmp;
     });
     return result;
-  }, [rows, search, sortField, sortDir, typeFilter]);
+  }, [rows, search, sortField, sortDir, typeFilter, externalFilter, csmSubmittedSet]);
 
   const hasCM = rows.some(r => r.isManagedServices);
 
