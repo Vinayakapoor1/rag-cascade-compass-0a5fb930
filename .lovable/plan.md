@@ -1,67 +1,66 @@
 
 
-# Enhanced Compliance Report: Per-Customer Pending Data View
+# Fix Compliance Report: Per-Customer Feature-Level Detail
 
-## What It Does
-Redesign the existing Compliance Report page (`/compliance-report`) to show a detailed breakdown of **which specific customers are pending data entry** for each CSM, for the current period. This gives you an actionable view of exactly what's missing and from whom.
+## Problem
+The current compliance report incorrectly uses a single global `totalExpected` count for all customers. In reality, each customer has different features mapped via `customer_features`, so "360 ONE" expects 100 entries while "ABP Network" expects only 10. The report also lacks detail on which specific features/indicators are filled vs pending.
 
-## Key Changes
+## Changes
 
-### 1. Add a detailed "Pending Data" table
-Below the existing summary cards, add an expandable table grouped by CSM, showing:
-- CSM name and email
-- Each customer assigned to them
-- Whether that customer has scores submitted for the current period
-- Status badge: "Submitted" (green) or "Pending" (red)
-- Number of scores submitted vs total expected (features x indicators)
+### 1. Fix the expected count calculation (ComplianceReport.tsx)
+- Fetch `customer_features` to know which features each customer has
+- For each customer, compute expected = count of `indicator_feature_links` rows where `feature_id` is in that customer's features
+- Replace the incorrect global `totalExpected` with per-customer expected counts
 
-### 2. Add an "All Time" vs "Current Period" toggle
-- Allow switching between viewing current period compliance and all-time compliance
-- "All Time" view shows CSMs who have NEVER submitted any data since inception
-- "Current Period" (default) shows what's pending for this month
+### 2. Fetch detailed score data (ComplianceReport.tsx)
+- Expand the current scores query to include `feature_id` and `indicator_id` (not just `customer_id`)
+- This lets us determine exactly which feature-indicator pairs are filled vs pending
 
-### 3. Add a per-customer drill-down in the pending section
-Instead of just listing customer names as small badges, show them as rows in a table with columns:
-- Customer Name
-- CSM Name
-- Features scored / Total features
-- Last submission date (if any, from any period)
-- Status
+### 3. Add expandable customer detail row (new component: ComplianceCustomerDetail.tsx)
+When a customer row is clicked/expanded, show a breakdown:
+- A mini-table listing each feature the customer has
+- For each feature: how many indicators are scored vs expected, and status (filled/pending)
+- Last check-in date for that specific customer (max `created_at` from scores)
+- Color-coded: green for filled features, red for pending ones
 
-### 4. Add summary stats
-- Total customers pending
-- Total customers completed
-- Percentage completion for the period
+### 4. Update ComplianceCustomerTable.tsx
+- Make rows expandable (using Collapsible or accordion pattern)
+- Pass the detailed score data and customer-feature mapping as props
+- Fix the "Scores" column to show correct per-customer expected count
 
 ## Technical Details
 
-### File: `src/pages/ComplianceReport.tsx`
-
-**New queries to add:**
-- Fetch all `indicator_feature_links` to know the total expected scores per customer
-- Fetch scores grouped by `customer_id` with count to show progress per customer
-- Fetch historical scores (without period filter) for the "all time" toggle
-
-**UI changes:**
-- Add a `Tabs` component with "Current Period" and "All Time" views
-- Replace the badge-based pending customer list with a proper `Table` component
-- Each row: Customer name, CSM name, scores submitted count, status badge
-- Add a search/filter input to quickly find a specific customer or CSM
-- Sortable columns (by CSM name, customer name, status)
-
-**Data structure:**
+### Data flow
 ```text
-For each CSM:
-  For each assigned customer:
-    - customer_name
-    - scores_this_period (count of csm_customer_feature_scores rows)
-    - total_expected (count of indicator_feature_links for applicable features)
-    - last_ever_submission (max created_at from any period)
-    - status: "complete" | "partial" | "pending"
+customer_features: customer_id -> [feature_ids]
+indicator_feature_links: feature_id -> [indicator_ids]
+
+Per customer expected = SUM of indicators linked to each of their features
+Per customer filled = COUNT of csm_customer_feature_scores rows for that customer+period
+
+Detail view per feature:
+  - Expected indicators = indicator_feature_links where feature_id = X
+  - Filled indicators = csm_customer_feature_scores where customer_id + feature_id + period match
 ```
 
-### No database changes needed
-All required data is already available in existing tables.
+### New queries in ComplianceReport.tsx
+- `customer_features`: fetch `customer_id, feature_id` (all rows)
+- Expand `currentScores` query to include `feature_id, indicator_id`
 
-### No new routes needed
-This enhances the existing `/compliance-report` page.
+### New component: `src/components/compliance/ComplianceCustomerDetail.tsx`
+- Receives: customer ID, feature list, indicator-feature links, scores for that customer
+- Renders a sub-table with one row per feature showing filled/pending indicator count
+
+### Modified: `src/components/compliance/ComplianceCustomerTable.tsx`
+- Add expand/collapse per row
+- Update `CustomerRow` interface to include `totalExpected` as per-customer value (already there, just calculated wrong)
+- Add new props for detail data
+
+### Modified: `src/components/compliance/ComplianceSummaryCards.tsx`
+- No changes needed (stats are computed from rows which will now have correct data)
+
+### Files touched
+1. `src/pages/ComplianceReport.tsx` -- fix data fetching and expected count logic
+2. `src/components/compliance/ComplianceCustomerTable.tsx` -- add expandable rows
+3. `src/components/compliance/ComplianceCustomerDetail.tsx` -- new component for feature-level detail
+
