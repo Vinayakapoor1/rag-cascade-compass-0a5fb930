@@ -1,41 +1,32 @@
 
 
-# Fix: CSM Data Entry Not Showing All Scores (1000-Row Limit)
+# Fix: Compliance Report Not Opening from Notifications
 
 ## Problem
-The CSM Data Entry matrix is not displaying previously entered scores for some customers (e.g., DCB Bank). The data exists in the database (2,451 rows for period 2026-02), but the queries fetching existing scores are hitting the default 1,000-row limit, causing scores to be silently dropped.
+When you click on a compliance notification (e.g., "1 Compliance Report Available"), it takes you back to the home page instead of opening the Compliance Report. This is because the notification's link is set to `/` instead of `/compliance-report`.
 
 ## Root Cause
-The database has a default query limit of 1,000 rows. The score-fetching queries in `CSMDataEntryMatrix.tsx` do not override this limit, so only the first 1,000 score rows are returned. Customers whose scores fall beyond row 1,000 appear as if they have no data.
+The backend function that creates compliance notifications (`csm-compliance-check`) sets `link: "/"` for admin notifications instead of `link: "/compliance-report"`.
 
-## Fix
+## Fixes
 
-### File: `src/components/user/CSMDataEntryMatrix.tsx`
+### 1. Fix notification link in the backend function
+**File:** `supabase/functions/csm-compliance-check/index.ts`
 
-Add `.limit(10000)` to all queries that fetch from `csm_customer_feature_scores` to ensure all rows are returned. There are 3 locations:
+Change the notification link from `"/"` to `"/compliance-report"` so clicking the notification takes admins directly to the compliance report page.
 
-1. **Line ~248-252** (Content Management direct scores query):
-   ```typescript
-   const { data: existingScoresDirect } = await supabase
-     .from('csm_customer_feature_scores' as any)
-     .select('*')
-     .in('indicator_id', indIds)
-     .eq('period', period)
-     .limit(10000);  // <-- ADD
-   ```
+### 2. Fix existing notifications in the database
+Run a database update to fix all existing compliance notifications that currently point to `/`:
 
-2. **Line ~302-306** (Main feature matrix scores query):
-   ```typescript
-   const { data: existingScores } = await supabase
-     .from('csm_customer_feature_scores' as any)
-     .select('*')
-     .in('indicator_id', indIds)
-     .eq('period', period)
-     .limit(10000);  // <-- ADD
-   ```
+```sql
+UPDATE notifications
+SET link = '/compliance-report'
+WHERE title LIKE '%Compliance Report%'
+  AND link = '/';
+```
 
-3. **Line ~407-412** (CM sub-section scores query -- need to verify exact location):
-   Same pattern -- add `.limit(10000)` to any remaining `csm_customer_feature_scores` fetch queries.
+### 3. Fix 1000-row limit on scores query in ComplianceReport
+**File:** `src/pages/ComplianceReport.tsx`
 
-This is a one-file fix. No database changes needed. The data is intact; it just needs to be fully loaded.
+The scores query (line ~37) doesn't specify a limit, so it's capped at 1,000 rows by default. With 2,400+ score rows, this causes inaccurate compliance status. Add `.limit(10000)` to the query.
 
