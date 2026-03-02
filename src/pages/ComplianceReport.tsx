@@ -34,7 +34,8 @@ export default function ComplianceReport() {
       const { data, error } = await supabase
         .from('csm_customer_feature_scores')
         .select('customer_id, period, created_at')
-        .eq('period', currentPeriod);
+        .eq('period', currentPeriod)
+        .limit(10000);
       if (error) throw error;
       return data || [];
     },

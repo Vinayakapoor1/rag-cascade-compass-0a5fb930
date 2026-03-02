@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
         user_id: userId,
         title: "📋 1 Compliance Report Available",
         message: `Weekly CSM check-in report for ${currentPeriod}: ${compliant.length}/${totalWithCustomers} CSMs have submitted. ${nonCompliant.length > 0 ? `Pending: ${nonCompliant.map(c => c.name).join(", ")}` : "All CSMs are up to date!"}`,
-        link: "/",
+        link: "/compliance-report",
       }));
       await supabase.from("notifications").insert(notifications);
     }
