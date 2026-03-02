@@ -10,6 +10,8 @@ export interface ScoreRecord {
   indicator_id: string;
   created_at: string;
   period: string;
+  value?: number | null;
+  updated_at?: string;
 }
 
 interface FeatureLink {
