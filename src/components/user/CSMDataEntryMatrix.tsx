@@ -266,32 +266,33 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           directScoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
         });
 
-        // Fetch previous period scores for direct mode
-        const { data: prevPeriodRowDirect } = await supabase
-          .from('csm_customer_feature_scores')
-          .select('period')
-          .in('indicator_id', indIds)
-          .lt('period', period)
-          .order('period', { ascending: false })
-          .limit(1);
-        const prevPeriodDirect = prevPeriodRowDirect?.[0]?.period || null;
-        let prevScoresDirect: ScoreMap = {};
+        // Fetch latest historical scores for fallback display
+        const lastKnownScoresDirect: ScoreMap = {};
         const lastCheckInDirect: Record<string, string> = {};
-        if (prevPeriodDirect) {
-          const { data: prevData } = await supabase
+        const directCustIds = directSections.map(s => s.id);
+
+        if (directCustIds.length > 0) {
+          const { data: historicalData } = await supabase
             .from('csm_customer_feature_scores')
-            .select('indicator_id, customer_id, feature_id, value, updated_at')
+            .select('indicator_id, customer_id, feature_id, value, updated_at, period')
             .in('indicator_id', indIds)
-            .eq('period', prevPeriodDirect)
+            .in('customer_id', directCustIds)
+            .neq('period', period)
+            .order('updated_at', { ascending: false })
             .limit(10000);
-          (prevData || []).forEach((s: any) => {
-            prevScoresDirect[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+
+          (historicalData || []).forEach((s: any) => {
+            const key = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+            if (lastKnownScoresDirect[key] === undefined) {
+              lastKnownScoresDirect[key] = s.value != null ? Number(s.value) : null;
+            }
             if (!lastCheckInDirect[s.customer_id] || s.updated_at > lastCheckInDirect[s.customer_id]) {
               lastCheckInDirect[s.customer_id] = s.updated_at;
             }
           });
         }
-        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: prevScoresDirect, previousPeriodLabel: prevPeriodDirect, lastCheckInByCustomer: lastCheckInDirect };
+
+        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: lastKnownScoresDirect, previousPeriodLabel: null as string | null, lastCheckInByCustomer: lastCheckInDirect };
       }
 
       if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
@@ -452,34 +453,31 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         }
       }
 
-      // Fetch previous period scores for trend comparison
-      const { data: prevPeriodRow } = await supabase
-        .from('csm_customer_feature_scores')
-        .select('period')
-        .in('indicator_id', indIds)
-        .lt('period', period)
-        .order('period', { ascending: false })
-        .limit(1);
-      const prevPeriod = prevPeriodRow?.[0]?.period || null;
-      let previousScoresMap: ScoreMap = {};
+      // Fetch latest historical scores (across any earlier period) for trend + fallback display
+      const allRelevantIndicatorIds = [...new Set([...indIds, ...cmIndicatorInfos.map(i => i.id)])];
+      const lastKnownScoresMap: ScoreMap = {};
       const lastCheckInMap: Record<string, string> = {};
-      if (prevPeriod) {
-        const custIds = sections.map(s => s.id);
-        if (custIds.length > 0) {
-          const { data: prevData } = await supabase
-            .from('csm_customer_feature_scores')
-            .select('indicator_id, customer_id, feature_id, value, updated_at')
-            .in('indicator_id', indIds)
-            .in('customer_id', custIds)
-            .eq('period', prevPeriod)
-            .limit(10000);
-          (prevData || []).forEach((s: any) => {
-            previousScoresMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
-            if (!lastCheckInMap[s.customer_id] || s.updated_at > lastCheckInMap[s.customer_id]) {
-              lastCheckInMap[s.customer_id] = s.updated_at;
-            }
-          });
-        }
+      const custIds = sections.map(s => s.id);
+
+      if (custIds.length > 0 && allRelevantIndicatorIds.length > 0) {
+        const { data: historicalData } = await supabase
+          .from('csm_customer_feature_scores')
+          .select('indicator_id, customer_id, feature_id, value, updated_at, period')
+          .in('indicator_id', allRelevantIndicatorIds)
+          .in('customer_id', custIds)
+          .neq('period', period)
+          .order('updated_at', { ascending: false })
+          .limit(10000);
+
+        (historicalData || []).forEach((s: any) => {
+          const key = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+          if (lastKnownScoresMap[key] === undefined) {
+            lastKnownScoresMap[key] = s.value != null ? Number(s.value) : null;
+          }
+          if (!lastCheckInMap[s.customer_id] || s.updated_at > lastCheckInMap[s.customer_id]) {
+            lastCheckInMap[s.customer_id] = s.updated_at;
+          }
+        });
       }
 
       return {
@@ -490,8 +488,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         cmIndicators: cmIndicatorInfos,
         cmBands: cmBandsMap,
         cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly ? cmDeptId : null,
-        previousScores: previousScoresMap,
-        previousPeriodLabel: prevPeriod,
+        previousScores: lastKnownScoresMap,
+        previousPeriodLabel: null as string | null,
         lastCheckInByCustomer: lastCheckInMap,
       };
     },
@@ -513,12 +511,16 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
   // Initialize scores from query data only once per query result
   useEffect(() => {
-    if (matrixData?.scores && !scoresInitializedRef.current) {
-      setScores({ ...matrixData.scores });
-      setOriginalScores({ ...matrixData.scores });
+    if (matrixData && !scoresInitializedRef.current) {
+      const hydratedScores = {
+        ...(matrixData.previousScores || {}),
+        ...(matrixData.scores || {}),
+      };
+      setScores(hydratedScores);
+      setOriginalScores(hydratedScores);
       scoresInitializedRef.current = true;
     }
-  }, [matrixData?.scores]);
+  }, [matrixData]);
 
   // Reset initialization flag when department/period changes
   useEffect(() => {
