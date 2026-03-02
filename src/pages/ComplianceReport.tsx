@@ -1,41 +1,32 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, AlertTriangle, Clock, Users, ArrowLeft, RefreshCw, Activity } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, Navigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ComplianceSummaryCards } from '@/components/compliance/ComplianceSummaryCards';
+import { ComplianceCustomerTable, type CustomerRow } from '@/components/compliance/ComplianceCustomerTable';
 
 export default function ComplianceReport() {
   const { user, isAdmin, loading: authLoading } = useAuth();
+  const [tab, setTab] = useState<string>('current');
 
   const currentPeriod = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
+  // --- Queries ---
   const { data: csms = [], isLoading: csmsLoading, isFetching: csmsFetching, refetch: refetchCsms } = useQuery({
     queryKey: ['compliance-report-csms'],
     queryFn: async () => {
       const { data, error } = await supabase.from('csms').select('id, name, email, user_id');
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const { data: scores = [], isLoading: scoresLoading, isFetching: scoresFetching, dataUpdatedAt: scoresUpdatedAt, refetch: refetchScores } = useQuery({
-    queryKey: ['compliance-report-scores', currentPeriod],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('csm_customer_feature_scores')
-        .select('customer_id, period, created_at')
-        .eq('period', currentPeriod)
-        .limit(10000);
       if (error) throw error;
       return data || [];
     },
@@ -53,133 +44,146 @@ export default function ComplianceReport() {
     },
   });
 
-  // Get non-compliant CSM user_ids for activity lookup
-  const nonCompliantUserIds = useMemo(() => {
-    if (csms.length === 0 || customers.length === 0) return [];
-    const customersByCsm = new Map<string, string[]>();
-    customers.forEach(c => {
-      if (!c.csm_id) return;
-      if (!customersByCsm.has(c.csm_id)) customersByCsm.set(c.csm_id, []);
-      customersByCsm.get(c.csm_id)!.push(c.id);
-    });
-    const customersWithScores = new Set(scores.map(s => s.customer_id));
-    return csms
-      .filter(csm => {
-        const csmCustomers = customersByCsm.get(csm.id) || [];
-        if (csmCustomers.length === 0) return false;
-        return !csmCustomers.some(cId => customersWithScores.has(cId));
-      })
-      .map(csm => csm.user_id)
-      .filter(Boolean) as string[];
-  }, [csms, scores, customers]);
-
-  const { data: activityMap = {} } = useQuery({
-    queryKey: ['compliance-csm-activity', nonCompliantUserIds],
+  // Current period scores
+  const { data: currentScores = [], isLoading: scoresLoading, isFetching: scoresFetching, dataUpdatedAt: scoresUpdatedAt, refetch: refetchScores } = useQuery({
+    queryKey: ['compliance-scores-current', currentPeriod],
     queryFn: async () => {
-      if (nonCompliantUserIds.length === 0) return {};
       const { data, error } = await supabase
-        .from('activity_logs')
-        .select('user_id, created_at')
-        .in('user_id', nonCompliantUserIds)
-        .order('created_at', { ascending: false });
+        .from('csm_customer_feature_scores')
+        .select('customer_id, period, created_at')
+        .eq('period', currentPeriod)
+        .limit(10000);
       if (error) throw error;
-      const map: Record<string, string> = {};
-      (data || []).forEach(row => {
-        if (row.user_id && !map[row.user_id]) {
-          map[row.user_id] = row.created_at!;
-        }
-      });
-      return map;
+      return data || [];
     },
-    enabled: nonCompliantUserIds.length > 0,
   });
 
-  // Recent activity logs for all users
+  // All-time scores (just customer_id + created_at for existence check)
+  const { data: allTimeScores = [], isLoading: allTimeLoading, refetch: refetchAllTime } = useQuery({
+    queryKey: ['compliance-scores-alltime'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('csm_customer_feature_scores')
+        .select('customer_id, created_at')
+        .limit(50000);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Indicator-feature links for expected count
+  const { data: featureLinks = [], isLoading: linksLoading } = useQuery({
+    queryKey: ['compliance-feature-links'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('indicator_feature_links')
+        .select('indicator_id, feature_id');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Recent activity
   const { data: recentActivities = [] } = useQuery({
     queryKey: ['compliance-recent-activities'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('activity_logs')
-        .select('id, action, entity_type, entity_name, user_id, created_at, metadata')
+        .select('id, action, entity_type, entity_name, user_id, created_at')
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(20);
       if (error) throw error;
       return data || [];
     },
     staleTime: 60000,
   });
 
-  // Map user_ids to CSM names for display
+  // CSM name map
   const userNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    csms.forEach(csm => {
-      if (csm.user_id) map[csm.user_id] = csm.name;
-    });
+    csms.forEach(csm => { if (csm.user_id) map[csm.user_id] = csm.name; });
     return map;
   }, [csms]);
 
-  const isLoading = csmsLoading || scoresLoading || customersLoading || authLoading;
+  const totalExpected = featureLinks.length; // total indicator-feature pairs expected per customer
+
+  // Build customer rows
+  const buildRows = (scores: { customer_id: string; created_at: string }[]): CustomerRow[] => {
+    const scoresByCustomer = new Map<string, { count: number; latest: string }>();
+    scores.forEach(s => {
+      const existing = scoresByCustomer.get(s.customer_id);
+      if (!existing) {
+        scoresByCustomer.set(s.customer_id, { count: 1, latest: s.created_at });
+      } else {
+        existing.count++;
+        if (s.created_at > existing.latest) existing.latest = s.created_at;
+      }
+    });
+
+    // Last ever submission from all-time data
+    const lastEver = new Map<string, string>();
+    allTimeScores.forEach(s => {
+      const prev = lastEver.get(s.customer_id);
+      if (!prev || s.created_at > prev) lastEver.set(s.customer_id, s.created_at);
+    });
+
+    const csmMap = new Map(csms.map(c => [c.id, c]));
+
+    return customers.map(cust => {
+      const csm = csmMap.get(cust.csm_id!);
+      const scoreInfo = scoresByCustomer.get(cust.id);
+      const count = scoreInfo?.count || 0;
+      let status: 'complete' | 'partial' | 'pending' = 'pending';
+      if (count > 0 && count >= totalExpected) status = 'complete';
+      else if (count > 0) status = 'partial';
+
+      return {
+        customerId: cust.id,
+        customerName: cust.name,
+        csmName: csm?.name || 'Unassigned',
+        csmEmail: csm?.email || null,
+        scoresThisPeriod: count,
+        totalExpected,
+        lastEverSubmission: lastEver.get(cust.id) || null,
+        status,
+      };
+    });
+  };
+
+  const currentRows = useMemo(() => buildRows(currentScores), [currentScores, allTimeScores, customers, csms, featureLinks]);
+  const allTimeRows = useMemo(() => buildRows(allTimeScores), [allTimeScores, customers, csms, featureLinks]);
+
+  const computeStats = (rows: CustomerRow[]) => {
+    const completed = rows.filter(r => r.status !== 'pending').length;
+    const pending = rows.filter(r => r.status === 'pending').length;
+    const csmWithSubmissions = new Set(rows.filter(r => r.status !== 'pending').map(r => r.csmName));
+    const csmWithCustomers = new Set(rows.map(r => r.csmName));
+    const pendingCsmCount = [...csmWithCustomers].filter(n => !csmWithSubmissions.has(n)).length;
+    const pct = rows.length > 0 ? Math.round((completed / rows.length) * 100) : 0;
+    return {
+      totalCsms: csmWithCustomers.size,
+      compliantCount: csmWithSubmissions.size,
+      pendingCsmCount,
+      completionPct: pct,
+      totalCustomers: rows.length,
+      completedCustomers: completed,
+      pendingCustomers: pending,
+    };
+  };
+
+  const currentStats = useMemo(() => computeStats(currentRows), [currentRows]);
+  const allTimeStats = useMemo(() => computeStats(allTimeRows), [allTimeRows]);
+
+  const isLoading = csmsLoading || scoresLoading || customersLoading || authLoading || linksLoading || allTimeLoading;
   const isFetching = csmsFetching || scoresFetching || customersFetching;
 
-  const handleRefresh = () => {
-    refetchCsms();
-    refetchScores();
-    refetchCustomers();
-  };
+  const handleRefresh = () => { refetchCsms(); refetchScores(); refetchCustomers(); refetchAllTime(); };
 
   const lastUpdatedLabel = useMemo(() => {
     if (!scoresUpdatedAt) return null;
     return formatDistanceToNow(new Date(scoresUpdatedAt), { addSuffix: true });
   }, [scoresUpdatedAt]);
 
-  const complianceData = useMemo(() => {
-    if (csms.length === 0) return { compliant: [], nonCompliant: [], total: 0 };
-
-    const customersByCsm = new Map<string, { id: string; name: string }[]>();
-    customers.forEach(c => {
-      if (!c.csm_id) return;
-      if (!customersByCsm.has(c.csm_id)) customersByCsm.set(c.csm_id, []);
-      customersByCsm.get(c.csm_id)!.push({ id: c.id, name: c.name });
-    });
-
-    const customersWithScores = new Set(scores.map(s => s.customer_id));
-
-    const compliant: { name: string; email: string | null; customerCount: number; submittedCount: number; lastSubmitted: string | null }[] = [];
-    const nonCompliant: { name: string; email: string | null; userId: string | null; customerCount: number; pendingCustomers: string[] }[] = [];
-
-    csms.forEach(csm => {
-      const csmCustomers = customersByCsm.get(csm.id) || [];
-      if (csmCustomers.length === 0) return;
-
-      const submitted = csmCustomers.filter(c => customersWithScores.has(c.id));
-      const hasAnyScores = submitted.length > 0;
-
-      if (hasAnyScores) {
-        const latestScore = scores
-          .filter(s => csmCustomers.some(c => c.id === s.customer_id))
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-        compliant.push({
-          name: csm.name,
-          email: csm.email,
-          customerCount: csmCustomers.length,
-          submittedCount: submitted.length,
-          lastSubmitted: latestScore?.created_at || null,
-        });
-      } else {
-        nonCompliant.push({
-          name: csm.name,
-          email: csm.email,
-          userId: csm.user_id,
-          customerCount: csmCustomers.length,
-          pendingCustomers: csmCustomers.map(c => c.name),
-        });
-      }
-    });
-
-    return { compliant, nonCompliant, total: compliant.length + nonCompliant.length };
-  }, [csms, scores, customers]);
-
-  // Deadline info
   const deadlineLabel = useMemo(() => {
     const now = new Date();
     const day = now.getDay();
@@ -209,13 +213,7 @@ export default function ComplianceReport() {
             {lastUpdatedLabel && ` • Updated ${lastUpdatedLabel}`}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={isFetching}
-          className="shrink-0"
-        >
+        <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isFetching} className="shrink-0">
           <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
         </Button>
       </div>
@@ -226,154 +224,70 @@ export default function ComplianceReport() {
           <Skeleton className="h-48 w-full" />
         </div>
       ) : (
-        <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="card-3d">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <Users className="h-8 w-8 text-muted-foreground" />
-                  <div>
-                    <p className="text-2xl font-bold">{complianceData.total}</p>
-                    <p className="text-xs text-muted-foreground">Total CSMs</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="card-3d border-l-4 border-l-rag-green">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-8 w-8 text-rag-green" />
-                  <div>
-                    <p className="text-2xl font-bold">{complianceData.compliant.length}</p>
-                    <p className="text-xs text-muted-foreground">Submitted</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="card-3d border-l-4 border-l-rag-red">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-8 w-8 text-rag-red" />
-                  <div>
-                    <p className="text-2xl font-bold">{complianceData.nonCompliant.length}</p>
-                    <p className="text-xs text-muted-foreground">Pending</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="current">Current Period</TabsTrigger>
+            <TabsTrigger value="alltime">All Time</TabsTrigger>
+          </TabsList>
 
-          {/* Non-Compliant CSMs */}
-          {complianceData.nonCompliant.length > 0 && (
-            <Card className="card-3d border-l-4 border-l-rag-red">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-rag-red" />
-                  Pending Check-ins ({complianceData.nonCompliant.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {complianceData.nonCompliant.map(csm => {
-                    const lastActive = csm.userId ? activityMap[csm.userId] : null;
-                    return (
-                      <div key={csm.name} className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-sm">{csm.name}</p>
-                          {csm.email && <p className="text-xs text-muted-foreground">{csm.email}</p>}
-                          <p className="text-xs text-muted-foreground">
-                            {lastActive
-                              ? `Last active ${formatDistanceToNow(new Date(lastActive), { addSuffix: true })}`
-                              : 'No recent activity'}
-                          </p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {csm.pendingCustomers.map(customer => (
-                              <Badge key={customer} variant="outline" className="text-[10px] border-rag-red/30 text-rag-red">
-                                {customer}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        <Badge variant="destructive" className="text-[10px] shrink-0">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {csm.pendingCustomers.length}/{csm.customerCount} pending
-                        </Badge>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <TabsContent value="current" className="space-y-6 mt-4">
+            <ComplianceSummaryCards
+              totalCsms={currentStats.totalCsms}
+              compliantCount={currentStats.compliantCount}
+              pendingCount={currentStats.pendingCsmCount}
+              completionPct={currentStats.completionPct}
+              totalCustomers={currentStats.totalCustomers}
+              completedCustomers={currentStats.completedCustomers}
+              pendingCustomers={currentStats.pendingCustomers}
+            />
+            <ComplianceCustomerTable rows={currentRows} periodLabel={currentPeriod} />
+          </TabsContent>
 
-          {/* Compliant CSMs */}
-          {complianceData.compliant.length > 0 && (
-            <Card className="card-3d border-l-4 border-l-rag-green">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-rag-green" />
-                  Completed ({complianceData.compliant.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {complianceData.compliant.map(csm => (
-                    <div key={csm.name} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                      <div>
-                        <p className="font-semibold text-sm">{csm.name}</p>
-                        {csm.email && <p className="text-xs text-muted-foreground">{csm.email}</p>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] border-rag-green/30 text-rag-green">
-                           {csm.submittedCount}/{csm.customerCount} customers
-                         </Badge>
-                        <CheckCircle2 className="h-4 w-4 text-rag-green" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <TabsContent value="alltime" className="space-y-6 mt-4">
+            <ComplianceSummaryCards
+              totalCsms={allTimeStats.totalCsms}
+              compliantCount={allTimeStats.compliantCount}
+              pendingCount={allTimeStats.pendingCsmCount}
+              completionPct={allTimeStats.completionPct}
+              totalCustomers={allTimeStats.totalCustomers}
+              completedCustomers={allTimeStats.completedCustomers}
+              pendingCustomers={allTimeStats.pendingCustomers}
+            />
+            <ComplianceCustomerTable rows={allTimeRows} periodLabel="All Time" />
+          </TabsContent>
+        </Tabs>
+      )}
 
-          {/* Recent Activity Log */}
-          {recentActivities.length > 0 && (
-            <Card className="card-3d">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
-                  Recent Activity ({recentActivities.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {recentActivities.map(activity => (
-                    <div key={activity.id} className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <p className="font-medium text-sm">
-                          {activity.user_id && userNameMap[activity.user_id]
-                            ? userNameMap[activity.user_id]
-                            : 'Unknown user'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium capitalize">{activity.action}</span>
-                          {' '}{activity.entity_type}
-                          {activity.entity_name && `: ${activity.entity_name}`}
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground shrink-0 ml-3">
-                        {activity.created_at
-                          ? formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })
-                          : ''}
-                      </span>
-                    </div>
-                  ))}
+      {/* Recent Activity */}
+      {recentActivities.length > 0 && (
+        <Card className="card-3d">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {recentActivities.map(a => (
+                <div key={a.id} className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <p className="font-medium text-sm">
+                      {a.user_id && userNameMap[a.user_id] ? userNameMap[a.user_id] : 'Unknown user'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium capitalize">{a.action}</span> {a.entity_type}
+                      {a.entity_name && `: ${a.entity_name}`}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground shrink-0 ml-3">
+                    {a.created_at ? formatDistanceToNow(new Date(a.created_at), { addSuffix: true }) : ''}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
