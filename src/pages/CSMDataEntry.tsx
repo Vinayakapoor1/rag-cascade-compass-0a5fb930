@@ -30,7 +30,7 @@ function dateToPeriod(date: Date, mode: PeriodMode): string {
 }
 
 export default function CSMDataEntry() {
-  const { user, isCSM, isAdmin, csmId, loading: authLoading } = useAuth();
+  const { user, isCSM, isAdmin, isDepartmentHead, csmId, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [departmentId, setDepartmentId] = useState<string | null>(null);
@@ -333,7 +333,7 @@ export default function CSMDataEntry() {
       <div className="hidden xl:block w-[320px] shrink-0">
         <div className="sticky top-4">
           <Card className="h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
-            <CSMDataEntryTimeline />
+            <CSMDataEntryTimeline csmId={csmId} isAdmin={isAdmin || isDepartmentHead} />
           </Card>
         </div>
       </div>

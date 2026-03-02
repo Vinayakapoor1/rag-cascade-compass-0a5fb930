@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useActivityLog } from '@/hooks/useActivityLog';
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle, ShieldAlert, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CustomerAttachments } from './CustomerAttachments';
@@ -166,19 +167,19 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         .from('functional_objectives')
         .select('id, name')
         .eq('department_id', departmentId);
-      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
+      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: krs } = await supabase
         .from('key_results')
         .select('id, name, functional_objective_id')
         .in('functional_objective_id', fos.map(f => f.id));
-      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
+      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: indicators } = await supabase
         .from('indicators')
         .select('id, name, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
-      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
+      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const indIds = indicators.map(i => i.id);
       const krMap = new Map(krs.map(k => [k.id, k]));
@@ -265,10 +266,35 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           directScoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
         });
 
-        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
+        // Fetch previous period scores for direct mode
+        const { data: prevPeriodRowDirect } = await supabase
+          .from('csm_customer_feature_scores')
+          .select('period')
+          .in('indicator_id', indIds)
+          .lt('period', period)
+          .order('period', { ascending: false })
+          .limit(1);
+        const prevPeriodDirect = prevPeriodRowDirect?.[0]?.period || null;
+        let prevScoresDirect: ScoreMap = {};
+        const lastCheckInDirect: Record<string, string> = {};
+        if (prevPeriodDirect) {
+          const { data: prevData } = await supabase
+            .from('csm_customer_feature_scores')
+            .select('indicator_id, customer_id, feature_id, value, updated_at')
+            .in('indicator_id', indIds)
+            .eq('period', prevPeriodDirect)
+            .limit(10000);
+          (prevData || []).forEach((s: any) => {
+            prevScoresDirect[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+            if (!lastCheckInDirect[s.customer_id] || s.updated_at > lastCheckInDirect[s.customer_id]) {
+              lastCheckInDirect[s.customer_id] = s.updated_at;
+            }
+          });
+        }
+        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: prevScoresDirect, previousPeriodLabel: prevPeriodDirect, lastCheckInByCustomer: lastCheckInDirect };
       }
 
-      if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null };
+      if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: customerFeatures } = await supabase
         .from('customer_features')
@@ -426,6 +452,36 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         }
       }
 
+      // Fetch previous period scores for trend comparison
+      const { data: prevPeriodRow } = await supabase
+        .from('csm_customer_feature_scores')
+        .select('period')
+        .in('indicator_id', indIds)
+        .lt('period', period)
+        .order('period', { ascending: false })
+        .limit(1);
+      const prevPeriod = prevPeriodRow?.[0]?.period || null;
+      let previousScoresMap: ScoreMap = {};
+      const lastCheckInMap: Record<string, string> = {};
+      if (prevPeriod) {
+        const custIds = sections.map(s => s.id);
+        if (custIds.length > 0) {
+          const { data: prevData } = await supabase
+            .from('csm_customer_feature_scores')
+            .select('indicator_id, customer_id, feature_id, value, updated_at')
+            .in('indicator_id', indIds)
+            .in('customer_id', custIds)
+            .eq('period', prevPeriod)
+            .limit(10000);
+          (prevData || []).forEach((s: any) => {
+            previousScoresMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+            if (!lastCheckInMap[s.customer_id] || s.updated_at > lastCheckInMap[s.customer_id]) {
+              lastCheckInMap[s.customer_id] = s.updated_at;
+            }
+          });
+        }
+      }
+
       return {
         sections,
         indicators: indicatorInfos,
@@ -434,6 +490,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         cmIndicators: cmIndicatorInfos,
         cmBands: cmBandsMap,
         cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly ? cmDeptId : null,
+        previousScores: previousScoresMap,
+        previousPeriodLabel: prevPeriod,
+        lastCheckInByCustomer: lastCheckInMap,
       };
     },
     enabled: !!departmentId && !!user,
@@ -448,6 +507,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const cmIndicators = matrixData?.cmIndicators ?? [];
   const cmBands = matrixData?.cmBands ?? {};
   const cmDepartmentId = matrixData?.cmDepartmentId ?? null;
+  const previousScores = matrixData?.previousScores ?? {};
+  const previousPeriodLabel = matrixData?.previousPeriodLabel ?? null;
+  const lastCheckInByCustomer = matrixData?.lastCheckInByCustomer ?? {};
 
   // Initialize scores from query data only once per query result
   useEffect(() => {
@@ -1225,6 +1287,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           hasUnsavedChanges={customerHasUnsavedChanges(section)}
           cmIndicators={cmIndicators}
           cmBands={cmBands}
+          previousScores={previousScores}
+          previousPeriodLabel={previousPeriodLabel}
+          lastCheckInDate={lastCheckInByCustomer[section.id] || null}
         />
       ))}
 
@@ -1363,6 +1428,9 @@ interface CustomerSectionCardProps {
   hasUnsavedChanges: boolean;
   cmIndicators: IndicatorInfo[];
   cmBands: BandMap;
+  previousScores: ScoreMap;
+  previousPeriodLabel: string | null;
+  lastCheckInDate: string | null;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1374,10 +1442,27 @@ function CustomerSectionCard({
   section, isOpen, onToggle, scores, kpiBands, onCellChange,
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
   departmentId, period, isSaved, isSaving, onSaveCustomer, hasUnsavedChanges,
-  cmIndicators, cmBands,
+  cmIndicators, cmBands, previousScores, previousPeriodLabel, lastCheckInDate,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
+
+  // Compute previous period average for this customer
+  const getPrevAvg = (): number | null => {
+    const allVals: number[] = [];
+    for (const ind of section.indicators) {
+      const feats = section.indicatorFeatureMap[ind.id];
+      if (!feats) continue;
+      for (const fid of feats) {
+        const v = previousScores[cellKey(ind.id, section.id, fid)];
+        if (v != null) allVals.push(v);
+      }
+    }
+    if (allVals.length === 0) return null;
+    return (allVals.reduce((a, b) => a + b, 0) / allVals.length) * 100;
+  };
+  const prevAvg = getPrevAvg();
+  const prevRag = prevAvg != null ? percentToRAG(Math.round(prevAvg)) : null;
 
   const [applyRowBand, setApplyRowBand] = useState<Record<string, string>>({});
   const [applyColBand, setApplyColBand] = useState<Record<string, string>>({});
@@ -1420,12 +1505,19 @@ function CustomerSectionCard({
                       <Badge className="text-xs bg-primary/15 text-primary border-none">CM</Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {directMode
-                      ? `${section.indicators.length} KPI${section.indicators.length !== 1 ? 's' : ''}`
-                      : `${section.features.length} feature${section.features.length !== 1 ? 's' : ''} × ${section.indicators.length} KPI${section.indicators.length !== 1 ? 's' : ''}`
-                    }
-                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground">
+                      {directMode
+                        ? `${section.indicators.length} KPI${section.indicators.length !== 1 ? 's' : ''}`
+                        : `${section.features.length} feature${section.features.length !== 1 ? 's' : ''} × ${section.indicators.length} KPI${section.indicators.length !== 1 ? 's' : ''}`
+                      }
+                    </p>
+                    {lastCheckInDate && (
+                      <span className="text-[10px] text-muted-foreground/60">
+                        · Last: {formatDistanceToNow(new Date(lastCheckInDate), { addSuffix: true })}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1435,7 +1527,30 @@ function CustomerSectionCard({
                     Saved
                   </Badge>
                 )}
-                {custAvg != null && custRag ? (
+                {/* Visual comparison: previous → current */}
+                {prevAvg != null && custAvg != null && prevRag && custRag ? (
+                  <div className="flex items-center gap-1.5">
+                    <Badge className={cn(RAG_BADGE_STYLES[prevRag], 'text-[10px] opacity-60')}>
+                      {Math.round(prevAvg)}%
+                    </Badge>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <Badge className={cn(RAG_BADGE_STYLES[custRag], 'text-xs')}>
+                      {Math.round(custAvg)}%
+                    </Badge>
+                    {custAvg > prevAvg ? (
+                      <TrendingUp className="h-3.5 w-3.5 text-rag-green" />
+                    ) : custAvg < prevAvg ? (
+                      <TrendingDown className="h-3.5 w-3.5 text-rag-red" />
+                    ) : null}
+                  </div>
+                ) : prevAvg != null && prevRag && custAvg == null ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-muted-foreground">Last:</span>
+                    <Badge className={cn(RAG_BADGE_STYLES[prevRag], 'text-[10px] opacity-70')}>
+                      {Math.round(prevAvg)}%
+                    </Badge>
+                  </div>
+                ) : custAvg != null && custRag ? (
                   <Badge className={cn(RAG_BADGE_STYLES[custRag], 'text-xs')}>
                     {Math.round(custAvg)}%
                   </Badge>
