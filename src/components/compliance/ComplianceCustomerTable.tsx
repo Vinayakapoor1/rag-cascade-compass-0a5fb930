@@ -3,9 +3,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ComplianceCustomerDetail, type ScoreRecord } from './ComplianceCustomerDetail';
 
 export interface CustomerRow {
   customerId: string;
@@ -24,12 +26,22 @@ type SortDir = 'asc' | 'desc';
 interface ComplianceCustomerTableProps {
   rows: CustomerRow[];
   periodLabel: string;
+  // Detail data for expandable rows
+  customerFeaturesMap: Map<string, string[]>; // customer_id -> feature_ids
+  featureNameMap: Map<string, string>; // feature_id -> feature_name
+  indicatorFeatureLinks: { indicator_id: string; feature_id: string }[];
+  detailedScores: ScoreRecord[];
+  period: string;
 }
 
-export function ComplianceCustomerTable({ rows, periodLabel }: ComplianceCustomerTableProps) {
+export function ComplianceCustomerTable({
+  rows, periodLabel,
+  customerFeaturesMap, featureNameMap, indicatorFeatureLinks, detailedScores, period,
+}: ComplianceCustomerTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('status');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -38,6 +50,14 @@ export function ComplianceCustomerTable({ rows, periodLabel }: ComplianceCustome
       setSortField(field);
       setSortDir('asc');
     }
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const filtered = useMemo(() => {
@@ -85,10 +105,11 @@ export function ComplianceCustomerTable({ rows, periodLabel }: ComplianceCustome
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="max-h-[500px] overflow-auto">
+        <div className="max-h-[600px] overflow-auto">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8"></TableHead>
                 <TableHead><SortButton field="customerName" label="Customer" /></TableHead>
                 <TableHead><SortButton field="csmName" label="CSM" /></TableHead>
                 <TableHead className="text-center"><SortButton field="scoresThisPeriod" label="Scores" /></TableHead>
@@ -99,49 +120,76 @@ export function ComplianceCustomerTable({ rows, periodLabel }: ComplianceCustome
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     {search ? 'No results match your search' : 'No data available'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map(row => (
-                  <TableRow key={row.customerId}>
-                    <TableCell className="font-medium">{row.customerName}</TableCell>
-                    <TableCell>
-                      <div>
-                        <span className="text-sm">{row.csmName}</span>
-                        {row.csmEmail && <p className="text-[10px] text-muted-foreground">{row.csmEmail}</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-sm font-mono">
-                        {row.scoresThisPeriod}/{row.totalExpected}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {row.lastEverSubmission
-                        ? formatDistanceToNow(new Date(row.lastEverSubmission), { addSuffix: true })
-                        : 'Never'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.status === 'complete' && (
-                        <Badge className="bg-rag-green/15 text-rag-green border-rag-green/30 text-[10px]">
-                          Submitted
-                        </Badge>
-                      )}
-                      {row.status === 'partial' && (
-                        <Badge className="bg-rag-amber/15 text-rag-amber border-rag-amber/30 text-[10px]">
-                          Partial
-                        </Badge>
-                      )}
-                      {row.status === 'pending' && (
-                        <Badge variant="destructive" className="text-[10px]">
-                          Pending
-                        </Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
+                filtered.map(row => {
+                  const isExpanded = expandedIds.has(row.customerId);
+                  const customerFeatureIds = customerFeaturesMap.get(row.customerId) || [];
+                  return (
+                    <Collapsible key={row.customerId} open={isExpanded} onOpenChange={() => toggleExpand(row.customerId)} asChild>
+                      <>
+                        <CollapsibleTrigger asChild>
+                          <TableRow className="cursor-pointer">
+                            <TableCell className="w-8 px-2">
+                              <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                            </TableCell>
+                            <TableCell className="font-medium">{row.customerName}</TableCell>
+                            <TableCell>
+                              <div>
+                                <span className="text-sm">{row.csmName}</span>
+                                {row.csmEmail && <p className="text-[10px] text-muted-foreground">{row.csmEmail}</p>}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-sm font-mono">
+                                {row.scoresThisPeriod}/{row.totalExpected}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {row.lastEverSubmission
+                                ? formatDistanceToNow(new Date(row.lastEverSubmission), { addSuffix: true })
+                                : 'Never'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {row.status === 'complete' && (
+                                <Badge className="bg-rag-green/15 text-rag-green border-rag-green/30 text-[10px]">
+                                  Submitted
+                                </Badge>
+                              )}
+                              {row.status === 'partial' && (
+                                <Badge className="bg-rag-amber/15 text-rag-amber border-rag-amber/30 text-[10px]">
+                                  Partial
+                                </Badge>
+                              )}
+                              {row.status === 'pending' && (
+                                <Badge variant="destructive" className="text-[10px]">
+                                  Pending
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent asChild>
+                          <tr>
+                            <td colSpan={6} className="p-0 border-b">
+                              <ComplianceCustomerDetail
+                                customerId={row.customerId}
+                                customerFeatureIds={customerFeatureIds}
+                                featureMap={featureNameMap}
+                                indicatorFeatureLinks={indicatorFeatureLinks}
+                                scores={detailedScores}
+                                period={period}
+                              />
+                            </td>
+                          </tr>
+                        </CollapsibleContent>
+                      </>
+                    </Collapsible>
+                  );
+                })
               )}
             </TableBody>
           </Table>
