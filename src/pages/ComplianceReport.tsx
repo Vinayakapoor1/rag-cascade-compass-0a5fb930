@@ -451,7 +451,7 @@ export default function ComplianceReport() {
           // Customer table
           const csmTableHeader = [
             { text: 'Customer', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10 } },
-            { text: 'Type', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
+            { text: 'Inclusion', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
             { text: 'Filled / Expected', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
             { text: 'Completion %', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
             { text: 'Status', options: { bold: true, color: COLORS.text, fill: { color: COLORS.card }, fontSize: 10, align: 'center' as const } },
@@ -463,7 +463,7 @@ export default function ComplianceReport() {
             const statusLabel = r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending';
             csmTableRows.push([
               { text: r.customerName, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg } } },
-              { text: r.isManagedServices ? 'CM' : 'CSM', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg }, align: 'center' } },
+              { text: r.isManagedServices ? 'Content Management' : 'CSM', options: { fontSize: 9, color: COLORS.muted, fill: { color: COLORS.bg }, align: 'center' } },
               { text: `${r.scoresThisPeriod} / ${r.totalExpected}`, options: { fontSize: 9, color: COLORS.text, fill: { color: COLORS.bg }, align: 'center' } },
               { text: `${custPct}%`, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
               { text: statusLabel, options: { fontSize: 9, color: statusColor, fill: { color: COLORS.bg }, align: 'center', bold: true } },
@@ -472,7 +472,7 @@ export default function ComplianceReport() {
           csmSlide.addTable(csmTableRows, {
             x: 0.3, y: tableY, w: 12.5,
             border: { type: 'solid', color: COLORS.border, pt: 0.5 },
-            colW: [4, 1, 2.5, 2.5, 2],
+            colW: [3, 2, 2.5, 2.5, 2],
             rowH: 0.32,
           });
 
