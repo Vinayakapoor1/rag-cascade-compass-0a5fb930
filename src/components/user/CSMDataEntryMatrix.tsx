@@ -1504,7 +1504,7 @@ function CustomerSectionCard({
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-base">{section.name}</CardTitle>
                     {cmIndicators.length > 0 && (
-                      <Badge className="text-xs bg-primary/15 text-primary border-none">CM</Badge>
+                      <Badge className="text-xs bg-primary/15 text-primary border-none">Content Management</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">

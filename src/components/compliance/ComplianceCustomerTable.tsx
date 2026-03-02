@@ -148,14 +148,14 @@ export function ComplianceCustomerTable({
           <div className="flex items-center gap-2">
             {hasCM && (
               <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
-                <SelectTrigger className="w-[140px] h-9">
+                <SelectTrigger className="w-[220px] h-9">
                   <Filter className="h-3.5 w-3.5 mr-1.5" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Customers</SelectItem>
                   <SelectItem value="csm">CSM Only</SelectItem>
-                  <SelectItem value="cm">CM Only</SelectItem>
+                  <SelectItem value="cm">Content Management Only</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -210,7 +210,7 @@ export function ComplianceCustomerTable({
                               <div className="flex items-center gap-1.5">
                                 {row.customerName}
                                 {row.isManagedServices && (
-                                  <Badge className="text-[9px] bg-primary/15 text-primary border-none px-1.5">CM</Badge>
+                                  <Badge className="text-[9px] bg-primary/15 text-primary border-none px-1.5">Content Management</Badge>
                                 )}
                               </div>
                             </TableCell>
