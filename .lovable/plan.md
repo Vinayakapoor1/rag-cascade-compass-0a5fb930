@@ -1,66 +1,80 @@
 
 
-# Fix Compliance Report: Per-Customer Feature-Level Detail
+# Enhanced Data Entry Timeline & Customer Summary
 
-## Problem
-The current compliance report incorrectly uses a single global `totalExpected` count for all customers. In reality, each customer has different features mapped via `customer_features`, so "360 ONE" expects 100 entries while "ABP Network" expects only 10. The report also lacks detail on which specific features/indicators are filled vs pending.
+## Overview
+Three improvements to the CSM data entry experience:
+1. **Role-scoped timeline** -- CSMs see only their assigned customers' updates; admins/team leads see everything
+2. **Customer accordion shows last-period data** -- instead of blank, pre-populate from the most recent period's scores and show last check-in date
+3. **Visual change indicator** -- mini sparkline/bar showing previous vs current period scores per customer
+
+---
 
 ## Changes
 
-### 1. Fix the expected count calculation (ComplianceReport.tsx)
-- Fetch `customer_features` to know which features each customer has
-- For each customer, compute expected = count of `indicator_feature_links` rows where `feature_id` is in that customer's features
-- Replace the incorrect global `totalExpected` with per-customer expected counts
+### 1. Role-Scoped Timeline (CSMDataEntryTimeline.tsx)
 
-### 2. Fetch detailed score data (ComplianceReport.tsx)
-- Expand the current scores query to include `feature_id` and `indicator_id` (not just `customer_id`)
-- This lets us determine exactly which feature-indicator pairs are filled vs pending
+**Current**: Fetches all 100 most recent scores globally -- every CSM sees everyone's data.
 
-### 3. Add expandable customer detail row (new component: ComplianceCustomerDetail.tsx)
-When a customer row is clicked/expanded, show a breakdown:
-- A mini-table listing each feature the customer has
-- For each feature: how many indicators are scored vs expected, and status (filled/pending)
-- Last check-in date for that specific customer (max `created_at` from scores)
-- Color-coded: green for filled features, red for pending ones
+**Fix**: Accept `csmId` and `isAdmin` as props. When `csmId` is set and user is not admin:
+- First fetch the CSM's assigned customer IDs from `customers` table (`csm_id = csmId`)
+- Filter `csm_customer_feature_scores` query to only those customer IDs using `.in('customer_id', assignedIds)`
+- Admins and team leads continue to see all updates
 
-### 4. Update ComplianceCustomerTable.tsx
-- Make rows expandable (using Collapsible or accordion pattern)
-- Pass the detailed score data and customer-feature mapping as props
-- Fix the "Scores" column to show correct per-customer expected count
+**Parent changes**: Pass `csmId` and `isAdmin` props from `CSMDataEntry.tsx` and `ContentManagementDataEntry.tsx` into the timeline component.
+
+### 2. Customer Accordion Shows Last-Period Data (CSMDataEntryMatrix.tsx)
+
+**Current**: When opening a new period, all cells are blank. The accordion header shows "No data" badge.
+
+**Fix**: In the matrix query (`queryFn`), also fetch the **previous period's scores**:
+- Query `csm_customer_feature_scores` for the most recent period before the current one (using `.lt('period', period).order('period', { ascending: false }).limit(1)` to find it, then fetch all scores for that period)
+- Return `previousScores` alongside `scores` in the query result
+- In the customer accordion header, show:
+  - Last check-in date (max `updated_at` from the previous period's scores for that customer)
+  - Score summary from previous period (e.g., "Last: 72%") when current period has no data
+- When current period has no data, display the previous values as ghost/faded reference values in cells (not editable, just visual context)
+
+### 3. Visual Change Chart (CustomerSectionCard in CSMDataEntryMatrix.tsx)
+
+**Current**: The accordion header shows only a single RAG badge with the current percentage.
+
+**Fix**: Add a mini comparison visual in the customer accordion header:
+- Show a small inline bar or arrow indicator: `Previous% -> Current%` with color coding
+- If previous period had 65% and current has 78%, show: `65% -> 78%` with a green upward arrow
+- If no current data yet, show: `Last: 65%` with the previous period label
+- Use simple colored spans/badges (no charting library needed for this compact view)
+- Include the last check-in date as small muted text (e.g., "Last: 2 days ago")
+
+This pattern will be reusable across all data entry forms (CSM, Content Management, Department).
+
+---
 
 ## Technical Details
 
-### Data flow
-```text
-customer_features: customer_id -> [feature_ids]
-indicator_feature_links: feature_id -> [indicator_ids]
+### CSMDataEntryTimeline.tsx changes
+- New props: `csmId: string | null`, `isAdmin: boolean`
+- In `fetchLogs`: if `csmId && !isAdmin`, first query `customers` for assigned IDs, then filter scores query with `.in('customer_id', assignedIds)`
+- No change for admin/team lead users
 
-Per customer expected = SUM of indicators linked to each of their features
-Per customer filled = COUNT of csm_customer_feature_scores rows for that customer+period
+### CSMDataEntryMatrix.tsx query changes
+- Add a sub-query to find the latest period before current: query distinct periods, find max < current period
+- Fetch previous period scores into `previousScores: ScoreMap`
+- Fetch previous period `updated_at` timestamps for last check-in display
+- Return both in query result: `{ ...existing, previousScores, previousPeriodLabel, lastCheckInByCustomer }`
 
-Detail view per feature:
-  - Expected indicators = indicator_feature_links where feature_id = X
-  - Filled indicators = csm_customer_feature_scores where customer_id + feature_id + period match
-```
+### CustomerSectionCard header enhancement
+- Receive `previousScores`, `previousPeriodLabel`, `lastCheckInByCustomer` as new props
+- Compute previous period average for the customer (same logic as `getCustomerOverallAvg` but using `previousScores`)
+- Render inline comparison: previous badge -> arrow -> current badge
+- Show "Last check-in: X ago" text below the customer name
 
-### New queries in ComplianceReport.tsx
-- `customer_features`: fetch `customer_id, feature_id` (all rows)
-- Expand `currentScores` query to include `feature_id, indicator_id`
-
-### New component: `src/components/compliance/ComplianceCustomerDetail.tsx`
-- Receives: customer ID, feature list, indicator-feature links, scores for that customer
-- Renders a sub-table with one row per feature showing filled/pending indicator count
-
-### Modified: `src/components/compliance/ComplianceCustomerTable.tsx`
-- Add expand/collapse per row
-- Update `CustomerRow` interface to include `totalExpected` as per-customer value (already there, just calculated wrong)
-- Add new props for detail data
-
-### Modified: `src/components/compliance/ComplianceSummaryCards.tsx`
-- No changes needed (stats are computed from rows which will now have correct data)
+### CSMDataEntry.tsx and ContentManagementDataEntry.tsx
+- Pass `csmId` and `isAdmin` to `CSMDataEntryTimeline`
 
 ### Files touched
-1. `src/pages/ComplianceReport.tsx` -- fix data fetching and expected count logic
-2. `src/components/compliance/ComplianceCustomerTable.tsx` -- add expandable rows
-3. `src/components/compliance/ComplianceCustomerDetail.tsx` -- new component for feature-level detail
+1. `src/components/user/CSMDataEntryTimeline.tsx` -- role-based filtering
+2. `src/components/user/CSMDataEntryMatrix.tsx` -- previous period data fetch + header visual
+3. `src/pages/CSMDataEntry.tsx` -- pass auth props to timeline
+4. `src/pages/ContentManagementDataEntry.tsx` -- add timeline sidebar + pass auth props
 
