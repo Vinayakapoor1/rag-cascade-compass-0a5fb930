@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CSMDataEntryMatrix } from '@/components/user/CSMDataEntryMatrix';
+import { CSMDataEntryTimeline } from '@/components/user/CSMDataEntryTimeline';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -28,7 +29,7 @@ function dateToPeriod(date: Date, mode: PeriodMode): string {
 }
 
 export default function ContentManagementDataEntry() {
-  const { user, isContentManager, isAdmin, loading: authLoading } = useAuth();
+  const { user, isContentManager, isAdmin, isDepartmentHead, csmId, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [departmentId, setDepartmentId] = useState<string | null>(null);
@@ -132,118 +133,130 @@ export default function ContentManagementDataEntry() {
   const periodOptions = generatePeriodOptions();
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ClipboardCheck className="h-7 w-7" />
-            Content Management Data Entry
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Enter feature adoption scores for managed services customers
+    <div className="flex gap-6">
+      {/* Main content */}
+      <div className="flex-1 min-w-0 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <ClipboardCheck className="h-7 w-7" />
+              Content Management Data Entry
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Enter feature adoption scores for managed services customers
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Mode Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPeriodMode(m => m === 'monthly' ? 'weekly' : 'monthly')}
+              className="gap-1.5"
+            >
+              {periodMode === 'monthly' ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
+              {periodMode === 'monthly' ? 'Monthly' : 'Weekly'}
+            </Button>
+
+            {/* Period Dropdown */}
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-[180px]">
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {periodOptions.map(p => (
+                  <SelectItem key={p} value={p}>
+                    <span className="flex items-center gap-2">
+                      {p}
+                      {periodsWithData.has(p) && (
+                        <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Calendar Picker */}
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon" title="Pick a date">
+                  <CalendarIcon className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  onSelect={handleCalendarSelect}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        {/* Mandatory Check-In Banner */}
+        <div className="banner-shine rounded-lg bg-gradient-to-r from-amber-400 to-yellow-300 dark:from-amber-600 dark:to-yellow-500 px-4 py-2.5 flex items-center gap-3 shadow-md">
+          <AlertTriangle className="h-5 w-5 text-amber-900 dark:text-amber-100 shrink-0" />
+          <p className="text-sm font-extrabold text-amber-950 dark:text-amber-50">
+            Weekly Check-In Required Every Friday
+            <span className="font-medium ml-2 text-amber-900/80 dark:text-amber-100/80">— Complete data entry &amp; submit before EOD. Incomplete check-ins will be flagged.</span>
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Mode Toggle */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPeriodMode(m => m === 'monthly' ? 'weekly' : 'monthly')}
-            className="gap-1.5"
-          >
-            {periodMode === 'monthly' ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
-            {periodMode === 'monthly' ? 'Monthly' : 'Weekly'}
-          </Button>
-
-          {/* Period Dropdown */}
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[180px]">
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {periodOptions.map(p => (
-                <SelectItem key={p} value={p}>
-                  <span className="flex items-center gap-2">
-                    {p}
-                    {periodsWithData.has(p) && (
-                      <span className="h-2 w-2 rounded-full bg-primary inline-block" />
-                    )}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Calendar Picker */}
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon" title="Pick a date">
-                <CalendarIcon className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                onSelect={handleCalendarSelect}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
-
-      {/* Mandatory Check-In Banner */}
-      <div className="banner-shine rounded-lg bg-gradient-to-r from-amber-400 to-yellow-300 dark:from-amber-600 dark:to-yellow-500 px-4 py-2.5 flex items-center gap-3 shadow-md">
-        <AlertTriangle className="h-5 w-5 text-amber-900 dark:text-amber-100 shrink-0" />
-        <p className="text-sm font-extrabold text-amber-950 dark:text-amber-50">
-          Weekly Check-In Required Every Friday
-          <span className="font-medium ml-2 text-amber-900/80 dark:text-amber-100/80">— Complete data entry &amp; submit before EOD. Incomplete check-ins will be flagged.</span>
-        </p>
-      </div>
-
-      {/* Instructions Card */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
-              <BookOpen className="h-5 w-5 text-primary" />
+        {/* Instructions Card */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+                <BookOpen className="h-5 w-5 text-primary" />
+              </div>
+              <div className="space-y-2 text-sm">
+                <h3 className="font-semibold text-base">Content Management Data Entry Guide</h3>
+                <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
+                  <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month or week using the dropdown or calendar picker.</li>
+                  <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their feature × KPI matrix.</li>
+                  <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band.</li>
+                  <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the copy icon to bulk-fill cells.</li>
+                  <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
+                  <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
+                </ol>
+                <p className="text-xs text-muted-foreground/80 pt-1">
+                  💡 <strong>Tip:</strong> Only managed services customers are shown. A pulsing Save button means you have unsaved changes for that customer.
+                </p>
+              </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <h3 className="font-semibold text-base">Content Management Data Entry Guide</h3>
-              <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
-                <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month or week using the dropdown or calendar picker.</li>
-                <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their feature × KPI matrix.</li>
-                <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band.</li>
-                <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the copy icon to bulk-fill cells.</li>
-                <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
-                <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
-              </ol>
-              <p className="text-xs text-muted-foreground/80 pt-1">
-                💡 <strong>Tip:</strong> Only managed services customers are shown. A pulsing Save button means you have unsaved changes for that customer.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Matrix */}
-      {departmentId ? (
-        <CSMDataEntryMatrix departmentId={departmentId} period={period} managedServicesOnly />
-      ) : (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Info className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-            <h3 className="text-lg font-semibold mb-1">Content Management Department Not Found</h3>
-            <p className="text-muted-foreground text-sm">
-              Please contact your admin to set up the Content Management department.
-            </p>
           </CardContent>
         </Card>
-      )}
+
+        {/* Matrix */}
+        {departmentId ? (
+          <CSMDataEntryMatrix departmentId={departmentId} period={period} managedServicesOnly />
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Info className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <h3 className="text-lg font-semibold mb-1">Content Management Department Not Found</h3>
+              <p className="text-muted-foreground text-sm">
+                Please contact your admin to set up the Content Management department.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Right sidebar — Recent Updates Timeline */}
+      <div className="hidden xl:block w-[320px] shrink-0">
+        <div className="sticky top-4">
+          <Card className="h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
+            <CSMDataEntryTimeline csmId={csmId} isAdmin={isAdmin || isDepartmentHead} />
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

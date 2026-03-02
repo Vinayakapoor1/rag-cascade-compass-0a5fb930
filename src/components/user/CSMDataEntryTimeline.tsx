@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Clock, ArrowRight, User } from 'lucide-react';
+import { Search, Clock, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -22,19 +22,45 @@ interface ScoreLog {
   user_name?: string;
 }
 
-export function CSMDataEntryTimeline() {
+interface CSMDataEntryTimelineProps {
+  csmId?: string | null;
+  isAdmin?: boolean;
+}
+
+export function CSMDataEntryTimeline({ csmId, isAdmin }: CSMDataEntryTimelineProps) {
   const [logs, setLogs] = useState<ScoreLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   const fetchLogs = useCallback(async () => {
     try {
+      // If CSM (not admin), scope to assigned customers only
+      let assignedCustomerIds: string[] | null = null;
+      if (csmId && !isAdmin) {
+        const { data: assignedCusts } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('csm_id', csmId);
+        if (!assignedCusts?.length) {
+          setLogs([]);
+          setLoading(false);
+          return;
+        }
+        assignedCustomerIds = assignedCusts.map(c => c.id);
+      }
+
       // Fetch recent score entries ordered by updated_at
-      const { data: scores, error } = await supabase
+      let query = supabase
         .from('csm_customer_feature_scores')
         .select('id, customer_id, feature_id, indicator_id, value, period, updated_at, created_by')
         .order('updated_at', { ascending: false })
         .limit(100);
+
+      if (assignedCustomerIds) {
+        query = query.in('customer_id', assignedCustomerIds);
+      }
+
+      const { data: scores, error } = await query;
 
       if (error) throw error;
       if (!scores?.length) { setLogs([]); setLoading(false); return; }
@@ -73,7 +99,7 @@ export function CSMDataEntryTimeline() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [csmId, isAdmin]);
 
   useEffect(() => {
     fetchLogs();
@@ -105,7 +131,6 @@ export function CSMDataEntryTimeline() {
     .filter(name => {
       if (!searchLower) return true;
       if (name.toLowerCase().includes(searchLower)) return true;
-      // Also search within entries
       return grouped[name].some(l =>
         l.feature_name?.toLowerCase().includes(searchLower) ||
         l.indicator_name?.toLowerCase().includes(searchLower)
@@ -168,11 +193,9 @@ export function CSMDataEntryTimeline() {
           ) : (
             filteredKeys.map(customerName => {
               const entries = grouped[customerName];
-              // Show max 5 per customer, sorted by most recent
               const recent = entries.slice(0, 5);
               return (
                 <div key={customerName} className="space-y-1">
-                  {/* Customer header */}
                   <div className="flex items-center gap-1.5 px-1">
                     <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <User className="h-3 w-3 text-primary" />
@@ -183,7 +206,6 @@ export function CSMDataEntryTimeline() {
                     </Badge>
                   </div>
 
-                  {/* Entries */}
                   <div className="ml-3 border-l border-border pl-3 space-y-1.5">
                     {recent.map(log => (
                       <div
