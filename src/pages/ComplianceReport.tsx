@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, RefreshCw, Activity } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Activity, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, Navigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ComplianceSummaryCards } from '@/components/compliance/ComplianceSummaryCards';
 import { ComplianceCustomerTable, type CustomerRow } from '@/components/compliance/ComplianceCustomerTable';
 import type { ScoreRecord } from '@/components/compliance/ComplianceCustomerDetail';
+import ExcelJS from 'exceljs';
+import { toast } from 'sonner';
 
 export default function ComplianceReport() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -229,6 +231,105 @@ export default function ComplianceReport() {
 
   const handleRefresh = () => { refetchCsms(); refetchScores(); refetchCustomers(); refetchAllTime(); };
 
+  const handleDownload = async () => {
+    try {
+      const rows = tab === 'current' ? currentRows : allTimeRows;
+      const scores = tab === 'current' ? currentScores : allTimeScores;
+      const periodLabel = tab === 'current' ? currentPeriod : 'All Time';
+      const stats = tab === 'current' ? currentStats : allTimeStats;
+
+      const wb = new ExcelJS.Workbook();
+
+      // Sheet 1: Summary
+      const summarySheet = wb.addWorksheet('Summary');
+      summarySheet.columns = [
+        { header: 'Metric', key: 'metric', width: 30 },
+        { header: 'Value', key: 'value', width: 20 },
+      ];
+      summarySheet.addRows([
+        { metric: 'Period', value: periodLabel },
+        { metric: 'Total CSMs', value: stats.totalCsms },
+        { metric: 'CSMs Submitted', value: stats.compliantCount },
+        { metric: 'CSMs Pending', value: stats.pendingCsmCount },
+        { metric: 'Completion %', value: `${stats.completionPct}%` },
+        { metric: 'Total Customers', value: stats.totalCustomers },
+        { metric: 'Customers Completed', value: stats.completedCustomers },
+        { metric: 'Customers Pending', value: stats.pendingCustomers },
+      ]);
+      summarySheet.getRow(1).font = { bold: true };
+
+      // Sheet 2: Customer Breakdown
+      const custSheet = wb.addWorksheet('Customer Breakdown');
+      custSheet.columns = [
+        { header: 'Customer', key: 'customer', width: 30 },
+        { header: 'CSM', key: 'csm', width: 25 },
+        { header: 'CSM Email', key: 'csmEmail', width: 30 },
+        { header: 'Scores Filled', key: 'filled', width: 15 },
+        { header: 'Total Expected', key: 'expected', width: 15 },
+        { header: 'Last Submission', key: 'lastSub', width: 25 },
+        { header: 'Status', key: 'status', width: 15 },
+      ];
+      rows.forEach(r => {
+        custSheet.addRow({
+          customer: r.customerName,
+          csm: r.csmName,
+          csmEmail: r.csmEmail || '',
+          filled: r.scoresThisPeriod,
+          expected: r.totalExpected,
+          lastSub: r.lastEverSubmission ? new Date(r.lastEverSubmission).toLocaleDateString() : 'Never',
+          status: r.status === 'complete' ? 'Submitted' : r.status === 'partial' ? 'Partial' : 'Pending',
+        });
+      });
+      custSheet.getRow(1).font = { bold: true };
+
+      // Sheet 3: Feature Detail
+      const detailSheet = wb.addWorksheet('Feature Detail');
+      detailSheet.columns = [
+        { header: 'Customer', key: 'customer', width: 30 },
+        { header: 'Feature', key: 'feature', width: 35 },
+        { header: 'Indicators Filled', key: 'filled', width: 18 },
+        { header: 'Indicators Expected', key: 'expected', width: 18 },
+        { header: 'Status', key: 'status', width: 15 },
+      ];
+      rows.forEach(r => {
+        const custFeatureIds = customerFeaturesMap.get(r.customerId) || [];
+        custFeatureIds.forEach(fid => {
+          const fname = featureNameMap.get(fid) || 'Unknown';
+          const expectedIndicators = featureLinks.filter(l => l.feature_id === fid).map(l => l.indicator_id);
+          const filledSet = new Set(
+            scores
+              .filter(s => s.customer_id === r.customerId && s.feature_id === fid)
+              .map(s => s.indicator_id)
+          );
+          const filledCount = expectedIndicators.filter(id => filledSet.has(id)).length;
+          const status = filledCount >= expectedIndicators.length && expectedIndicators.length > 0
+            ? 'Filled' : filledCount > 0 ? 'Partial' : 'Pending';
+          detailSheet.addRow({
+            customer: r.customerName,
+            feature: fname,
+            filled: filledCount,
+            expected: expectedIndicators.length,
+            status,
+          });
+        });
+      });
+      detailSheet.getRow(1).font = { bold: true };
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `CSM_Compliance_Report_${periodLabel.replace(/\s/g, '_')}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Report downloaded');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate report');
+    }
+  };
+
   const lastUpdatedLabel = useMemo(() => {
     if (!scoresUpdatedAt) return null;
     return formatDistanceToNow(new Date(scoresUpdatedAt), { addSuffix: true });
@@ -263,9 +364,14 @@ export default function ComplianceReport() {
             {lastUpdatedLabel && ` • Updated ${lastUpdatedLabel}`}
           </p>
         </div>
-        <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isFetching} className="shrink-0">
-          <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="icon" onClick={handleDownload} disabled={isLoading} title="Download Excel report">
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isFetching}>
+            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
