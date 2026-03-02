@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ComplianceSummaryCards } from '@/components/compliance/ComplianceSummaryCards';
 import { ComplianceCustomerTable, type CustomerRow } from '@/components/compliance/ComplianceCustomerTable';
+import type { ScoreRecord } from '@/components/compliance/ComplianceCustomerDetail';
 
 export default function ComplianceReport() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -44,34 +45,57 @@ export default function ComplianceReport() {
     },
   });
 
-  // Current period scores
-  const { data: currentScores = [], isLoading: scoresLoading, isFetching: scoresFetching, dataUpdatedAt: scoresUpdatedAt, refetch: refetchScores } = useQuery({
-    queryKey: ['compliance-scores-current', currentPeriod],
+  // Customer-feature mapping
+  const { data: customerFeatures = [], isLoading: cfLoading } = useQuery({
+    queryKey: ['compliance-customer-features'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('csm_customer_feature_scores')
-        .select('customer_id, period, created_at')
-        .eq('period', currentPeriod)
-        .limit(10000);
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  // All-time scores (just customer_id + created_at for existence check)
-  const { data: allTimeScores = [], isLoading: allTimeLoading, refetch: refetchAllTime } = useQuery({
-    queryKey: ['compliance-scores-alltime'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('csm_customer_feature_scores')
-        .select('customer_id, created_at')
+        .from('customer_features')
+        .select('customer_id, feature_id')
         .limit(50000);
       if (error) throw error;
       return data || [];
     },
   });
 
-  // Indicator-feature links for expected count
+  // Feature names
+  const { data: features = [] } = useQuery({
+    queryKey: ['compliance-features'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('features').select('id, name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Current period scores (detailed with feature_id, indicator_id)
+  const { data: currentScores = [], isLoading: scoresLoading, isFetching: scoresFetching, dataUpdatedAt: scoresUpdatedAt, refetch: refetchScores } = useQuery({
+    queryKey: ['compliance-scores-current', currentPeriod],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('csm_customer_feature_scores')
+        .select('customer_id, feature_id, indicator_id, period, created_at')
+        .eq('period', currentPeriod)
+        .limit(50000);
+      if (error) throw error;
+      return (data || []) as ScoreRecord[];
+    },
+  });
+
+  // All-time scores (detailed)
+  const { data: allTimeScores = [], isLoading: allTimeLoading, refetch: refetchAllTime } = useQuery({
+    queryKey: ['compliance-scores-alltime'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('csm_customer_feature_scores')
+        .select('customer_id, feature_id, indicator_id, period, created_at')
+        .limit(50000);
+      if (error) throw error;
+      return (data || []) as ScoreRecord[];
+    },
+  });
+
+  // Indicator-feature links
   const { data: featureLinks = [], isLoading: linksLoading } = useQuery({
     queryKey: ['compliance-feature-links'],
     queryFn: async () => {
@@ -105,10 +129,35 @@ export default function ComplianceReport() {
     return map;
   }, [csms]);
 
-  const totalExpected = featureLinks.length; // total indicator-feature pairs expected per customer
+  // Per-customer feature mapping
+  const customerFeaturesMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    customerFeatures.forEach(cf => {
+      const list = map.get(cf.customer_id) || [];
+      list.push(cf.feature_id);
+      map.set(cf.customer_id, list);
+    });
+    return map;
+  }, [customerFeatures]);
+
+  // Feature name map
+  const featureNameMap = useMemo(() => {
+    return new Map(features.map(f => [f.id, f.name]));
+  }, [features]);
+
+  // Per-customer expected count: count indicator-feature links where feature is in customer's features
+  const customerExpectedMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const [custId, featureIds] of customerFeaturesMap.entries()) {
+      const featureSet = new Set(featureIds);
+      const expected = featureLinks.filter(l => featureSet.has(l.feature_id)).length;
+      map.set(custId, expected);
+    }
+    return map;
+  }, [customerFeaturesMap, featureLinks]);
 
   // Build customer rows
-  const buildRows = (scores: { customer_id: string; created_at: string }[]): CustomerRow[] => {
+  const buildRows = (scores: ScoreRecord[]): CustomerRow[] => {
     const scoresByCustomer = new Map<string, { count: number; latest: string }>();
     scores.forEach(s => {
       const existing = scoresByCustomer.get(s.customer_id);
@@ -133,6 +182,7 @@ export default function ComplianceReport() {
       const csm = csmMap.get(cust.csm_id!);
       const scoreInfo = scoresByCustomer.get(cust.id);
       const count = scoreInfo?.count || 0;
+      const totalExpected = customerExpectedMap.get(cust.id) || 0;
       let status: 'complete' | 'partial' | 'pending' = 'pending';
       if (count > 0 && count >= totalExpected) status = 'complete';
       else if (count > 0) status = 'partial';
@@ -150,8 +200,8 @@ export default function ComplianceReport() {
     });
   };
 
-  const currentRows = useMemo(() => buildRows(currentScores), [currentScores, allTimeScores, customers, csms, featureLinks]);
-  const allTimeRows = useMemo(() => buildRows(allTimeScores), [allTimeScores, customers, csms, featureLinks]);
+  const currentRows = useMemo(() => buildRows(currentScores), [currentScores, allTimeScores, customers, csms, customerExpectedMap]);
+  const allTimeRows = useMemo(() => buildRows(allTimeScores), [allTimeScores, customers, csms, customerExpectedMap]);
 
   const computeStats = (rows: CustomerRow[]) => {
     const completed = rows.filter(r => r.status !== 'pending').length;
@@ -174,7 +224,7 @@ export default function ComplianceReport() {
   const currentStats = useMemo(() => computeStats(currentRows), [currentRows]);
   const allTimeStats = useMemo(() => computeStats(allTimeRows), [allTimeRows]);
 
-  const isLoading = csmsLoading || scoresLoading || customersLoading || authLoading || linksLoading || allTimeLoading;
+  const isLoading = csmsLoading || scoresLoading || customersLoading || authLoading || linksLoading || allTimeLoading || cfLoading;
   const isFetching = csmsFetching || scoresFetching || customersFetching;
 
   const handleRefresh = () => { refetchCsms(); refetchScores(); refetchCustomers(); refetchAllTime(); };
@@ -240,7 +290,15 @@ export default function ComplianceReport() {
               completedCustomers={currentStats.completedCustomers}
               pendingCustomers={currentStats.pendingCustomers}
             />
-            <ComplianceCustomerTable rows={currentRows} periodLabel={currentPeriod} />
+            <ComplianceCustomerTable
+              rows={currentRows}
+              periodLabel={currentPeriod}
+              customerFeaturesMap={customerFeaturesMap}
+              featureNameMap={featureNameMap}
+              indicatorFeatureLinks={featureLinks}
+              detailedScores={currentScores}
+              period={currentPeriod}
+            />
           </TabsContent>
 
           <TabsContent value="alltime" className="space-y-6 mt-4">
@@ -253,7 +311,15 @@ export default function ComplianceReport() {
               completedCustomers={allTimeStats.completedCustomers}
               pendingCustomers={allTimeStats.pendingCustomers}
             />
-            <ComplianceCustomerTable rows={allTimeRows} periodLabel="All Time" />
+            <ComplianceCustomerTable
+              rows={allTimeRows}
+              periodLabel="All Time"
+              customerFeaturesMap={customerFeaturesMap}
+              featureNameMap={featureNameMap}
+              indicatorFeatureLinks={featureLinks}
+              detailedScores={allTimeScores}
+              period="all"
+            />
           </TabsContent>
         </Tabs>
       )}
