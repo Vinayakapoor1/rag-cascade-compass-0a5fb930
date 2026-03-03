@@ -1,71 +1,60 @@
 
 
-# Map Data Entry Forms for 5 New Departments
+# Simplified CSM-Focused Compliance PPT
 
-## What We'll Do
+## Problem
+The current PPT has too many slides -- a flat customer table, per-CSM slides, AND per-customer detail slides. The user wants fewer slides but more actionable CSM-centric information: who filled, what percentage, what's missing.
 
-Set up database data (features, indicator-feature links, KPI RAG bands, customer-feature assignments) and adjust two UI files so all 5 departments have working data entry forms.
+## New PPT Structure (4 slide types instead of current 5)
 
-## Department Models (from updated Excel)
+### Slide 1: Title (keep as-is)
+Period, generation date, branding.
 
-| Department | Model | Page |
-|---|---|---|
-| Product Engineering | 10 KPIs x 5 features per customer | Page 6 |
-| Product Management | 10 KPIs x 5 features per customer | Page 5 |
-| Quality Assurance | 10 KPIs x 5 features per customer | Page 4 |
-| Security & Technology | Hybrid: 7 KPIs x 5 features + 3 Deployment KPIs as direct line items per customer | Page 3 |
-| Sales | 10 KPIs as direct line items, department-level only (like Content Management, no customers) | Page 7 |
+### Slide 2: CSM Leaderboard Summary (replaces old summary + flat customer table)
+- A single table ranking all CSMs by completion %
+- Columns: CSM Name | Email | Customers | Filled/Expected | Completion % | Status
+- Color-coded completion % (green >= 80, amber >= 50, red < 50)
+- Shows pending CSMs at bottom in red
 
-## Database Inserts (4 steps, using insert tool)
+### Slide 3+ (one per CSM): CSM Detail Slide (enhanced)
+For each CSM, one slide with:
+- **Header**: CSM name, email
+- **Stats row**: Total Customers, Submitted count, Pending count, Completion %
+- **Customers table** with columns: Customer | Type (CSM/CM) | Filled/Expected | Completion % | Status
+- **"Not Filled" section**: Below the table, a bulleted list of customer names that are still Pending or Partial, with what's missing (e.g., "CustomerX - 3/8 filled, missing 5 indicators")
 
-### 1. Create 20 Features
-Insert 5 features per department into `features` table with category tags: `product_engineering`, `product_management`, `quality_assurance`, `security_technology`.
+### Remove: Per-Customer Feature Detail Slides
+These are too granular for a management report. The CSM slides now include what's missing per customer inline.
 
-### 2. Create Indicator-Feature Links
-Insert into `indicator_feature_links`:
-- **PE**: 10 indicators x 5 features = 50 links
-- **PM**: 10 indicators x 5 features = 50 links
-- **QA**: 10 indicators x 5 features = 50 links
-- **SecTech**: 7 non-deployment indicators x 5 features = 35 links
-- 3 Deployment indicators (Platform Availability, Resilience & Capacity, Preventive Security) get NO links
-- **Total**: 185 links
+## Changes
 
-### 3. Create KPI RAG Bands
-Insert 3 bands (Green/Amber/Red) per indicator into `kpi_rag_bands` for all 50 indicators. Band labels extracted from the updated Excel:
+### File: `src/pages/ComplianceReport.tsx` -- `handleDownload` function (lines 279-598)
 
-**Example bands from Excel:**
-- On-Time Release Rate (PE): `96-100%` (Green), `51-95%` (Amber), `1-50%` (Red)
-- Platform Availability (SecTech): `99-100%` (Green), `81-98%` (Amber), `1-80%` (Red)
-- PMF Validation Rate (PM): `76-100%` (Green), `51-75%` (Amber), `1-50%` (Red)
+Rewrite the PPT generation:
 
-For **Sales**, since it uses Content Management-style entry (per-indicator direct, no features), RAG bands will use the same pattern -- derive 3-tier bands from the shown aggregate scores in the Excel.
+1. **Slide 1 (Title)**: Keep existing title slide logic unchanged.
 
-### 4. Assign Features to Active Customers
-Bulk-insert into `customer_features` -- assign all 5 features per department to all active, non-managed-services customers (8 customers currently).
+2. **Slide 2 (CSM Leaderboard)**: 
+   - Group `rows` by `csmName`
+   - For each CSM: compute total customers, filled count, expected count, completion %
+   - Sort by completion % ascending (worst first, so action items are at top)
+   - Render as a single table with header + one row per CSM
 
-## Code Changes
+3. **Slides 3+ (Per-CSM Detail)**:
+   - Keep existing per-CSM slide logic (lines 410-505) but enhance:
+   - Remove `Prev %`, `Current %`, `Trend` columns (too complex per user request)
+   - Replace with simpler: Customer | Type | Filled/Expected | Completion % | Status
+   - Add a "Missing" text block below the table listing customers that are Partial/Pending with their gap (e.g., "CustomerX: 3/8 filled")
+   - If more than ~10 customers for a CSM, paginate across multiple slides
 
-### 1. `src/pages/DepartmentDataEntry.tsx` (~3 lines)
-- Add `isSalesDept` detection: `const isSalesDept = department?.name === 'Sales';`
-- When `isSalesDept`, hide the "Feature Matrix" tab (line 649) -- Sales has no features/customers
-- Only show the "Per Indicator" tab for Sales
+4. **Remove**: Per-customer feature detail slides (lines 507-590) -- delete entirely
 
-### 2. `src/components/user/CSMDataEntryMatrix.tsx` (~50 lines)
-Handle SecTech hybrid mode:
-- After fetching `indicator_feature_links`, split indicators into two groups:
-  - `linkedIndicators`: indicators with feature links (7 standard KPIs)
-  - `directIndicators`: indicators with zero feature links (3 Deployment KPIs)
-- For each customer accordion, render both:
-  1. Feature-based grid for `linkedIndicators` (existing behavior)
-  2. Below the grid, a "Deployment Indicators" section with direct-score dropdowns for `directIndicators` (using placeholder feature ID `00000000-0000-0000-0000-000000000000`)
-- This hybrid rendering only activates when both groups are non-empty
+This reduces total slide count significantly while giving more actionable CSM-level detail.
 
-## Indicator ID Reference
+## Technical Details
 
-**SecTech Deployment indicators (NO feature links):**
-- `182d7aea-4003-4e87-8038-002e42e2f53d` -- Platform Availability %
-- `136e1e14-c3ab-409e-a1af-0fa020d95e92` -- Resilience & Capacity Compliance %
-- `0ba15bb3-d7ae-414d-aee1-058f947b7941` -- Preventive Security Control Coverage %
-
-**Sales Department ID:** `663a95ea-5e81-453b-8846-21c17528cd98`
+- Only `src/pages/ComplianceReport.tsx` is modified (the `handleDownload` function)
+- No database or component changes needed
+- PPT library usage remains the same (PptxGenJS)
+- Color scheme and styling constants remain the same
 
