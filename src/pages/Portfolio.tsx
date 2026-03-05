@@ -119,9 +119,11 @@ interface AggregatedDepartment {
 
 export default function Portfolio() {
   const [filterStatus, setFilterStatus] = useState<RAGStatus | null>(null);
+  const [periodMode, setPeriodMode] = useState<'current' | 'all-time'>('current');
   const { data: ventures } = useVentures();
   const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
   const { user, isAdmin, isCSM, isContentManager, csmId, accessibleDepartments } = useAuth();
+  const { data: allTimeValues } = useAllTimeIndicatorValues();
 
   // Auto-select HumanFirewall on first load
   useEffect(() => {
@@ -135,21 +137,72 @@ export default function Portfolio() {
 
   const { isDepartmentHead } = useAuth();
 
+  // Helper: overlay all-time values onto org objectives
+  function applyAllTimeValues(objectives: DBOrgObjective[]): DBOrgObjective[] {
+    if (!allTimeValues || allTimeValues.size === 0) return objectives;
+    return objectives.map(org => ({
+      ...org,
+      departments: org.departments.map(dept => ({
+        ...dept,
+        functional_objectives: dept.functional_objectives.map(fo => ({
+          ...fo,
+          key_results: fo.key_results.map(kr => ({
+            ...kr,
+            indicators: kr.indicators.map(ind => {
+              const allTimeVal = allTimeValues.get(ind.id);
+              if (allTimeVal !== undefined && ind.target_value != null && ind.target_value > 0) {
+                // Convert all-time RAG score to the same scale as current_value
+                // allTimeVal is a 0-100 score; current_value is raw value where progress = current/target * 100
+                // So we set current_value = allTimeVal / 100 * target_value
+                return { ...ind, current_value: (allTimeVal / 100) * ind.target_value };
+              }
+              return ind;
+            }),
+          })),
+        })),
+      })),
+    }));
+  }
+
   // Department-scoped filtering: CSM and viewer roles see only assigned departments
   // Admins and Department Heads see everything (full portfolio)
   const orgObjectives = useMemo(() => {
     if (!rawOrgObjectives) return rawOrgObjectives;
-    // Admins see everything; department heads are scoped to their departments
-    if (isAdmin || !user) return rawOrgObjectives;
     
-    // CSMs and viewers: filter departments within each org objective
-    return rawOrgObjectives
-      .map(obj => ({
-        ...obj,
-        departments: obj.departments.filter(d => accessibleDepartments.includes(d.id))
-      }))
-      .filter(obj => obj.departments.length > 0);
-  }, [rawOrgObjectives, isAdmin, isDepartmentHead, user, accessibleDepartments]);
+    let objectives = rawOrgObjectives;
+    
+    // Admins see everything; non-admins filter by department access
+    if (!isAdmin && user) {
+      objectives = objectives
+        .map(obj => ({
+          ...obj,
+          departments: obj.departments.filter(d => accessibleDepartments.includes(d.id))
+        }))
+        .filter(obj => obj.departments.length > 0);
+    }
+    
+    // Apply all-time overlay if selected
+    if (periodMode === 'all-time') {
+      objectives = applyAllTimeValues(objectives);
+      // Recalculate okrProgress and okrHealth for each objective
+      objectives = objectives.map(org => {
+        const deptProgresses = org.departments
+          .map(dept => calcDeptProgress(dept).progress)
+          .filter(p => p > 0);
+        const progress = deptProgresses.length > 0
+          ? deptProgresses.reduce((sum, p) => sum + p, 0) / deptProgresses.length
+          : 0;
+        return {
+          ...org,
+          okrProgress: progress,
+          okrHealth: progress > 0 ? progressToRAG(progress) : ('not-set' as RAGStatus),
+          overallHealth: progress > 0 ? progressToRAG(progress) : ('not-set' as RAGStatus),
+        };
+      });
+    }
+    
+    return objectives;
+  }, [rawOrgObjectives, isAdmin, isDepartmentHead, user, accessibleDepartments, periodMode, allTimeValues]);
 
   // Fetch accurate customer and feature counts, scoped by role
   // Content managers see only managed_services customers and their linked features
