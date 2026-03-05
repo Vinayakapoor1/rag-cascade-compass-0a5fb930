@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOrgObjectives, useVentures, DBOrgObjective, calculateFOProgress, calculateDepartmentProgress as calcDeptProgress } from '@/hooks/useOrgObjectives';
 import { useAuth } from '@/hooks/useAuth';
+import { useAllTimeIndicatorValues } from '@/hooks/useAllTimeIndicatorValues';
 import { BusinessOutcomeSection } from '@/components/BusinessOutcomeSection';
 import { RAGBadge } from '@/components/RAGBadge';
 import { OKRHierarchyLegend } from '@/components/OKRHierarchyLegend';
@@ -12,12 +13,13 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { scoreToRAG } from '@/lib/ragUtils';
 import { progressToRAG } from '@/lib/formulaCalculations';
-import { AlertTriangle, CheckCircle, XCircle, Database, Target, BarChart3, Settings, Activity, Users, Puzzle, ChevronRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Database, Target, BarChart3, Settings, Activity, Users, Puzzle, ChevronRight, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { RAGStatus, OrgObjectiveColor, OrgObjectiveClassification } from '@/types/venture';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { VentureSelector } from '@/components/VentureSelector';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Calculate percentage using rollup: Indicators → KR (formula) → FO (formula) → Dept (AVG) → Org (AVG)
 function calculateOrgObjectivePercentage(objective: DBOrgObjective): number {

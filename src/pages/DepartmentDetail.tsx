@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DrilldownBreadcrumb } from '@/components/DrilldownBreadcrumb';
 import { RAGBadge } from '@/components/RAGBadge';
 import { CalculationBreakdownDialog } from '@/components/CalculationBreakdownDialog';
+import { useAllTimeIndicatorValues } from '@/hooks/useAllTimeIndicatorValues';
 
 
 import { OKRHierarchyLegend } from '@/components/OKRHierarchyLegend';
