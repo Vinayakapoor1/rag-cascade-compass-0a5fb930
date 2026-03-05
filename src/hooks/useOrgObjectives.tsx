@@ -492,4 +492,4 @@ export function useOrgObjectiveById(id: string) {
 }
 
 // Export helper functions for use in components
-export { calculateIndicatorProgress, calculateKRHealth, calculateFOHealth, calculateDepartmentHealth };
+export { calculateIndicatorProgress, calculateKRHealth, calculateFOHealth, calculateFOProgress, calculateDepartmentHealth, calculateDepartmentProgress, calculateOrgObjectiveProgress };

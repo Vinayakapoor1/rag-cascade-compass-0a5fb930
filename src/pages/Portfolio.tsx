@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useOrgObjectives, useVentures, DBOrgObjective } from '@/hooks/useOrgObjectives';
+import { useOrgObjectives, useVentures, DBOrgObjective, calculateFOProgress, calculateDepartmentProgress as calcDeptProgress } from '@/hooks/useOrgObjectives';
 import { useAuth } from '@/hooks/useAuth';
 import { BusinessOutcomeSection } from '@/components/BusinessOutcomeSection';
 import { RAGBadge } from '@/components/RAGBadge';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { scoreToRAG } from '@/lib/ragUtils';
+import { progressToRAG } from '@/lib/formulaCalculations';
 import { AlertTriangle, CheckCircle, XCircle, Database, Target, BarChart3, Settings, Activity, Users, Puzzle, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { RAGStatus, OrgObjectiveColor, OrgObjectiveClassification } from '@/types/venture';
@@ -18,94 +19,48 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { VentureSelector } from '@/components/VentureSelector';
 
-// Calculate percentage from indicators for an org objective
+// Calculate percentage using rollup: Indicators → KR (formula) → FO (formula) → Dept (AVG) → Org (AVG)
 function calculateOrgObjectivePercentage(objective: DBOrgObjective): number {
-  let totalProgress = 0;
-  let indicatorCount = 0;
-
-  objective.departments.forEach(dept => {
-    dept.functional_objectives.forEach(fo => {
-      fo.key_results.forEach(kr => {
-        kr.indicators.forEach(ind => {
-          if (ind.current_value !== null && ind.target_value !== null && ind.target_value > 0) {
-            totalProgress += (ind.current_value / ind.target_value) * 100;
-            indicatorCount++;
-          }
-        });
-      });
-    });
-  });
-
-  return indicatorCount > 0 ? totalProgress / indicatorCount : 0;
+  return objective.okrProgress;
 }
 
-// Calculate filtered percentage based on filter status
-function calculateFilteredPercentage(objective: DBOrgObjective, status: RAGStatus | null): number {
-  if (!status) return calculateOrgObjectivePercentage(objective);
-  
-  let totalProgress = 0;
-  let count = 0;
-  
-  objective.departments.forEach(dept => {
-    dept.functional_objectives.forEach(fo => {
-      fo.key_results.forEach(kr => {
-        kr.indicators.forEach(ind => {
-          if (ind.current_value !== null && ind.target_value !== null && ind.target_value > 0) {
-            const progress = (ind.current_value / ind.target_value) * 100;
-            const indStatus = scoreToRAG(progress);
-            if (indStatus === status) {
-              totalProgress += progress;
-              count++;
-            }
-          }
-        });
-      });
-    });
-  });
-  
-  return count > 0 ? totalProgress / count : 0;
+// Calculate rollup percentage from departments (for filtered/reconstructed objectives)
+function calculateRollupFromDepts(objective: DBOrgObjective): number {
+  if (objective.departments.length === 0) return 0;
+  const deptProgresses = objective.departments
+    .map(dept => calcDeptProgress(dept).progress)
+    .filter(p => p > 0);
+  if (deptProgresses.length === 0) return 0;
+  return deptProgresses.reduce((sum, p) => sum + p, 0) / deptProgresses.length;
 }
 
-// Calculate department percentage
+// Calculate department percentage using rollup: Indicators → KR (formula) → FO (formula) → Dept (AVG)
 function calculateDepartmentPercentage(dept: DBOrgObjective['departments'][0], filterStatus: RAGStatus | null): number {
-  let totalProgress = 0;
-  let count = 0;
-
-  dept.functional_objectives.forEach(fo => {
-    fo.key_results.forEach(kr => {
-      kr.indicators.forEach(ind => {
-        if (ind.current_value !== null && ind.target_value !== null && ind.target_value > 0) {
+  if (filterStatus) {
+    // Filter indicators by status, then rollup the filtered structure
+    const filteredFOs = dept.functional_objectives.map(fo => ({
+      ...fo,
+      key_results: fo.key_results.map(kr => ({
+        ...kr,
+        indicators: kr.indicators.filter(ind => {
+          if (ind.current_value === null || ind.target_value === null || ind.target_value <= 0) return false;
           const progress = (ind.current_value / ind.target_value) * 100;
-          if (!filterStatus || scoreToRAG(progress) === filterStatus) {
-            totalProgress += progress;
-            count++;
-          }
-        }
-      });
-    });
-  });
-
-  return count > 0 ? totalProgress / count : 0;
+          return scoreToRAG(progress) === filterStatus;
+        })
+      })).filter(kr => kr.indicators.length > 0)
+    })).filter(fo => fo.key_results.length > 0);
+    
+    if (filteredFOs.length === 0) return 0;
+    const filteredDept = { ...dept, functional_objectives: filteredFOs };
+    return calcDeptProgress(filteredDept).progress;
+  }
+  
+  return calcDeptProgress(dept).progress;
 }
 
-// Calculate department RAG status
+// Calculate department RAG status using rollup
 function calculateDepartmentStatus(dept: DBOrgObjective['departments'][0]): RAGStatus {
-  // Check if there's any actual data (current_value > 0)
-  let hasAnyData = false;
-  dept.functional_objectives.forEach(fo => {
-    fo.key_results.forEach(kr => {
-      kr.indicators.forEach(ind => {
-        if (ind.current_value !== null && ind.current_value > 0) {
-          hasAnyData = true;
-        }
-      });
-    });
-  });
-  
-  if (!hasAnyData) return 'not-set';
-  
-  const percentage = calculateDepartmentPercentage(dept, null);
-  return scoreToRAG(percentage);
+  return calcDeptProgress(dept).status;
 }
 
 // Helper to filter objective internal data by RAG status
@@ -135,6 +90,14 @@ function filterObjectiveByStatus(objective: DBOrgObjective, status: RAGStatus | 
   if (filteredDepartments.length === 0) return null;
 
   return { ...objective, departments: filteredDepartments };
+}
+
+// Calculate filtered percentage based on filter status (uses rollup on filtered data)
+function calculateFilteredPercentage(objective: DBOrgObjective, status: RAGStatus | null): number {
+  if (!status) return calculateOrgObjectivePercentage(objective);
+  const filtered = filterObjectiveByStatus(objective, status);
+  if (!filtered) return 0;
+  return calculateRollupFromDepts(filtered);
 }
 
 // Aggregate department type
@@ -251,11 +214,13 @@ export default function Portfolio() {
     || { green: 0, amber: 0, red: 0, totalProgress: 0, indicatorsWithData: 0, deptCount: 0, foCount: 0, krCount: 0, indicatorCount: 0 };
 
   const totalIndicatorsWithStatus = portfolioStats.green + portfolioStats.amber + portfolioStats.red;
-  const avgScore = portfolioStats.indicatorsWithData > 0 
-    ? portfolioStats.totalProgress / portfolioStats.indicatorsWithData
+  // Use rollup-based averaging: average of org objective rollup percentages
+  const orgProgressValues = (orgObjectives || []).map(org => org.okrProgress).filter(p => p > 0);
+  const avgScore = orgProgressValues.length > 0
+    ? orgProgressValues.reduce((sum, p) => sum + p, 0) / orgProgressValues.length
     : 0;
-  const portfolioHealth = portfolioStats.indicatorsWithData > 0 
-    ? scoreToRAG(avgScore) 
+  const portfolioHealth = orgProgressValues.length > 0 
+    ? progressToRAG(avgScore) 
     : 'not-set';
 
   // Sort org objectives: Critical first, then At Risk, then On Track

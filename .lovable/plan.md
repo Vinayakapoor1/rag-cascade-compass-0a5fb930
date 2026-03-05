@@ -1,21 +1,17 @@
 
 
-## Plan: Unify Portfolio.tsx to use rollup averaging
+## Problem Found
 
-### Problem
-`Portfolio.tsx` calculates percentages by flat-averaging all indicator percentages, ignoring the KR/FO formula hierarchy. The `useOrgObjectives` hook already computes correct rollup values (`okrProgress`) but Portfolio.tsx recalculates with its own flat logic.
+The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
 
-### Changes — single file: `src/pages/Portfolio.tsx`
+## Plan
 
-1. **Import** `parseFormulaType`, `aggregateProgress`, `progressToRAG` from `@/lib/formulaCalculations`.
+1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
+   ```sql
+   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
+   ```
 
-2. **Replace `calculateOrgObjectivePercentage`** (lines 22-40): Use rollup logic — for each dept, calculate FO progresses (each FO aggregates KR progresses using KR formula, then aggregates KRs using FO formula), average FO progresses for dept, then average dept progresses for org objective. Same logic as `useOrgObjectives.tsx` lines 99-166.
+2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
 
-3. **Replace `calculateDepartmentPercentage`** (lines 70-89): Rollup through FOs→KRs→Indicators using stored formulas, then average FO progresses.
-
-4. **Replace `calculateFilteredPercentage`** (lines 43-67): Same rollup logic but only include indicators matching the filter status.
-
-5. **Replace `calculateDepartmentStatus`** (lines 92-109): Use `progressToRAG()` on the rollup percentage.
-
-6. **Update `portfolioStats` overall average** (lines 254-259): Compute `avgScore` as the average of org objective rollup percentages instead of flat indicator average. Keep the per-indicator green/amber/red counts as-is (those are correct for the count badges). Round before RAG determination.
+No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
 
