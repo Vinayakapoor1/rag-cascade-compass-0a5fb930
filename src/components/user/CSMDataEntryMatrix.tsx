@@ -119,7 +119,7 @@ type ScoreMap = Record<string, number | null>;
 type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
 export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }: CSMDataEntryMatrixProps) {
-  const { user, isAdmin, isDepartmentHead } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember } = useAuth();
   const { logActivity } = useActivityLog();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -142,7 +142,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       if (!departmentId || !user) return null;
 
       let csmId: string | null = null;
-      if (!isAdmin && !isDepartmentHead) {
+      if (!isAdmin && !isDepartmentHead && !isDepartmentMember) {
         const { data: csmRow } = await supabase
           .from('csms')
           .select('id')
