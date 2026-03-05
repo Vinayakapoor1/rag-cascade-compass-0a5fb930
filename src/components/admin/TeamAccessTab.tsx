@@ -244,6 +244,8 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
         return <Badge className="bg-primary/10 text-primary"><Shield className="h-3 w-3 mr-1" />Admin</Badge>;
       case 'department_head':
         return <Badge className="bg-rag-amber/10 text-rag-amber"><Building className="h-3 w-3 mr-1" />Dept Head</Badge>;
+      case 'department_member':
+        return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Users className="h-3 w-3 mr-1" />Dept Member</Badge>;
       case 'csm':
         return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400"><UserCheck className="h-3 w-3 mr-1" />CSM{linkedCsmName ? ` (${linkedCsmName})` : ''}</Badge>;
       case 'content_manager':
