@@ -163,6 +163,14 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       }
       const isCMDepartment = cmDeptId === departmentId;
 
+      // Check if current department is Customer Success (CS dept heads see CM indicators)
+      const { data: currentDept } = await supabase
+        .from('departments')
+        .select('name')
+        .eq('id', departmentId)
+        .maybeSingle();
+      const isCustomerSuccessDept = currentDept?.name === 'Customer Success';
+
       const { data: fos } = await supabase
         .from('functional_objectives')
         .select('id, name')
@@ -485,9 +493,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         indicators: indicatorInfos,
         bands: bandsMap,
         scores: scoreMap,
-        cmIndicators: (isDepartmentHead || isDepartmentMember) && !isAdmin ? [] as IndicatorInfo[] : cmIndicatorInfos,
-        cmBands: (isDepartmentHead || isDepartmentMember) && !isAdmin ? {} as BandMap : cmBandsMap,
-        cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly && !isDepartmentMember && !isDepartmentHead ? cmDeptId : null,
+        cmIndicators: ((isDepartmentHead && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin ? [] as IndicatorInfo[] : cmIndicatorInfos,
+        cmBands: ((isDepartmentHead && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin ? {} as BandMap : cmBandsMap,
+        cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly && !isDepartmentMember && !((isDepartmentHead && !isCustomerSuccessDept)) ? cmDeptId : null,
         previousScores: lastKnownScoresMap,
         previousPeriodLabel: null as string | null,
         lastCheckInByCustomer: lastCheckInMap,
