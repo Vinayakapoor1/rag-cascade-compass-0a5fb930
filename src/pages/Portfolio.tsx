@@ -174,8 +174,8 @@ export default function Portfolio() {
   // Admins and Department Heads see everything (full portfolio)
   const orgObjectives = useMemo(() => {
     if (!rawOrgObjectives) return rawOrgObjectives;
-    // Admins, department heads, and unauthenticated users see everything
-    if (isAdmin || isDepartmentHead || !user) return rawOrgObjectives;
+    // Admins see everything; department heads are scoped to their departments
+    if (isAdmin || !user) return rawOrgObjectives;
     
     // CSMs and viewers: filter departments within each org objective
     return rawOrgObjectives

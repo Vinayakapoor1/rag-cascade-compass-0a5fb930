@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useOrgObjectives } from '@/hooks/useOrgObjectives';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardDepartmentCard } from '@/components/DashboardDepartmentCard';
@@ -19,8 +19,20 @@ import { CSMComplianceWidget } from '@/components/CSMComplianceWidget';
 import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 
 const Index = () => {
-  const { data: orgObjectives, isLoading, error, refetch } = useOrgObjectives();
-  const { user, isAdmin, isDepartmentHead, isCSM, loading: authLoading } = useAuth();
+  const { data: rawOrgObjectives, isLoading, error, refetch } = useOrgObjectives();
+  const { user, isAdmin, isDepartmentHead, isCSM, accessibleDepartments, loading: authLoading } = useAuth();
+
+  // Scope departments: admins see all, others see only accessible departments
+  const orgObjectives = useMemo(() => {
+    if (!rawOrgObjectives) return rawOrgObjectives;
+    if (isAdmin || !user) return rawOrgObjectives;
+    return rawOrgObjectives
+      .map(obj => ({
+        ...obj,
+        departments: obj.departments.filter(d => accessibleDepartments.includes(d.id))
+      }))
+      .filter(obj => obj.departments.length > 0);
+  }, [rawOrgObjectives, isAdmin, user, accessibleDepartments]);
 
   // Calculate totals
   const totalOrgObjectives = orgObjectives?.length ?? 0;
@@ -157,7 +169,6 @@ const Index = () => {
             </div>
           ))}
         </div>
-
 
         {/* Login prompt for non-logged in users */}
         {!user && (
