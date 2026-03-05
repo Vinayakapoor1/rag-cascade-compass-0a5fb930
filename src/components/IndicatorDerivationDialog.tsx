@@ -122,7 +122,7 @@ export function IndicatorDerivationDialog({
 }: IndicatorDerivationDialogProps) {
   const { isAdmin, isCSM, csmId } = useAuth();
   const [periodMode, setPeriodMode] = useState<PeriodMode>('monthly');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all-time');
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [featureFilter, setFeatureFilter] = useState<string>('all');
   const [ragFilter, setRagFilter] = useState<RAGStatus | null>(null);
