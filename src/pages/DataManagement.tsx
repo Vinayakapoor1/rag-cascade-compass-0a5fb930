@@ -44,7 +44,7 @@ function dateToPeriod(date: Date, mode: PeriodMode): string {
 
 export default function DataManagement() {
   const navigate = useNavigate();
-  const { user, isAdmin, isDepartmentHead, loading: authLoading, signOut } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember, loading: authLoading, signOut } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeMainTab, setActiveMainTab] = useState('okr');
 
@@ -69,7 +69,7 @@ export default function DataManagement() {
   // Fetch departments for department heads
   useEffect(() => {
     async function fetchDepartments() {
-      if (!user || !isDepartmentHead || isAdmin) {
+      if (!user || (!isDepartmentHead && !isDepartmentMember) || isAdmin) {
         setDeptLoading(false);
         return;
       }
@@ -87,7 +87,7 @@ export default function DataManagement() {
       }
     }
     fetchDepartments();
-  }, [user, isDepartmentHead, isAdmin, navigate]);
+  }, [user, isDepartmentHead, isDepartmentMember, isAdmin, navigate]);
 
   // Fetch all departments + periods with data for CSM Entries tab
   useEffect(() => {
@@ -167,7 +167,7 @@ export default function DataManagement() {
   if (!user) return null;
 
   // Department heads are redirected to bulk entry view
-  if (isDepartmentHead && !isAdmin) {
+  if ((isDepartmentHead || isDepartmentMember) && !isAdmin) {
     if (deptLoading) {
       return (
         <AppLayout>

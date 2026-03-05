@@ -19,7 +19,7 @@ interface UserWithRole {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'department_head' | 'viewer' | 'csm' | 'content_manager' | null;
+  role: 'admin' | 'department_head' | 'department_member' | 'viewer' | 'csm' | 'content_manager' | null;
   departments: { id: string; name: string }[];
   linkedCsmId?: string | null;
   linkedCsmName?: string | null;
@@ -54,7 +54,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
 
   // Form state
   const [formData, setFormData] = useState({
-    role: 'viewer' as 'admin' | 'department_head' | 'viewer' | 'csm' | 'content_manager',
+    role: 'viewer' as 'admin' | 'department_head' | 'department_member' | 'viewer' | 'csm' | 'content_manager',
     departmentIds: [] as string[],
     linkedCsmId: '' as string,
   });
@@ -376,6 +376,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                     <SelectItem value="csm">CSM</SelectItem>
                     <SelectItem value="content_manager">Content Manager</SelectItem>
                     <SelectItem value="department_head">Department Head</SelectItem>
+                    <SelectItem value="department_member">Department Member</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>

@@ -25,7 +25,7 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, isDepartmentHead, isCSM, isContentManager, accessibleDepartments, signOut, loading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, accessibleDepartments, signOut, loading } = useAuth();
   const [has2FA, setHas2FA] = useState<boolean | null>(null);
   const [toggling2FA, setToggling2FA] = useState(false);
 
@@ -130,8 +130,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                       </Link>
                     )}
 
-                    {/* Department Head: Enter Data Button - route directly if single department */}
-                    {isDepartmentHead && !isAdmin && !isCSM && (
+                    {/* Department Head / Member: Enter Data Button - route directly if single department */}
+                    {(isDepartmentHead || isDepartmentMember) && !isAdmin && !isCSM && (
                       <Link to={accessibleDepartments.length === 1 ? `/department/${accessibleDepartments[0]}/data-entry` : '/data'}>
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />

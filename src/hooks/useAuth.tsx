@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   isAdmin: boolean;
   isDepartmentHead: boolean;
+  isDepartmentMember: boolean;
   isCSM: boolean;
   isContentManager: boolean;
   csmId: string | null;
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDepartmentHead, setIsDepartmentHead] = useState(false);
+  const [isDepartmentMember, setIsDepartmentMember] = useState(false);
   const [isCSM, setIsCSM] = useState(false);
   const [isContentManager, setIsContentManager] = useState(false);
   const [csmId, setCsmId] = useState<string | null>(null);
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastCheckedUserIdRef.current = null;
         setIsAdmin(false);
         setIsDepartmentHead(false);
+        setIsDepartmentMember(false);
         setIsCSM(false);
         setIsContentManager(false);
         setCsmId(null);
@@ -105,6 +108,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     setIsDepartmentHead(!!deptHeadData);
 
+    // Check department_member role
+    const { data: deptMemberData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'department_member' as any)
+      .maybeSingle();
+    
+    setIsDepartmentMember(!!deptMemberData);
+
     // Check CSM role
     const { data: csmRoleData } = await supabase
       .from('user_roles')
@@ -152,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setIsAdmin(false);
     setIsDepartmentHead(false);
+    setIsDepartmentMember(false);
     setIsCSM(false);
     setIsContentManager(false);
     setCsmId(null);
@@ -159,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, isDepartmentHead, isCSM, isContentManager, csmId, accessibleDepartments, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, csmId, accessibleDepartments, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

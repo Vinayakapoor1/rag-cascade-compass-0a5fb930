@@ -17,7 +17,7 @@ import PptxGenJS from 'pptxgenjs';
 import { toast } from 'sonner';
 
 export default function ComplianceReport() {
-  const { user, isAdmin, isDepartmentHead, loading: authLoading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<string>('current');
   const [cardFilter, setCardFilter] = useState<ComplianceFilter>(null);
 
@@ -520,7 +520,7 @@ export default function ComplianceReport() {
     return `Friday 11:30 PM (in ${diff} days)`;
   }, []);
 
-  if (!authLoading && (!user || (!isAdmin && !isDepartmentHead))) {
+  if (!authLoading && (!user || (!isAdmin && !isDepartmentHead && !isDepartmentMember))) {
     return <Navigate to="/" replace />;
   }
 
