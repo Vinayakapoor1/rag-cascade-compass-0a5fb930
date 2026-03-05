@@ -92,6 +92,14 @@ function filterObjectiveByStatus(objective: DBOrgObjective, status: RAGStatus | 
   return { ...objective, departments: filteredDepartments };
 }
 
+// Calculate filtered percentage based on filter status (uses rollup on filtered data)
+function calculateFilteredPercentage(objective: DBOrgObjective, status: RAGStatus | null): number {
+  if (!status) return calculateOrgObjectivePercentage(objective);
+  const filtered = filterObjectiveByStatus(objective, status);
+  if (!filtered) return 0;
+  return calculateRollupFromDepts(filtered);
+}
+
 // Aggregate department type
 interface AggregatedDepartment {
   id: string;
@@ -205,6 +213,7 @@ export default function Portfolio() {
   }, { green: 0, amber: 0, red: 0, totalProgress: 0, indicatorsWithData: 0, deptCount: 0, foCount: 0, krCount: 0, indicatorCount: 0 }) 
     || { green: 0, amber: 0, red: 0, totalProgress: 0, indicatorsWithData: 0, deptCount: 0, foCount: 0, krCount: 0, indicatorCount: 0 };
 
+  const totalIndicatorsWithStatus = portfolioStats.green + portfolioStats.amber + portfolioStats.red;
   // Use rollup-based averaging: average of org objective rollup percentages
   const orgProgressValues = (orgObjectives || []).map(org => org.okrProgress).filter(p => p > 0);
   const avgScore = orgProgressValues.length > 0
