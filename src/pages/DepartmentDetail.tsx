@@ -715,8 +715,20 @@ export default function DepartmentDetail() {
         ]}
       />
 
-      {/* Legends */}
+      {/* Legends & Period Toggle */}
       <div className="flex items-end justify-end gap-3 flex-wrap">
+        <Tabs value={periodMode} onValueChange={(v) => setPeriodMode(v as 'current' | 'all-time')}>
+          <TabsList>
+            <TabsTrigger value="current" className="gap-1.5">
+              <Target className="h-3.5 w-3.5" />
+              Current
+            </TabsTrigger>
+            <TabsTrigger value="all-time" className="gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              All Time
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         <OKRHierarchyLegend />
         <RAGLegend />
       </div>
