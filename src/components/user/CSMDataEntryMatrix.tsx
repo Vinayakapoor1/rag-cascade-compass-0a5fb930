@@ -487,7 +487,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         scores: scoreMap,
         cmIndicators: cmIndicatorInfos,
         cmBands: cmBandsMap,
-        cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly && !isDepartmentMember ? cmDeptId : null,
+        cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly && !isDepartmentMember && !isDepartmentHead ? cmDeptId : null,
         previousScores: lastKnownScoresMap,
         previousPeriodLabel: null as string | null,
         lastCheckInByCustomer: lastCheckInMap,
