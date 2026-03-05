@@ -137,7 +137,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const scoresInitializedRef = useRef(false);
 
   const { data: matrixData, isLoading: loading } = useQuery({
-    queryKey: ['csm-matrix', departmentId, period, user?.id, isAdmin, managedServicesOnly],
+    queryKey: ['csm-matrix', departmentId, period, user?.id, isAdmin, isDepartmentHead, isDepartmentMember, managedServicesOnly],
     queryFn: async () => {
       if (!departmentId || !user) return null;
 
@@ -485,8 +485,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         indicators: indicatorInfos,
         bands: bandsMap,
         scores: scoreMap,
-        cmIndicators: cmIndicatorInfos,
-        cmBands: cmBandsMap,
+        cmIndicators: (isDepartmentHead || isDepartmentMember) && !isAdmin ? [] as IndicatorInfo[] : cmIndicatorInfos,
+        cmBands: (isDepartmentHead || isDepartmentMember) && !isAdmin ? {} as BandMap : cmBandsMap,
         cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly && !isDepartmentMember && !isDepartmentHead ? cmDeptId : null,
         previousScores: lastKnownScoresMap,
         previousPeriodLabel: null as string | null,
