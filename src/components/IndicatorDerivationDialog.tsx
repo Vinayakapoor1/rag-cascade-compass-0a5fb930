@@ -196,18 +196,34 @@ export function IndicatorDerivationDialog({
   // Auto-select latest period when periods change
   useEffect(() => {
     if (periods.length > 0) {
-      if (!periods.includes(selectedPeriod)) {
+      if (!periods.includes(selectedPeriod) && selectedPeriod !== 'all-time') {
         setSelectedPeriod(periods[0]);
       }
-    } else {
+    } else if (selectedPeriod !== 'all-time') {
       setSelectedPeriod('');
     }
   }, [periods]);
 
-  // Scores for the selected period
+  // Scores for the selected period (or all periods for "all-time")
   const scores = useMemo(() => {
+    if (selectedPeriod === 'all-time') {
+      // For all-time, use the LATEST score per customer+feature combination
+      const latestMap = new Map<string, ScoreRow>();
+      const modeFiltered = rbacFilteredScores.filter(s => {
+        if (periodMode === 'monthly') return /^\d{4}-\d{2}$/.test(s.period);
+        if (periodMode === 'weekly') return /^\d{4}-W\d{2}$/.test(s.period);
+        return true;
+      });
+      // Sort ascending so latest overwrites
+      const sorted = [...modeFiltered].sort((a, b) => a.period.localeCompare(b.period));
+      sorted.forEach(s => {
+        const key = `${s.customer_id}::${s.feature_id}`;
+        latestMap.set(key, s);
+      });
+      return Array.from(latestMap.values());
+    }
     return rbacFilteredScores.filter(s => s.period === selectedPeriod);
-  }, [rbacFilteredScores, selectedPeriod]);
+  }, [rbacFilteredScores, selectedPeriod, periodMode]);
 
   const isLoading = allScoresLoading;
 
@@ -400,6 +416,7 @@ export function IndicatorDerivationDialog({
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all-time">All Time</SelectItem>
               {periods.map(p => (
                 <SelectItem key={p} value={p}>{p}</SelectItem>
               ))}
