@@ -389,17 +389,16 @@ function KRStatBlock({
   const displayStatus = filterStatus || status;
   const kpiCount = kr.indicators?.length || 0;
 
-  // Calculate percentage
-  let totalProgress = 0;
-  let count = 0;
+  // Calculate percentage using KR's stored formula
+  const indProgresses: number[] = [];
   kr.indicators?.forEach(ind => {
     if (ind.current_value !== null && ind.target_value !== null && ind.target_value > 0) {
       const progress = (ind.current_value / ind.target_value) * 100;
-      totalProgress += progress;
-      count++;
+      indProgresses.push(progress);
     }
   });
-  const percentage = count > 0 ? totalProgress / count : 0;
+  const krFormulaType = parseFormulaType(kr.formula);
+  const percentage = indProgresses.length > 0 ? aggregateProgress(indProgresses, krFormulaType) : 0;
 
   return (
     <Card className={`border-l-4 h-full ${getBorderColorClass(displayStatus)}`}>
