@@ -1,57 +1,60 @@
 
 
-## Plan: RBAC Scoping for Departmental Portals
+## Plan: Add Department Member Roles for Data Entry
 
-### Problem
+### Summary
+Create a new `department_member` role in the `app_role` enum that works like the CSM role but for departmental data entry. Department members will be assigned to specific departments via `department_access` and see ALL customers in their data entry matrices (no customer filtering).
 
-Currently, the Portfolio page gives **department heads full visibility** across all departments (`isDepartmentHead` bypasses the `accessibleDepartments` filter at line 178 of Portfolio.tsx). A PE lead should only see Product Engineering data, not QA or Sales. The same issue exists on the Index.tsx page (no department filtering at all).
+### Current State
+- `app_role` enum: `admin`, `viewer`, `department_head`, `csm`, `content_manager`
+- `department_head` role already has data entry access via `department_access` table
+- CSM role filters customers by `csm_id` on the customers table
+- `CSMDataEntryMatrix` component skips CSM filtering when `isAdmin || isDepartmentHead` (line 145)
 
 ### Changes Required
 
-#### 1. Scope Portfolio view for Department Heads
-**File: `src/pages/Portfolio.tsx` (line 178)**
-
-Change the filtering logic so department heads are also filtered by `accessibleDepartments`, same as CSMs/viewers. Only admins see everything.
-
-```
-// Before:
-if (isAdmin || isDepartmentHead || !user) return rawOrgObjectives;
-
-// After:
-if (isAdmin || !user) return rawOrgObjectives;
+#### 1. Database: Add `department_member` role to enum
+Add new enum value to `app_role`:
+```sql
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'department_member';
 ```
 
-This ensures PE lead only sees PE department cards, QA lead only sees QA, etc.
+#### 2. Auth Hook: Track `isDepartmentMember` role
+**File: `src/hooks/useAuth.tsx`**
+- Add `isDepartmentMember` state (same pattern as `isCSM`, `isDepartmentHead`)
+- Query `user_roles` for `department_member` role in `checkUserRoles`
+- Expose via context
 
-#### 2. Scope Index.tsx dashboard for Department Heads
-**File: `src/pages/Index.tsx`**
-
-This page (the old dashboard at `/`) is still routed but the main view is Portfolio. If it's still accessible, add the same `accessibleDepartments` filtering to department data shown here.
-
-#### 3. Add compliance report visibility for department heads
-**File: `src/pages/ComplianceReport.tsx`**
-
-Currently restricted to admin only (`isAdmin` check). Department heads should be able to view compliance data scoped to their department's indicators. We'll gate this behind `isAdmin || isDepartmentHead` and filter the displayed data accordingly.
-
-#### 4. Add department-specific "Enter Data" routing in AppLayout
+#### 3. AppLayout: Add "Enter Data" button for department members
 **File: `src/components/AppLayout.tsx`**
+- Add an "Enter Data" button for `isDepartmentMember` users (same logic as department heads — route directly if single department, otherwise to `/data`)
 
-The current department head "Enter Data" button routes to `/data`. For department heads with a single department, we can route directly to `/department/:id/data-entry` to skip the intermediate selection page. This requires checking `accessibleDepartments.length === 1` and routing accordingly.
+#### 4. DepartmentDataEntry: Allow department members access
+**File: `src/pages/DepartmentDataEntry.tsx`**
+- The access check at line 145-156 already uses `department_access` table, so department members with entries there will pass. No change needed here.
 
-#### 5. Show compliance widget for department heads on Portfolio
-**File: `src/pages/Portfolio.tsx`**
+#### 5. DataManagement: Handle department member routing
+**File: `src/pages/DataManagement.tsx`**
+- Add `isDepartmentMember` to the department selection/redirect logic (lines 70-90, 170) so department members get the same department selector or direct redirect as department heads
 
-Currently the CSMComplianceWidget only shows for CSMs/admins on Index.tsx. Consider adding a department-scoped compliance widget on Portfolio for department heads so they can track their team's data entry completion status.
+#### 6. CSMDataEntryMatrix: Skip customer filtering for department members
+**File: `src/components/user/CSMDataEntryMatrix.tsx`**
+- Line 145: Change `if (!isAdmin && !isDepartmentHead)` to also include `!isDepartmentMember` so department members see ALL customers in the feature matrix (not filtered by csm_id)
+
+#### 7. Portfolio & Index: Scope visibility for department members
+**Files: `src/pages/Portfolio.tsx`, `src/pages/Index.tsx`**
+- Add `isDepartmentMember` to the department filtering logic (same scoping as department heads — filtered by `accessibleDepartments`)
+
+#### 8. TeamAccessTab: Add department_member option
+**File: `src/components/admin/TeamAccessTab.tsx`**
+- Add `department_member` to the role dropdown in the edit dialog so admins can assign this role
+
+#### 9. ComplianceReport: Allow department members access
+**File: `src/pages/ComplianceReport.tsx`**
+- Add `isDepartmentMember` alongside `isDepartmentHead` in the access check
 
 ### What This Does NOT Touch
-- No changes to existing CSM, Content Management, or Admin flows
-- No database schema changes needed
-- No new roles needed — uses existing `department_head` role + `department_access` table
-- No changes to DepartmentDataEntry.tsx (already works correctly with department-scoped access)
-
-### Technical Details
-- The `accessibleDepartments` array from `useAuth()` is already populated from the `department_access` table for all users
-- Department heads already have `department_access` entries linking them to their departments
-- The `DepartmentDataEntry` page already validates access via `department_access` query (line 145-156)
-- Sales department already correctly hides the Feature Matrix tab
+- No changes to CSM flow, Content Management flow, or Admin flow
+- No new database tables needed — reuses existing `department_access` table
+- No changes to the data entry form UI itself — department members use the same `DepartmentDataEntry` page
 
