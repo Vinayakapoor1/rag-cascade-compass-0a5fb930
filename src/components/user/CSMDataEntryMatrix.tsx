@@ -265,7 +265,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       let selfDeploymentIndicators: IndicatorInfo[] = [];
       let selfDeploymentBands: BandMap = {};
       if (isSTDepartment) {
-        selfDeploymentIndicators = indicatorInfos.filter(ind => DEPLOYMENT_INDICATOR_NAMES_SELF.includes(ind.name));
+        selfDeploymentIndicators = indicatorInfos.filter(ind => DEPLOYMENT_INDICATOR_NAMES_SELF.includes(ind.name.replace(/\s+/g, ' ').trim()));
         const selfDeployIndIds = selfDeploymentIndicators.map(i => i.id);
         selfDeployIndIds.forEach(id => {
           if (bandsMap[id]) selfDeploymentBands[id] = bandsMap[id];
@@ -523,7 +523,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
             if (stInds?.length) {
               // Filter to only Deployment indicators
-              const deploymentInds = stInds.filter(ind => DEPLOYMENT_INDICATOR_NAMES.includes(ind.name));
+              const deploymentInds = stInds.filter(ind => DEPLOYMENT_INDICATOR_NAMES.includes(ind.name.replace(/\s+/g, ' ').trim()));
 
               stIndicatorInfos = deploymentInds.map(ind => {
                 const kr = stKrMap.get(ind.key_result_id!);
