@@ -507,12 +507,11 @@ export default function DepartmentDetail() {
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [featureFilter, setFeatureFilter] = useState<string>('all');
   const [derivationIndicator, setDerivationIndicator] = useState<DBIndicator | null>(null);
-  const [periodMode, setPeriodMode] = useState<'current' | 'all-time'>('current');
 
-  // Apply all-time values overlay
+  // Always apply all-time values overlay
   const department = useMemo(() => {
     if (!rawDepartment) return rawDepartment;
-    if (periodMode !== 'all-time' || !allTimeValues || allTimeValues.size === 0) return rawDepartment;
+    if (!allTimeValues || allTimeValues.size === 0) return rawDepartment;
     
     return {
       ...rawDepartment,
@@ -530,7 +529,7 @@ export default function DepartmentDetail() {
         })),
       })),
     } as DBDepartment;
-  }, [rawDepartment, periodMode, allTimeValues]);
+  }, [rawDepartment, allTimeValues]);
 
 
   // Sync filter state if URL param changes
