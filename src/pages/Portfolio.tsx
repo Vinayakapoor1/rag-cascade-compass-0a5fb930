@@ -24,14 +24,14 @@ function calculateOrgObjectivePercentage(objective: DBOrgObjective): number {
   return objective.okrProgress;
 }
 
-// Calculate filtered percentage based on filter status (uses rollup on filtered data)
-function calculateFilteredPercentage(objective: DBOrgObjective, status: RAGStatus | null): number {
-  if (!status) return calculateOrgObjectivePercentage(objective);
-  
-  // Filter the objective data, then rollup the filtered version
-  const filtered = filterObjectiveByStatus(objective, status);
-  if (!filtered) return 0;
-  return calculateOrgObjectivePercentage(filtered);
+// Calculate rollup percentage from departments (for filtered/reconstructed objectives)
+function calculateRollupFromDepts(objective: DBOrgObjective): number {
+  if (objective.departments.length === 0) return 0;
+  const deptProgresses = objective.departments
+    .map(dept => calcDeptProgress(dept).progress)
+    .filter(p => p > 0);
+  if (deptProgresses.length === 0) return 0;
+  return deptProgresses.reduce((sum, p) => sum + p, 0) / deptProgresses.length;
 }
 
 // Calculate department percentage using rollup: Indicators → KR (formula) → FO (formula) → Dept (AVG)
@@ -205,12 +205,13 @@ export default function Portfolio() {
   }, { green: 0, amber: 0, red: 0, totalProgress: 0, indicatorsWithData: 0, deptCount: 0, foCount: 0, krCount: 0, indicatorCount: 0 }) 
     || { green: 0, amber: 0, red: 0, totalProgress: 0, indicatorsWithData: 0, deptCount: 0, foCount: 0, krCount: 0, indicatorCount: 0 };
 
-  const totalIndicatorsWithStatus = portfolioStats.green + portfolioStats.amber + portfolioStats.red;
-  const avgScore = portfolioStats.indicatorsWithData > 0 
-    ? portfolioStats.totalProgress / portfolioStats.indicatorsWithData
+  // Use rollup-based averaging: average of org objective rollup percentages
+  const orgProgressValues = (orgObjectives || []).map(org => org.okrProgress).filter(p => p > 0);
+  const avgScore = orgProgressValues.length > 0
+    ? orgProgressValues.reduce((sum, p) => sum + p, 0) / orgProgressValues.length
     : 0;
-  const portfolioHealth = portfolioStats.indicatorsWithData > 0 
-    ? scoreToRAG(avgScore) 
+  const portfolioHealth = orgProgressValues.length > 0 
+    ? progressToRAG(avgScore) 
     : 'not-set';
 
   // Sort org objectives: Critical first, then At Risk, then On Track
