@@ -377,7 +377,7 @@ export function IndicatorDerivationDialog({
           <Card>
             <CardContent className="pt-4 pb-3 text-center">
               <p className="text-xs text-muted-foreground">Current Value</p>
-              <p className="text-2xl font-bold">{currentValue !== null ? `${currentValue}${unit || '%'}` : '—'}</p>
+              <p className="text-2xl font-bold">{currentValue !== null ? `${Math.round(currentValue * 10) / 10}${unit || '%'}` : '—'}</p>
             </CardContent>
           </Card>
           <Card>
