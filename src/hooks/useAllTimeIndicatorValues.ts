@@ -55,13 +55,12 @@ export function useAllTimeIndicatorValues() {
 
         if (latestMap.size === 0) continue;
 
-        // Average across all latest values
+        // Average across all latest values (values are RAG numerics like 0, 0.5, 1)
         const values = Array.from(latestMap.values());
         const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
 
-        // The value from csm_customer_feature_scores is a RAG numeric (e.g. 0-100 scale)
-        // Store as-is — it represents the aggregate score for this indicator
-        result.set(indicatorId, avg);
+        // Convert to percentage (0-100 scale) like the Derivation Dialog does
+        result.set(indicatorId, avg * 100);
       }
 
       return result;
