@@ -1,12 +1,17 @@
 
 
-## Plan: Add Department Member Badge to Role Display
+## Problem Found
 
-### Problem
-The `getRoleBadge` function in `TeamAccessTab.tsx` has no case for `department_member` — it falls through to the `default` case and displays "Viewer", which is incorrect and confusing.
+The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
 
-### Change
-**File: `src/components/admin/TeamAccessTab.tsx` (lines 241-254)**
+## Plan
 
-Add a `case 'department_member'` to the `getRoleBadge` switch statement, with a distinct badge (e.g., green-tinted with a `Users` icon and label "Dept Member"), placed between `department_head` and `csm` cases.
+1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
+   ```sql
+   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
+   ```
+
+2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+
+No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
 
