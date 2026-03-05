@@ -102,7 +102,7 @@ function RAGBadge({ status, size = 'sm' }: { status: 'green' | 'amber' | 'red' |
 export default function DepartmentDataEntry() {
     const { departmentId } = useParams<{ departmentId: string }>();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, isDepartmentMember, isAdmin, isDepartmentHead } = useAuth();
     const { logActivity } = useActivityLog();
 
     const [department, setDepartment] = useState<{ id: string; name: string } | null>(null);
@@ -117,7 +117,15 @@ export default function DepartmentDataEntry() {
     const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [period, setPeriod] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
+    const isDeptMemberOnly = isDepartmentMember && !isAdmin && !isDepartmentHead;
     const [activeTab, setActiveTab] = useState<string>('per-indicator');
+
+    // Department members only see Feature Matrix - set default once auth resolves
+    useEffect(() => {
+        if (isDeptMemberOnly) {
+            setActiveTab('feature-matrix');
+        }
+    }, [isDeptMemberOnly]);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -646,7 +654,9 @@ export default function DepartmentDataEntry() {
             {/* Tab Switcher */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
-                    <TabsTrigger value="per-indicator">Per Indicator</TabsTrigger>
+                    {!isDeptMemberOnly && (
+                        <TabsTrigger value="per-indicator">Per Indicator</TabsTrigger>
+                    )}
                     {!isSalesDept && (
                         <TabsTrigger value="feature-matrix">{isContentManagementDept ? 'Indicator Matrix' : 'Feature Matrix'}</TabsTrigger>
                     )}
