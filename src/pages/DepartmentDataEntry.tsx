@@ -107,6 +107,7 @@ export default function DepartmentDataEntry() {
 
     const [department, setDepartment] = useState<{ id: string; name: string } | null>(null);
     const isContentManagementDept = department?.name === 'Content Management';
+    const isSalesDept = department?.name === 'Sales';
     const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [updates, setUpdates] = useState<Record<string, IndicatorUpdate>>({});
     const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
@@ -646,7 +647,9 @@ export default function DepartmentDataEntry() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
                     <TabsTrigger value="per-indicator">Per Indicator</TabsTrigger>
-                    <TabsTrigger value="feature-matrix">{isContentManagementDept ? 'Indicator Matrix' : 'Feature Matrix'}</TabsTrigger>
+                    {!isSalesDept && (
+                        <TabsTrigger value="feature-matrix">{isContentManagementDept ? 'Indicator Matrix' : 'Feature Matrix'}</TabsTrigger>
+                    )}
                 </TabsList>
 
                 <TabsContent value="feature-matrix" className="space-y-4">
