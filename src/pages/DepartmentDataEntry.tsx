@@ -109,6 +109,7 @@ export default function DepartmentDataEntry() {
     const normalizedDepartmentName = department?.name?.trim().toLowerCase() ?? '';
     const isContentManagementDept = normalizedDepartmentName === 'content management';
     const isSalesDept = normalizedDepartmentName === 'sales';
+    const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [updates, setUpdates] = useState<Record<string, IndicatorUpdate>>({});
     const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
     const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
