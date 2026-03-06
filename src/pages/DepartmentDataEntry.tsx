@@ -667,7 +667,63 @@ export default function DepartmentDataEntry() {
 
                 <TabsContent value="feature-matrix" className="space-y-4">
                     {isSalesDept ? (
-                        <SalesKPIScoringGrid departmentId={departmentId!} period={period} />
+                        <>
+                            {/* Sales KPI Scoring Grid Instructions */}
+                            <Card className="border-primary/20 bg-primary/5">
+                                <CardContent className="p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+                                            <BookOpen className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <h3 className="font-semibold text-base">Sales KPI Scoring Grid Guide</h3>
+                                            <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
+                                                <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month using the date picker below.</li>
+                                                <li><span className="font-medium text-foreground">Expand a Functional Objective accordion</span> — click on an FO name to reveal its KPIs.</li>
+                                                <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each row to pick the appropriate RAG band.</li>
+                                                <li><span className="font-medium text-foreground">Save all scores</span> — click <strong>Save All Scores</strong> at the top to persist your selections.</li>
+                                                <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> to complete your weekly submission.</li>
+                                            </ol>
+                                            <p className="text-xs text-muted-foreground/80 pt-1">
+                                                💡 <strong>Tip:</strong> All indicators default to "Not Set" until scored. A pulsing Save button means you have unsaved changes.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Period Selector & Check-in for Sales */}
+                            <Card>
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                type="month"
+                                                value={period}
+                                                onChange={(e) => setPeriod(e.target.value)}
+                                                className="w-48"
+                                            />
+                                        </div>
+                                        <Button
+                                            onClick={handleSaveAll}
+                                            disabled={saving || changedCount === 0}
+                                            size="lg"
+                                            className="gap-2"
+                                        >
+                                            {saving ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <CheckCircle2 className="h-4 w-4" />
+                                            )}
+                                            Update &amp; Check In
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <SalesKPIScoringGrid departmentId={departmentId!} period={period} />
+                        </>
                     ) : (
                         <>
                             {/* Matrix-specific Instructions Card */}
@@ -855,13 +911,18 @@ export default function DepartmentDataEntry() {
 
                                         {expandedKRs.has(krId) && (
                                             <div className="p-4">
-                                                <div className="grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr] gap-2 text-xs font-medium text-muted-foreground mb-2 px-2">
+                                                <div className={cn(
+                                                    "gap-2 text-xs font-medium text-muted-foreground mb-2 px-2 grid",
+                                                    isSalesDept
+                                                        ? "grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr]"
+                                                        : "grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr]"
+                                                )}>
                                                     <div className="text-center">ℹ️</div>
                                                     <div>Indicator</div>
                                                     <div className="text-center">Target</div>
                                                     <div className="text-center">Previous</div>
                                                     <div className="text-center">Current</div>
-                                                    <div className="text-center">Progress</div>
+                                                    {!isSalesDept && <div className="text-center">Progress</div>}
                                                     <div className="text-center">RAG</div>
                                                     <div className="text-center">Evidence</div>
                                                     <div className="text-center">Reason</div>
@@ -886,7 +947,10 @@ export default function DepartmentDataEntry() {
                                                             <div
                                                                 key={ind.id}
                                                                 className={cn(
-                                                                    "grid grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr] gap-2 items-start p-2 rounded-lg border",
+                                                                    "gap-2 items-start p-2 rounded-lg border grid",
+                                                                    isSalesDept
+                                                                        ? "grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr]"
+                                                                        : "grid-cols-[0.3fr,2fr,0.7fr,0.7fr,1fr,0.7fr,0.5fr,1.5fr,1.5fr,0.5fr,0.5fr]",
                                                                     hasChanged && "border-primary/50 bg-muted/30",
                                                                     isInvalid && "border-destructive/50 bg-destructive/5"
                                                                 )}
@@ -941,9 +1005,11 @@ export default function DepartmentDataEntry() {
                                                                         className="h-8 text-sm text-center"
                                                                     />
                                                                 </div>
+                                                                {!isSalesDept && (
                                                                 <div className="text-center pt-1">
                                                                     <span className="text-sm font-semibold">{progress}%</span>
                                                                 </div>
+                                                                )}
                                                                 <div className="flex justify-center pt-1">
                                                                     <RAGBadge status={ragStatus} />
                                                                 </div>
