@@ -55,6 +55,7 @@ interface Department {
   name: string;
   org_objective_id: string | null;
   color: string;
+  owner: string | null;
   functional_objectives: FunctionalObjective[];
 }
 
@@ -167,15 +168,15 @@ function DepartmentEditPanel({
   onClose: () => void;
 }) {
   const [color, setColor] = useState(dept.color);
+  const [owner, setOwner] = useState(dept.owner || '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update the department's own color
       const { error } = await supabase
         .from('departments')
-        .update({ color })
+        .update({ color, owner: owner || null })
         .eq('id', dept.id);
       
       if (error) {
@@ -213,6 +214,10 @@ function DepartmentEditPanel({
       <Separator />
 
       <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium mb-2 block">Owner</label>
+          <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="e.g., Jane Doe" />
+        </div>
         <div>
           <label className="text-sm font-medium mb-2 block">Department Color</label>
           <Select value={color} onValueChange={setColor}>
@@ -636,7 +641,7 @@ export function OKRHierarchyTab() {
       // Fetch departments including their own color column
       const { data: depts, error: deptError } = await supabase
         .from('departments')
-        .select('id, name, org_objective_id, color');
+        .select('id, name, org_objective_id, color, owner');
 
       if (deptError) throw deptError;
 
