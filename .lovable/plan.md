@@ -1,40 +1,38 @@
 
 
-## Import Sales KPI Scores from Excel
+## Add Simple Scoring Grid for Sales Department
 
-### What the Excel Contains
-10 Sales KPIs with band-based aggregate scores (e.g., "25-100%", "1-10%"). These are standalone department-level inputs — no customer or feature association.
+### What the user wants
+A "Feature Matrix" tab for Sales that shows a simple standalone scoring grid — each Sales KPI listed with a band selector dropdown (Green/Amber/Red) — without the customer/feature dimensions used by other departments.
 
-### Current State
-- All 10 Sales indicators exist in the database with `current_value: null`
-- Each indicator has 3 RAG bands defined in `kpi_rag_bands` (green/amber/red)
-- The Sales "Per Indicator" tab already renders these indicators with numeric input fields
+### Current state
+- Sales has 10 indicators with no `indicator_feature_links` or `indicator_customer_links`
+- The Feature Matrix tab is explicitly hidden when `isSalesDept` is true (lines 667-669, 672-705 of `DepartmentDataEntry.tsx`)
+- Each indicator already has `kpi_rag_bands` defined (3 bands each)
 
-### What Needs to Happen
+### Plan
 
-**Data insertion only — no code changes required.**
+**1. Remove the Sales exclusion from the tab rendering** in `DepartmentDataEntry.tsx`:
+- Lines 667-669: Show "Feature Matrix" tab for Sales too (rename it "KPI Scoring Grid" for Sales)
+- Lines 672-705: Remove the `!isSalesDept` gate on the TabsContent
 
-Match each Excel band label to the indicator's `kpi_rag_bands` entry to determine the `rag_numeric` value and RAG color, then:
+**2. Add a Sales-specific branch inside the `feature-matrix` TabsContent**:
+- When `isSalesDept`, render a new `SalesKPIScoringGrid` component instead of `CSMDataEntryMatrix`
+- This component will:
+  - Fetch all 10 Sales indicators for the department
+  - Fetch their `kpi_rag_bands`
+  - Display a table: rows = indicators (grouped by FO/KR), columns = Band Selector + Current Status
+  - Each row has a dropdown with the indicator's specific bands (e.g., "25-100%", "13-24%", "1-10%")
+  - On save, update `indicators.current_value` and `rag_status`, insert into `indicator_history`
 
-1. **Update each indicator's `current_value`** with the matched `rag_numeric` score and set `rag_status` accordingly
-2. **Insert `indicator_history` records** for audit trail (period: current month)
+**3. Create `src/components/user/SalesKPIScoringGrid.tsx`**:
+- Props: `departmentId`, `period`
+- Queries: indicators via FO→KR→indicators chain, `kpi_rag_bands` per indicator
+- UI: Card per FO group, table with indicator name, current band, band dropdown, save button
+- Save logic: same pattern as Per Indicator tab but using band selection instead of numeric input
 
-| KPI | Excel Score | RAG Band Match | Value | Status |
-|-----|------------|----------------|-------|--------|
-| Net new ARR (%) | 25-100% | green | 1 | green |
-| Number of new customers acquired | 13-24% | amber | 0.5 | amber |
-| Expansion ARR from renewals | 25-100% | green | 1 | green |
-| Cross-sell ARR | 1-10% | red | 0 | red |
-| Co-sell influenced ARR | 25-100% | green | 1 | green |
-| Partner-sourced ARR | 51-100% | green | 1 | green |
-| Enterprise ARR closed | 51-75% | amber | 0.5 | amber |
-| Win rate improvement (%) | 1-7% | red | 0 | red |
-| Sales cycle reduction (%) | 11-19% | amber | 0.5 | amber |
-| Rep quota attainment distribution | 1-50% | red | 0 | red |
+**4. Update default tab logic** (line 124-131):
+- Remove the `isSalesDept` override that forces `per-indicator` — let Sales users choose either tab
 
-### Execution
-- 10 UPDATE statements on `indicators` table (set `current_value` and `rag_status`)
-- 10 INSERT statements into `indicator_history` (period `2026-03`, created_by = admin user)
-
-No schema changes, no code changes. The Sales Per Indicator tab will immediately reflect the entered values.
+### No database changes required
 
