@@ -1,17 +1,25 @@
 
 
-## Problem Found
+## Diagnosis: Sales Data Entry Form is Empty
 
-The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
+### Root Cause
 
-## Plan
+The Sales department data entry page has a **conflicting tab visibility logic**:
 
-1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
-   ```sql
-   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
-   ```
+1. Sales department members (`isDeptMemberOnly`) get their `activeTab` forced to `'feature-matrix'` (line 125-128)
+2. The Sales department hides the "Feature Matrix" tab trigger because Sales uses a department-level-only model (`isSalesDept`, line 660)
+3. The `feature-matrix` TabsContent renders the `CSMDataEntryMatrix`, which queries for customer/feature score data — but Sales has no customer/feature mapping, so the matrix is empty
 
-2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+**Result**: The user sees an empty form because they're viewing the Feature Matrix content (which has no data for Sales) instead of the Per Indicator tab (which has all 10 indicators).
 
-No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
+### Fix
+
+In `src/pages/DepartmentDataEntry.tsx`:
+
+1. **Update the default tab logic** (around line 124-128): When `isSalesDept` is true, always default to `'per-indicator'` regardless of role, since Feature Matrix is not applicable for Sales.
+
+2. **Ensure Per Indicator tab is visible for Sales department members**: The current logic hides "Per Indicator" for `isDeptMemberOnly` users (line 657), but for Sales this is the **only** valid tab. Add an exception so Sales department members can see the Per Indicator tab.
+
+### Files to Edit
+- `src/pages/DepartmentDataEntry.tsx` — Fix the `useEffect` that sets `activeTab` and the conditional rendering of tab triggers
 
