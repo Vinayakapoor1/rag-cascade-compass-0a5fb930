@@ -22,6 +22,7 @@ import { IndicatorHistoryDialog } from '@/components/IndicatorHistoryDialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { IndicatorEvidenceInline } from '@/components/user/IndicatorEvidenceInline';
 import { notifyAdminsOfCompletion } from '@/lib/notifyAdmins';
+import { SalesKPIScoringGrid } from '@/components/user/SalesKPIScoringGrid';
 
 interface Indicator {
     id: string;
@@ -121,14 +122,12 @@ export default function DepartmentDataEntry() {
     const isDeptMemberOnly = isDepartmentMember && !isAdmin && !isDepartmentHead;
     const [activeTab, setActiveTab] = useState<string>('per-indicator');
 
-    // Department members only see Feature Matrix - except Sales which only has Per Indicator
+    // Department members only see Feature Matrix
     useEffect(() => {
-        if (isSalesDept) {
-            setActiveTab('per-indicator');
-        } else if (isDeptMemberOnly) {
+        if (isDeptMemberOnly) {
             setActiveTab('feature-matrix');
         }
-    }, [isDeptMemberOnly, isSalesDept]);
+    }, [isDeptMemberOnly]);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -664,45 +663,49 @@ export default function DepartmentDataEntry() {
                     {(!isDeptMemberOnly || isSalesDept) && (
                         <TabsTrigger value="per-indicator">Per Indicator</TabsTrigger>
                     )}
-                    {!isSalesDept && (
-                        <TabsTrigger value="feature-matrix">{isContentManagementDept ? 'Indicator Matrix' : 'Feature Matrix'}</TabsTrigger>
-                    )}
+                    <TabsTrigger value="feature-matrix">
+                        {isSalesDept ? 'KPI Scoring Grid' : isContentManagementDept ? 'Indicator Matrix' : 'Feature Matrix'}
+                    </TabsTrigger>
                 </TabsList>
 
-                {!isSalesDept && (
-                    <TabsContent value="feature-matrix" className="space-y-4">
-                        {/* Matrix-specific Instructions Card */}
-                        <Card className="border-primary/20 bg-primary/5">
-                            <CardContent className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
-                                        <BookOpen className="h-5 w-5 text-primary" />
+                <TabsContent value="feature-matrix" className="space-y-4">
+                    {isSalesDept ? (
+                        <SalesKPIScoringGrid departmentId={departmentId!} period={period} />
+                    ) : (
+                        <>
+                            {/* Matrix-specific Instructions Card */}
+                            <Card className="border-primary/20 bg-primary/5">
+                                <CardContent className="p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+                                            <BookOpen className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <h3 className="font-semibold text-base">
+                                                {isContentManagementDept ? 'Content Management Indicator Matrix Guide' : 'CSM Feature Matrix Guide'}
+                                            </h3>
+                                            <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
+                                                <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month using the date picker above.</li>
+                                                <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their {isContentManagementDept ? 'KPI scoring grid' : 'feature × KPI matrix'}.</li>
+                                                <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band.</li>
+                                                <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the copy icon to bulk-fill cells.</li>
+                                                <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
+                                                <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
+                                            </ol>
+                                            <p className="text-xs text-muted-foreground/80 pt-1">
+                                                💡 <strong>Tip:</strong> {isContentManagementDept
+                                                    ? 'Only managed services customers are shown. A pulsing Save button means you have unsaved changes for that customer.'
+                                                    : 'A green dot next to a period means data has been submitted. A pulsing Save button means you have unsaved changes.'}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="space-y-2 text-sm">
-                                        <h3 className="font-semibold text-base">
-                                            {isContentManagementDept ? 'Content Management Indicator Matrix Guide' : 'CSM Feature Matrix Guide'}
-                                        </h3>
-                                        <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
-                                            <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month using the date picker above.</li>
-                                            <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their {isContentManagementDept ? 'KPI scoring grid' : 'feature × KPI matrix'}.</li>
-                                            <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band.</li>
-                                            <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the copy icon to bulk-fill cells.</li>
-                                            <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
-                                            <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
-                                        </ol>
-                                        <p className="text-xs text-muted-foreground/80 pt-1">
-                                            💡 <strong>Tip:</strong> {isContentManagementDept
-                                                ? 'Only managed services customers are shown. A pulsing Save button means you have unsaved changes for that customer.'
-                                                : 'A green dot next to a period means data has been submitted. A pulsing Save button means you have unsaved changes.'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
 
-                        <CSMDataEntryMatrix departmentId={departmentId!} period={period} managedServicesOnly={isContentManagementDept} />
-                    </TabsContent>
-                )}
+                            <CSMDataEntryMatrix departmentId={departmentId!} period={period} managedServicesOnly={isContentManagementDept} />
+                        </>
+                    )}
+                </TabsContent>
 
                 <TabsContent value="per-indicator">
 
