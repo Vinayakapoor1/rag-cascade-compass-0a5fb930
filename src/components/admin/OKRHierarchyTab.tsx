@@ -953,6 +953,7 @@ export function OKRHierarchyTab() {
             </div>
           ) : selectedItem.type === 'department' ? (
             <DepartmentEditPanel 
+              key={selectedItem.data.id}
               dept={selectedItem.data} 
               onSave={handleRefresh} 
               onDelete={handleDelete}
