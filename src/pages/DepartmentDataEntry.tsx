@@ -109,7 +109,8 @@ export default function DepartmentDataEntry() {
     const [department, setDepartment] = useState<{ id: string; name: string } | null>(null);
     const normalizedDepartmentName = department?.name?.trim().toLowerCase() ?? '';
     const isContentManagementDept = normalizedDepartmentName.includes('content management');
-    const isSalesDept = normalizedDepartmentName.includes('sales');
+     const isSalesDept = normalizedDepartmentName.includes('sales');
+     console.log('[DeptDataEntry] department name:', normalizedDepartmentName, 'isSalesDept:', isSalesDept, 'isDeptMemberOnly:', isDeptMemberOnly);
     const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [updates, setUpdates] = useState<Record<string, IndicatorUpdate>>({});
     const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
