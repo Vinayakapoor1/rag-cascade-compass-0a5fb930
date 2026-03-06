@@ -120,12 +120,14 @@ export default function DepartmentDataEntry() {
     const isDeptMemberOnly = isDepartmentMember && !isAdmin && !isDepartmentHead;
     const [activeTab, setActiveTab] = useState<string>('per-indicator');
 
-    // Department members only see Feature Matrix - set default once auth resolves
+    // Department members only see Feature Matrix - except Sales which only has Per Indicator
     useEffect(() => {
-        if (isDeptMemberOnly) {
+        if (isSalesDept) {
+            setActiveTab('per-indicator');
+        } else if (isDeptMemberOnly) {
             setActiveTab('feature-matrix');
         }
-    }, [isDeptMemberOnly]);
+    }, [isDeptMemberOnly, isSalesDept]);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -654,7 +656,7 @@ export default function DepartmentDataEntry() {
             {/* Tab Switcher */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
-                    {!isDeptMemberOnly && (
+                    {(!isDeptMemberOnly || isSalesDept) && (
                         <TabsTrigger value="per-indicator">Per Indicator</TabsTrigger>
                     )}
                     {!isSalesDept && (
