@@ -1,17 +1,31 @@
 
 
-## Problem Found
+## Plan: Align Sales Data Entry with Other Departments
 
-The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
+### Problem
+Two issues on the Sales Data Entry page:
 
-## Plan
+1. **Per Indicator tab** — Shows a "Progress" column with percentages. For Sales (which has no numeric targets), this is meaningless. All indicators should display as "Not Set" when empty, and the progress column should be hidden for Sales.
 
-1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
-   ```sql
-   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
-   ```
+2. **KPI Scoring Grid tab** — Missing the instructional guide card and the "Update & Check In" banner that all other departments have. It currently just renders the bare grid.
 
-2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+### Changes
 
-No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
+**1. Per Indicator tab — Hide Progress column for Sales** (`DepartmentDataEntry.tsx`)
+- Remove the "Progress" column header (line 864) when `isSalesDept`
+- Remove the progress percentage cell (line 944-946) when `isSalesDept`
+- Adjust the grid column template to drop that column for Sales
+- Ensure current values show "Not Set" styling when null (already works via the `—` fallback, but verify)
+
+**2. KPI Scoring Grid tab — Add instruction card and check-in pattern** (`DepartmentDataEntry.tsx`)
+- Wrap `SalesKPIScoringGrid` with the same instruction card pattern used by other departments (lines 674-700), with Sales-specific wording:
+  - "Sales KPI Scoring Grid Guide"
+  - Steps: select period, expand FO accordion, select band scores, save per FO group, final check-in
+- Add the period selector above the grid (same `Input type="month"` pattern)
+- Add an "Update & Check In" button matching other departments
+
+**3. No database changes required.**
+
+### Files Modified
+- `src/pages/DepartmentDataEntry.tsx` — conditional grid columns for Sales, instruction card in KPI Scoring Grid tab
 
