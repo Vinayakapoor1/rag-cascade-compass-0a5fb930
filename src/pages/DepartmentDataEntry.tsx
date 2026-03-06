@@ -107,8 +107,8 @@ export default function DepartmentDataEntry() {
 
     const [department, setDepartment] = useState<{ id: string; name: string } | null>(null);
     const normalizedDepartmentName = department?.name?.trim().toLowerCase() ?? '';
-    const isContentManagementDept = normalizedDepartmentName === 'content management';
-    const isSalesDept = normalizedDepartmentName === 'sales';
+    const isContentManagementDept = normalizedDepartmentName.includes('content management');
+    const isSalesDept = normalizedDepartmentName.includes('sales');
     const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [updates, setUpdates] = useState<Record<string, IndicatorUpdate>>({});
     const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
@@ -175,6 +175,9 @@ export default function DepartmentDataEntry() {
                 .single();
 
             setDepartment(deptData);
+            if (deptData?.name?.trim().toLowerCase().includes('sales')) {
+                setActiveTab('per-indicator');
+            }
 
             // Get all indicators for this department
             const { data: fos } = await supabase
@@ -666,38 +669,40 @@ export default function DepartmentDataEntry() {
                     )}
                 </TabsList>
 
-                <TabsContent value="feature-matrix" className="space-y-4">
-                    {/* Matrix-specific Instructions Card */}
-                    <Card className="border-primary/20 bg-primary/5">
-                        <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                                <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
-                                    <BookOpen className="h-5 w-5 text-primary" />
+                {!isSalesDept && (
+                    <TabsContent value="feature-matrix" className="space-y-4">
+                        {/* Matrix-specific Instructions Card */}
+                        <Card className="border-primary/20 bg-primary/5">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 rounded-lg bg-primary/10 mt-0.5">
+                                        <BookOpen className="h-5 w-5 text-primary" />
+                                    </div>
+                                    <div className="space-y-2 text-sm">
+                                        <h3 className="font-semibold text-base">
+                                            {isContentManagementDept ? 'Content Management Indicator Matrix Guide' : 'CSM Feature Matrix Guide'}
+                                        </h3>
+                                        <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
+                                            <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month using the date picker above.</li>
+                                            <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their {isContentManagementDept ? 'KPI scoring grid' : 'feature × KPI matrix'}.</li>
+                                            <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band.</li>
+                                            <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the copy icon to bulk-fill cells.</li>
+                                            <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
+                                            <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
+                                        </ol>
+                                        <p className="text-xs text-muted-foreground/80 pt-1">
+                                            💡 <strong>Tip:</strong> {isContentManagementDept
+                                                ? 'Only managed services customers are shown. A pulsing Save button means you have unsaved changes for that customer.'
+                                                : 'A green dot next to a period means data has been submitted. A pulsing Save button means you have unsaved changes.'}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="space-y-2 text-sm">
-                                    <h3 className="font-semibold text-base">
-                                        {isContentManagementDept ? 'Content Management Indicator Matrix Guide' : 'CSM Feature Matrix Guide'}
-                                    </h3>
-                                    <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
-                                        <li><span className="font-medium text-foreground">Select the reporting period</span> — choose the correct month using the date picker above.</li>
-                                        <li><span className="font-medium text-foreground">Expand a customer accordion</span> — click on a customer name to reveal their {isContentManagementDept ? 'KPI scoring grid' : 'feature × KPI matrix'}.</li>
-                                        <li><span className="font-medium text-foreground">Select band scores</span> — use the dropdown in each cell to pick the appropriate RAG band.</li>
-                                        <li><span className="font-medium text-foreground">Use "Apply to Column" / "Apply to Row"</span> — select a band and click the copy icon to bulk-fill cells.</li>
-                                        <li><span className="font-medium text-foreground">Save per customer</span> — click the pulsing <strong>Save</strong> button inside each customer card to save that customer's scores immediately.</li>
-                                        <li><span className="font-medium text-foreground">Final check-in</span> — click <strong>Update &amp; Check In</strong> at the top to aggregate all scores, update KPIs, and complete the check-in.</li>
-                                    </ol>
-                                    <p className="text-xs text-muted-foreground/80 pt-1">
-                                        💡 <strong>Tip:</strong> {isContentManagementDept
-                                            ? 'Only managed services customers are shown. A pulsing Save button means you have unsaved changes for that customer.'
-                                            : 'A green dot next to a period means data has been submitted. A pulsing Save button means you have unsaved changes.'}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
 
-                    <CSMDataEntryMatrix departmentId={departmentId!} period={period} managedServicesOnly={isContentManagementDept} />
-                </TabsContent>
+                        <CSMDataEntryMatrix departmentId={departmentId!} period={period} managedServicesOnly={isContentManagementDept} />
+                    </TabsContent>
+                )}
 
                 <TabsContent value="per-indicator">
 
