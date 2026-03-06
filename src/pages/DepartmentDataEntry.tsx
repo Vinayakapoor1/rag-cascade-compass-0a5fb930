@@ -106,8 +106,9 @@ export default function DepartmentDataEntry() {
     const { logActivity } = useActivityLog();
 
     const [department, setDepartment] = useState<{ id: string; name: string } | null>(null);
-    const isContentManagementDept = department?.name === 'Content Management';
-    const isSalesDept = department?.name === 'Sales';
+    const normalizedDepartmentName = department?.name?.trim().toLowerCase() ?? '';
+    const isContentManagementDept = normalizedDepartmentName === 'content management';
+    const isSalesDept = normalizedDepartmentName === 'sales';
     const [indicators, setIndicators] = useState<Indicator[]>([]);
     const [updates, setUpdates] = useState<Record<string, IndicatorUpdate>>({});
     const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
