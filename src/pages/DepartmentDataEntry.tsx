@@ -120,6 +120,7 @@ export default function DepartmentDataEntry() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [period, setPeriod] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
     const isDeptMemberOnly = isDepartmentMember && !isAdmin && !isDepartmentHead;
+    console.log('[DeptDataEntry] dept:', normalizedDepartmentName, 'isSalesDept:', isSalesDept, 'isDeptMemberOnly:', isDeptMemberOnly);
     const [activeTab, setActiveTab] = useState<string>('per-indicator');
 
     // Department members only see Feature Matrix
