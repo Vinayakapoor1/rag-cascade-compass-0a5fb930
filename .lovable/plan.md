@@ -1,17 +1,16 @@
 
 
-## Problem Found
+## Investigation Summary
 
-The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
+The code changes are already correctly in place:
+- Line 663-665: The "KPI Scoring Grid" tab trigger renders unconditionally for Sales
+- Line 669-670: The `SalesKPIScoringGrid` component renders in the feature-matrix tab content for Sales
 
-## Plan
+Both tabs ("Per Indicator" and "KPI Scoring Grid") should appear side by side. The fact that only "Per Indicator" shows in your screenshot suggests the preview may not have refreshed with the latest code changes.
 
-1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
-   ```sql
-   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
-   ```
+### Fix Plan
 
-2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+To ensure the tab is visible, I'll make a small no-op touch to `DepartmentDataEntry.tsx` to force a rebuild. No logic changes needed — the code is already correct.
 
-No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
+If the issue persists after rebuild, I'll add a `console.log` to verify `isSalesDept` resolves to `true` for the current department and check that the tab rendering path executes.
 
