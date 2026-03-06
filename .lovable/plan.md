@@ -1,19 +1,17 @@
 
 
-## Add Department Owner Editing to Admin Panel
+## Problem Found
 
-### Problem
-The department edit panel in the OKR Structure tab (Data Management page) only allows changing the department color. There is no way to view or update the department **owner** name.
+The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
 
-### Solution
-Add an "Owner" text input field to the existing `DepartmentEditPanel` component in `src/components/admin/OKRHierarchyTab.tsx`. This requires:
+## Plan
 
-1. **Add `owner` state** to `DepartmentEditPanel` (alongside existing `color` state), initialized from `dept.owner`
-2. **Add an Owner input field** in the form UI between the department header and the color selector
-3. **Include `owner` in the save handler** — update the `departments` table with both `color` and `owner`
-4. **Update the Department interface** to include `owner` (it's missing from the local interface despite existing in the DB)
-5. **Update the data fetch query** to also select the `owner` column so it's available in the tree
+1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
+   ```sql
+   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
+   ```
 
-### File to Edit
-- `src/components/admin/OKRHierarchyTab.tsx` — ~15 lines changed across 4 small spots
+2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+
+No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
 
