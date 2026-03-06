@@ -152,15 +152,16 @@ export default function DepartmentDataEntry() {
 
         setLoading(true);
         try {
-            // Check access
-            const { data: accessData } = await supabase
-                .from('department_access')
-                .select('department_id')
-                .eq('user_id', user!.id)
-                .eq('department_id', departmentId)
-                .maybeSingle();
+            // Check access (admins should always pass)
+            const { data: hasAccess, error: accessError } = await supabase
+                .rpc('has_department_access', {
+                    _user_id: user!.id,
+                    _dept_id: departmentId,
+                });
 
-            if (!accessData) {
+            if (accessError) throw accessError;
+
+            if (!hasAccess) {
                 toast.error('You do not have access to this department');
                 navigate('/');
                 return;
