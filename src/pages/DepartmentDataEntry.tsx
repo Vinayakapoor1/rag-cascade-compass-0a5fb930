@@ -175,6 +175,9 @@ export default function DepartmentDataEntry() {
                 .single();
 
             setDepartment(deptData);
+            if (deptData?.name?.trim().toLowerCase().includes('sales')) {
+                setActiveTab('per-indicator');
+            }
 
             // Get all indicators for this department
             const { data: fos } = await supabase
