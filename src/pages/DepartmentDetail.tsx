@@ -455,13 +455,17 @@ function KRStatBlock({
 function IndicatorStatBlock({
   ind,
   filterStatus,
-  onClick
+  onClick,
+  isSalesDept
 }: {
   ind: DBIndicator;
   filterStatus: RAGStatus | null;
   onClick?: () => void;
+  isSalesDept?: boolean;
 }) {
-  const status = calculateIndicatorStatus(ind);
+  // For Sales, use rag_status directly from the database
+  const calculatedStatus = calculateIndicatorStatus(ind);
+  const status = isSalesDept ? ((ind.rag_status as RAGStatus) || 'not-set') : calculatedStatus;
   const displayStatus = filterStatus || status;
 
   const percentage = ind.current_value !== null && ind.target_value !== null && ind.target_value > 0
@@ -496,14 +500,20 @@ function IndicatorStatBlock({
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
             <RAGBadge status={displayStatus} size="sm" />
-            <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            {isSalesDept ? (
+              <span className="text-sm font-medium text-muted-foreground">Not Set</span>
+            ) : (
+              <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            )}
           </div>
         </div>
 
-        <Progress
-          value={Math.min(percentage, 100)}
-          className={`h-2 ${getProgressColorClass(displayStatus)}`}
-        />
+        {!isSalesDept && (
+          <Progress
+            value={Math.min(percentage, 100)}
+            className={`h-2 ${getProgressColorClass(displayStatus)}`}
+          />
+        )}
       </CardContent>
     </Card>
   );
