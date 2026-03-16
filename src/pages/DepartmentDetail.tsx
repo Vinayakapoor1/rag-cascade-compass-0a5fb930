@@ -30,6 +30,7 @@ interface DBIndicator {
   target_value: number | null;
   tier: string;
   unit: string | null;
+  rag_status: string | null;
   last_updated_at?: string | null;
   last_updated_by?: string | null;
 }
