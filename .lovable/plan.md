@@ -1,33 +1,17 @@
 
 
-## Plan: Reset Sales KPIs to "Not Set" and Fix Display
+## Problem Found
 
-### Problem
-1. Sales KPIs in the database have stale values (`current_value` = 0, 0.5, or 1 with `target_value` = 100), causing the Department Detail page to show "1% completion" instead of "Not Set"
-2. The DepartmentDetail page shows percentage progress bars for Sales KPIs, which is meaningless since Sales uses band-based scoring (not numeric targets)
+The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
 
-### Changes
+## Plan
 
-**1. Database: Reset all Sales indicators to "not-set"**
-- Run a migration to set `current_value = NULL`, `rag_status = 'not-set'` for all indicators under the Sales department
-- This ensures clean slate for fresh data entry
+1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
+   ```sql
+   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
+   ```
 
-**2. DepartmentDetail.tsx: Handle Sales department differently**
-- Detect Sales department using the same `name.includes('sales')` pattern
-- For Sales department, the FOStatBlock, KRStatBlock, and IndicatorStatBlock should:
-  - Show RAG badge based on `rag_status` field directly (not calculated from current_value/target_value)
-  - Hide the percentage number and progress bar (or show "Not Set" when null)
-  - When `rag_status = 'not-set'`, display "Not Set" instead of "0%"
-- The `calculateDepartmentStatus`, `calculateFOStatus`, `calculateKRStatus` functions should return `'not-set'` when all underlying indicators have null current_value
+2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
 
-**3. DepartmentDetail.tsx: Sales-specific stat blocks**
-- Pass an `isSalesDept` boolean down to stat block components
-- When `isSalesDept`:
-  - Replace `{Math.round(percentage)}%` with the band label or "Not Set"
-  - Use `rag_status` from the indicator directly instead of calculating from current_value/target_value
-  - Progress bar shows 0 or is hidden
-
-### Files Modified
-- `src/pages/DepartmentDetail.tsx` — Add Sales-specific display logic
-- Database migration — Reset Sales indicator values to NULL/not-set
+No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
 

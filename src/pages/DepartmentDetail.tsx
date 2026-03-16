@@ -30,6 +30,7 @@ interface DBIndicator {
   target_value: number | null;
   tier: string;
   unit: string | null;
+  rag_status: string | null;
   last_updated_at?: string | null;
   last_updated_by?: string | null;
 }
@@ -109,7 +110,8 @@ function useDepartmentById(departmentId: string) {
                 current_value,
                 target_value,
                 tier,
-                unit
+                unit,
+                rag_status
               )
             )
           )
@@ -330,10 +332,12 @@ const getBorderColorClass = (s: RAGStatus) => {
 // FO Stat Block Component
 function FOStatBlock({
   fo,
-  filterStatus
+  filterStatus,
+  isSalesDept
 }: {
   fo: DBFunctionalObjective;
   filterStatus: RAGStatus | null;
+  isSalesDept?: boolean;
 }) {
   const status = calculateFOStatus(fo);
   const percentage = calculateFOPercentage(fo);
@@ -365,14 +369,20 @@ function FOStatBlock({
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
             <RAGBadge status={displayStatus} size="sm" />
-            <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            {isSalesDept ? (
+              <span className="text-sm font-medium text-muted-foreground">Not Set</span>
+            ) : (
+              <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            )}
           </div>
         </div>
 
-        <Progress
-          value={Math.min(percentage, 100)}
-          className={`h-2 ${getProgressColorClass(displayStatus)}`}
-        />
+        {!isSalesDept && (
+          <Progress
+            value={Math.min(percentage, 100)}
+            className={`h-2 ${getProgressColorClass(displayStatus)}`}
+          />
+        )}
       </CardContent>
     </Card>
   );
@@ -381,10 +391,12 @@ function FOStatBlock({
 // KR Stat Block Component (flat view - no parent label)
 function KRStatBlock({
   kr,
-  filterStatus
+  filterStatus,
+  isSalesDept
 }: {
   kr: DBKeyResult;
   filterStatus: RAGStatus | null;
+  isSalesDept?: boolean;
 }) {
   const status = calculateKRStatus(kr);
   const displayStatus = filterStatus || status;
@@ -420,14 +432,20 @@ function KRStatBlock({
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
             <RAGBadge status={displayStatus} size="sm" />
-            <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            {isSalesDept ? (
+              <span className="text-sm font-medium text-muted-foreground">Not Set</span>
+            ) : (
+              <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            )}
           </div>
         </div>
 
-        <Progress
-          value={Math.min(percentage, 100)}
-          className={`h-2 ${getProgressColorClass(displayStatus)}`}
-        />
+        {!isSalesDept && (
+          <Progress
+            value={Math.min(percentage, 100)}
+            className={`h-2 ${getProgressColorClass(displayStatus)}`}
+          />
+        )}
       </CardContent>
     </Card>
   );
@@ -437,13 +455,17 @@ function KRStatBlock({
 function IndicatorStatBlock({
   ind,
   filterStatus,
-  onClick
+  onClick,
+  isSalesDept
 }: {
   ind: DBIndicator;
   filterStatus: RAGStatus | null;
   onClick?: () => void;
+  isSalesDept?: boolean;
 }) {
-  const status = calculateIndicatorStatus(ind);
+  // For Sales, use rag_status directly from the database
+  const calculatedStatus = calculateIndicatorStatus(ind);
+  const status = isSalesDept ? ((ind.rag_status as RAGStatus) || 'not-set') : calculatedStatus;
   const displayStatus = filterStatus || status;
 
   const percentage = ind.current_value !== null && ind.target_value !== null && ind.target_value > 0
@@ -478,14 +500,20 @@ function IndicatorStatBlock({
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
             <RAGBadge status={displayStatus} size="sm" />
-            <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            {isSalesDept ? (
+              <span className="text-sm font-medium text-muted-foreground">Not Set</span>
+            ) : (
+              <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            )}
           </div>
         </div>
 
-        <Progress
-          value={Math.min(percentage, 100)}
-          className={`h-2 ${getProgressColorClass(displayStatus)}`}
-        />
+        {!isSalesDept && (
+          <Progress
+            value={Math.min(percentage, 100)}
+            className={`h-2 ${getProgressColorClass(displayStatus)}`}
+          />
+        )}
       </CardContent>
     </Card>
   );
@@ -701,6 +729,7 @@ export default function DepartmentDetail() {
 
   const departmentStatus = calculateDepartmentStatus(department);
   const displayHealth = initialFilter || departmentStatus;
+  const isSalesDept = department.name.toLowerCase().includes('sales');
   const colorClasses = getOrgObjectiveColorClasses((department.color || department.org_objectives?.color || 'green') as OrgObjectiveColor);
   const hasActiveFilter = statusFilter !== 'all' || customerFilter !== 'all' || featureFilter !== 'all';
 
@@ -885,7 +914,7 @@ export default function DepartmentDetail() {
                   {/* Column 1: FO Card - stretches to match children */}
                   <div className="w-80 flex-shrink-0 flex">
                     <div className="flex-1">
-                      <FOStatBlock fo={fo} filterStatus={statusFilter === 'all' ? null : statusFilter} />
+                      <FOStatBlock fo={fo} filterStatus={statusFilter === 'all' ? null : statusFilter} isSalesDept={isSalesDept} />
                     </div>
                   </div>
 
@@ -921,7 +950,7 @@ export default function DepartmentDetail() {
 
                               {/* KR Card */}
                               <div className="w-80 flex-shrink-0">
-                                <KRStatBlock kr={kr} filterStatus={statusFilter === 'all' ? null : statusFilter} />
+                                <KRStatBlock kr={kr} filterStatus={statusFilter === 'all' ? null : statusFilter} isSalesDept={isSalesDept} />
                               </div>
 
                               {/* Horizontal connector from KR to KPIs */}
@@ -952,7 +981,7 @@ export default function DepartmentDetail() {
                                         </div>
 
                                         <div className="w-80 flex-shrink-0">
-                                          <IndicatorStatBlock ind={ind} filterStatus={statusFilter === 'all' ? null : statusFilter} onClick={() => setDerivationIndicator(ind)} />
+                                          <IndicatorStatBlock ind={ind} filterStatus={statusFilter === 'all' ? null : statusFilter} onClick={() => setDerivationIndicator(ind)} isSalesDept={isSalesDept} />
                                         </div>
                                       </div>
                                     ))}
