@@ -950,7 +950,7 @@ export default function DepartmentDetail() {
 
                               {/* KR Card */}
                               <div className="w-80 flex-shrink-0">
-                                <KRStatBlock kr={kr} filterStatus={statusFilter === 'all' ? null : statusFilter} />
+                                <KRStatBlock kr={kr} filterStatus={statusFilter === 'all' ? null : statusFilter} isSalesDept={isSalesDept} />
                               </div>
 
                               {/* Horizontal connector from KR to KPIs */}
