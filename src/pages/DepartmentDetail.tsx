@@ -110,7 +110,8 @@ function useDepartmentById(departmentId: string) {
                 current_value,
                 target_value,
                 tier,
-                unit
+                unit,
+                rag_status
               )
             )
           )
