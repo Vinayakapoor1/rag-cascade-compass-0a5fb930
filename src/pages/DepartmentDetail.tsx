@@ -729,6 +729,7 @@ export default function DepartmentDetail() {
 
   const departmentStatus = calculateDepartmentStatus(department);
   const displayHealth = initialFilter || departmentStatus;
+  const isSalesDept = department.name.toLowerCase().includes('sales');
   const colorClasses = getOrgObjectiveColorClasses((department.color || department.org_objectives?.color || 'green') as OrgObjectiveColor);
   const hasActiveFilter = statusFilter !== 'all' || customerFilter !== 'all' || featureFilter !== 'all';
 
