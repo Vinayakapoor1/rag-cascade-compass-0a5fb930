@@ -914,7 +914,7 @@ export default function DepartmentDetail() {
                   {/* Column 1: FO Card - stretches to match children */}
                   <div className="w-80 flex-shrink-0 flex">
                     <div className="flex-1">
-                      <FOStatBlock fo={fo} filterStatus={statusFilter === 'all' ? null : statusFilter} />
+                      <FOStatBlock fo={fo} filterStatus={statusFilter === 'all' ? null : statusFilter} isSalesDept={isSalesDept} />
                     </div>
                   </div>
 
