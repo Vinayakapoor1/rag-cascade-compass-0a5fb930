@@ -981,7 +981,7 @@ export default function DepartmentDetail() {
                                         </div>
 
                                         <div className="w-80 flex-shrink-0">
-                                          <IndicatorStatBlock ind={ind} filterStatus={statusFilter === 'all' ? null : statusFilter} onClick={() => setDerivationIndicator(ind)} />
+                                          <IndicatorStatBlock ind={ind} filterStatus={statusFilter === 'all' ? null : statusFilter} onClick={() => setDerivationIndicator(ind)} isSalesDept={isSalesDept} />
                                         </div>
                                       </div>
                                     ))}
