@@ -332,10 +332,12 @@ const getBorderColorClass = (s: RAGStatus) => {
 // FO Stat Block Component
 function FOStatBlock({
   fo,
-  filterStatus
+  filterStatus,
+  isSalesDept
 }: {
   fo: DBFunctionalObjective;
   filterStatus: RAGStatus | null;
+  isSalesDept?: boolean;
 }) {
   const status = calculateFOStatus(fo);
   const percentage = calculateFOPercentage(fo);
@@ -367,14 +369,20 @@ function FOStatBlock({
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
             <RAGBadge status={displayStatus} size="sm" />
-            <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            {isSalesDept ? (
+              <span className="text-sm font-medium text-muted-foreground">Not Set</span>
+            ) : (
+              <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            )}
           </div>
         </div>
 
-        <Progress
-          value={Math.min(percentage, 100)}
-          className={`h-2 ${getProgressColorClass(displayStatus)}`}
-        />
+        {!isSalesDept && (
+          <Progress
+            value={Math.min(percentage, 100)}
+            className={`h-2 ${getProgressColorClass(displayStatus)}`}
+          />
+        )}
       </CardContent>
     </Card>
   );
