@@ -391,10 +391,12 @@ function FOStatBlock({
 // KR Stat Block Component (flat view - no parent label)
 function KRStatBlock({
   kr,
-  filterStatus
+  filterStatus,
+  isSalesDept
 }: {
   kr: DBKeyResult;
   filterStatus: RAGStatus | null;
+  isSalesDept?: boolean;
 }) {
   const status = calculateKRStatus(kr);
   const displayStatus = filterStatus || status;
@@ -430,14 +432,20 @@ function KRStatBlock({
           </div>
           <div className="flex flex-col items-end flex-shrink-0">
             <RAGBadge status={displayStatus} size="sm" />
-            <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            {isSalesDept ? (
+              <span className="text-sm font-medium text-muted-foreground">Not Set</span>
+            ) : (
+              <span className="text-lg font-bold">{Math.round(percentage)}%</span>
+            )}
           </div>
         </div>
 
-        <Progress
-          value={Math.min(percentage, 100)}
-          className={`h-2 ${getProgressColorClass(displayStatus)}`}
-        />
+        {!isSalesDept && (
+          <Progress
+            value={Math.min(percentage, 100)}
+            className={`h-2 ${getProgressColorClass(displayStatus)}`}
+          />
+        )}
       </CardContent>
     </Card>
   );
