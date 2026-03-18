@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isContentManager, setIsContentManager] = useState(false);
   const [csmId, setCsmId] = useState<string | null>(null);
   const [accessibleDepartments, setAccessibleDepartments] = useState<string[]>([]);
+  const [accessibleCsmIds, setAccessibleCsmIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const lastCheckedUserIdRef = useRef<string | null>(null);
 
