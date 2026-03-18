@@ -541,36 +541,6 @@ export type Database = {
         }
         Relationships: []
       }
-      feedbacks: {
-        Row: {
-          created_at: string
-          id: string
-          message: string
-          page_url: string
-          status: string
-          user_email: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          message: string
-          page_url: string
-          status?: string
-          user_email?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          message?: string
-          page_url?: string
-          status?: string
-          user_email?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       formula_versions: {
         Row: {
           created_at: string
