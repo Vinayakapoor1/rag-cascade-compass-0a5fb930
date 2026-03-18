@@ -85,12 +85,13 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
 }
 
 export default function CustomersPage() {
-  const { isAdmin, isDepartmentHead, isCSM, isContentManager, csmId } = useAuth();
+  const { isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, csmId, accessibleCsmIds } = useAuth();
   const { data: allCustomers, isLoading, refetch } = useCustomersWithImpact();
 
   // Scope customers by role:
   // - Content managers (non-admin): only managed_services customers
   // - CSMs (non-admin): only their assigned customers
+  // - Department members: only customers belonging to their assigned CSMs
   const customers = useMemo(() => {
     if (!allCustomers) return allCustomers;
     if (isContentManager && !isAdmin) {
@@ -99,8 +100,11 @@ export default function CustomersPage() {
     if (isCSM && !isAdmin && !isDepartmentHead && csmId) {
       return allCustomers.filter(c => c.csmId === csmId);
     }
+    if (isDepartmentMember && !isAdmin && !isDepartmentHead && accessibleCsmIds.length > 0) {
+      return allCustomers.filter(c => accessibleCsmIds.includes(c.csmId));
+    }
     return allCustomers;
-  }, [allCustomers, isCSM, isAdmin, isDepartmentHead, isContentManager, csmId]);
+  }, [allCustomers, isCSM, isAdmin, isDepartmentHead, isDepartmentMember, isContentManager, csmId, accessibleCsmIds]);
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
