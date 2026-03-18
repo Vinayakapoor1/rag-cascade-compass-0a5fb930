@@ -159,6 +159,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', userId);
     
     setAccessibleDepartments(accessData?.map(a => a.department_id) || []);
+
+    // Get accessible CSM IDs for department members
+    if (deptMemberData) {
+      const { data: csmAccessData } = await supabase
+        .from('member_csm_access')
+        .select('csm_id')
+        .eq('user_id', userId);
+      setAccessibleCsmIds(csmAccessData?.map(a => (a as any).csm_id) || []);
+    } else {
+      setAccessibleCsmIds([]);
+    }
   };
 
   const signOut = async () => {
