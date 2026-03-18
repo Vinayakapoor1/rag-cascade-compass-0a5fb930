@@ -198,8 +198,11 @@ export default function Portfolio() {
 
   // Fetch accurate customer and feature counts, scoped by role
   // Content managers see only managed_services customers and their linked features
+  // Department members see only customers belonging to their assigned CSMs
   const [scopedCounts, setScopedCounts] = useState({ customers: 0, features: 0 });
   const isCMScoped = isContentManager && !isAdmin;
+  const isDeptMemberScoped = isDepartmentMember && !isAdmin && !isDepartmentHead && accessibleCsmIds.length > 0;
+  const isCSMScoped = isCSM && !isAdmin && !isDepartmentHead && !!csmId;
   useEffect(() => {
     const fetchCounts = async () => {
       if (isCMScoped) {
@@ -220,6 +223,40 @@ export default function Portfolio() {
           customers: customerCount ?? 0,
           features: uniqueFeatures.size,
         });
+      } else if (isDeptMemberScoped) {
+        // Department members: only customers belonging to their assigned CSMs
+        const { count: customerCount } = await supabase
+          .from('customers')
+          .select('id', { count: 'exact', head: true })
+          .in('csm_id', accessibleCsmIds);
+
+        const { data: cfData } = await supabase
+          .from('customer_features')
+          .select('feature_id, customers!inner(csm_id)')
+          .in('customers.csm_id', accessibleCsmIds);
+        const uniqueFeatures = new Set(cfData?.map(r => r.feature_id) || []);
+
+        setScopedCounts({
+          customers: customerCount ?? 0,
+          features: uniqueFeatures.size,
+        });
+      } else if (isCSMScoped) {
+        // CSMs: only their own customers
+        const { count: customerCount } = await supabase
+          .from('customers')
+          .select('id', { count: 'exact', head: true })
+          .eq('csm_id', csmId);
+
+        const { data: cfData } = await supabase
+          .from('customer_features')
+          .select('feature_id, customers!inner(csm_id)')
+          .eq('customers.csm_id', csmId);
+        const uniqueFeatures = new Set(cfData?.map(r => r.feature_id) || []);
+
+        setScopedCounts({
+          customers: customerCount ?? 0,
+          features: uniqueFeatures.size,
+        });
       } else {
         const [customersRes, featuresRes] = await Promise.all([
           supabase.from('customers').select('id', { count: 'exact', head: true }),
@@ -232,7 +269,7 @@ export default function Portfolio() {
       }
     };
     fetchCounts();
-  }, [isCMScoped]);
+  }, [isCMScoped, isDeptMemberScoped, isCSMScoped, accessibleCsmIds, csmId]);
 
   // Calculate portfolio-level stats from ALL indicators across all org objectives
   const portfolioStats = orgObjectives?.reduce((stats, org) => {
