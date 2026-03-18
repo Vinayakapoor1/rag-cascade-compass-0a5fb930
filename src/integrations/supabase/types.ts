@@ -1134,6 +1134,35 @@ export type Database = {
         }
         Relationships: []
       }
+      member_csm_access: {
+        Row: {
+          created_at: string
+          csm_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          csm_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          csm_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_csm_access_csm_id_fkey"
+            columns: ["csm_id"]
+            isOneToOne: false
+            referencedRelation: "csms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
