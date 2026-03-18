@@ -62,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCsmId(null);
         setAccessibleDepartments([]);
         setAccessibleCsmIds([]);
+      }
     });
 
     const initializeAuth = async () => {
