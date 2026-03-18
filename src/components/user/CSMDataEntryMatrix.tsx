@@ -620,7 +620,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       }
 
       // Visibility rules for ST Deployment indicators (similar to CM)
-      const hideSTIndicators = ((isDepartmentHead && !isSecTechDept && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin;
+      const isCSMOnly = !!csmId && !isAdmin && !isDepartmentHead;
+      const hideSTIndicators = ((isDepartmentHead && !isSecTechDept && !isCustomerSuccessDept) || isDepartmentMember || isCSMOnly) && !isAdmin;
 
       // Merge: if current dept is Sec+Tech, use selfDeployment; otherwise use cross-dept fetch
       const finalSTIndicators = isSTDepartment ? selfDeploymentIndicators : (hideSTIndicators ? [] as IndicatorInfo[] : stIndicatorInfos);
