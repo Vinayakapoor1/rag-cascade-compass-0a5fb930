@@ -12,6 +12,7 @@ interface AuthContextType {
   isContentManager: boolean;
   csmId: string | null;
   accessibleDepartments: string[];
+  accessibleCsmIds: string[];
   loading: boolean;
   signOut: () => Promise<void>;
 }
