@@ -242,6 +242,15 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     }));
   };
 
+  const toggleCsmAccess = (csmId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      assignedCsmIds: prev.assignedCsmIds.includes(csmId)
+        ? prev.assignedCsmIds.filter(id => id !== csmId)
+        : [...prev.assignedCsmIds, csmId]
+    }));
+  };
+
   const openRemoveDialog = (user: UserWithRole) => {
     setUserToRemove(user);
     setRemoveDialogOpen(true);
