@@ -119,7 +119,7 @@ type ScoreMap = Record<string, number | null>;
 type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
 export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }: CSMDataEntryMatrixProps) {
-  const { user, isAdmin, isDepartmentHead, isDepartmentMember } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember, accessibleCsmIds } = useAuth();
   const { logActivity } = useActivityLog();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
