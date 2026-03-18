@@ -220,7 +220,15 @@ export default function ComplianceReport() {
 
     const csmMap = new Map(csms.map(c => [c.id, c]));
 
-    return customers.map(cust => {
+    return customers
+      .filter(cust => {
+        // Filter by accessible CSM IDs for department members
+        if (isDepartmentMember && accessibleCsmIds.length > 0) {
+          return accessibleCsmIds.includes(cust.csm_id!);
+        }
+        return true;
+      })
+      .map(cust => {
       const csm = csmMap.get(cust.csm_id!);
       const scoreInfo = scoresByCustomer.get(cust.id);
       const count = scoreInfo?.count || 0;
