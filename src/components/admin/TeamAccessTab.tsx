@@ -23,6 +23,7 @@ interface UserWithRole {
   departments: { id: string; name: string }[];
   linkedCsmId?: string | null;
   linkedCsmName?: string | null;
+  assignedCsmIds?: string[];
 }
 
 interface Department {
