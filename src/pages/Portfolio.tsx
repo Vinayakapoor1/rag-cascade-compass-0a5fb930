@@ -120,7 +120,7 @@ export default function Portfolio() {
   const [filterStatus, setFilterStatus] = useState<RAGStatus | null>(null);
   const { data: ventures } = useVentures();
   const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
-  const { user, isAdmin, isCSM, isContentManager, isDepartmentMember, csmId, accessibleDepartments, accessibleCsmIds } = useAuth();
+  const { user, isAdmin, isCSM, isContentManager, isDepartmentHead, isDepartmentMember, csmId, accessibleDepartments, accessibleCsmIds } = useAuth();
   const { data: allTimeValues } = useAllTimeIndicatorValues();
 
   // Auto-select HumanFirewall on first load
@@ -133,7 +133,6 @@ export default function Portfolio() {
 
   const { data: rawOrgObjectives, isLoading, refetch } = useOrgObjectives(selectedVentureId ?? undefined);
 
-  const { isDepartmentHead } = useAuth();
 
   // Helper: overlay all-time values onto org objectives
   function applyAllTimeValues(objectives: DBOrgObjective[]): DBOrgObjective[] {
