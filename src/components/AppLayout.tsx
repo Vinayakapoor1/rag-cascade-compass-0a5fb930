@@ -218,6 +218,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         {children}
       </main>
 
+      {/* Global Feedback Widget */}
+      <FeedbackWidget />
+
       {/* Footer */}
       <footer className="glass border-t border-border/30 py-10 mt-auto">
         {/* Top highlight line */}
