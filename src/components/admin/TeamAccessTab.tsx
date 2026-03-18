@@ -23,6 +23,7 @@ interface UserWithRole {
   departments: { id: string; name: string }[];
   linkedCsmId?: string | null;
   linkedCsmName?: string | null;
+  assignedCsmIds?: string[];
 }
 
 interface Department {
@@ -57,6 +58,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     role: 'viewer' as 'admin' | 'department_head' | 'department_member' | 'viewer' | 'csm' | 'content_manager',
     departmentIds: [] as string[],
     linkedCsmId: '' as string,
+    assignedCsmIds: [] as string[],
   });
 
   useEffect(() => {
@@ -94,6 +96,11 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
       .select('id, name, user_id')
       .order('name');
 
+    // Fetch all member_csm_access entries
+    const { data: memberCsmAccess } = await supabase
+      .from('member_csm_access')
+      .select('user_id, csm_id');
+
     if (depts) setDepartments(depts);
     if (csms) setCsmRecords(csms);
 
@@ -102,6 +109,9 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
         const userRole = roles?.find((r) => r.user_id === p.user_id);
         const userAccess = access?.filter((a) => a.user_id === p.user_id) || [];
         const linkedCsm = csms?.find((c) => c.user_id === p.user_id);
+        const userCsmAccess = (memberCsmAccess || [])
+          .filter((a: any) => a.user_id === p.user_id)
+          .map((a: any) => a.csm_id);
         
         return {
           id: p.user_id,
@@ -114,6 +124,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           })),
           linkedCsmId: linkedCsm?.id || null,
           linkedCsmName: linkedCsm?.name || null,
+          assignedCsmIds: userCsmAccess,
         };
       });
 
@@ -129,6 +140,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
       role: user.role || 'viewer',
       departmentIds: user.departments.map(d => d.id),
       linkedCsmId: user.linkedCsmId || '',
+      assignedCsmIds: user.assignedCsmIds || [],
     });
     setDialogOpen(true);
   };
@@ -194,6 +206,23 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           .eq('user_id', selectedUser.id);
       }
 
+      // Save member_csm_access for department_member role
+      await supabase
+        .from('member_csm_access')
+        .delete()
+        .eq('user_id', selectedUser.id);
+
+      if (formData.role === 'department_member' && formData.assignedCsmIds.length > 0) {
+        await supabase
+          .from('member_csm_access')
+          .insert(
+            formData.assignedCsmIds.map(csmId => ({
+              user_id: selectedUser.id,
+              csm_id: csmId,
+            }))
+          );
+      }
+
       toast.success('User access updated');
       setDialogOpen(false);
       fetchData();
@@ -213,6 +242,15 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     }));
   };
 
+  const toggleCsmAccess = (csmId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      assignedCsmIds: prev.assignedCsmIds.includes(csmId)
+        ? prev.assignedCsmIds.filter(id => id !== csmId)
+        : [...prev.assignedCsmIds, csmId]
+    }));
+  };
+
   const openRemoveDialog = (user: UserWithRole) => {
     setUserToRemove(user);
     setRemoveDialogOpen(true);
@@ -224,6 +262,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     try {
       await supabase.from('user_roles').delete().eq('user_id', userToRemove.id);
       await supabase.from('department_access').delete().eq('user_id', userToRemove.id);
+      await supabase.from('member_csm_access').delete().eq('user_id', userToRemove.id);
       await supabase.from('csms').update({ user_id: null, email: null }).eq('user_id', userToRemove.id);
       await supabase.from('user_2fa').delete().eq('user_id', userToRemove.id);
       await supabase.from('profiles').delete().eq('user_id', userToRemove.id);
@@ -433,6 +472,36 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                             className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                           >
                             {dept.name}
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {formData.role === 'department_member' && (
+                <div className="space-y-2">
+                  <Label>CSM Visibility</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Choose which CSMs' customers this member can see. Leave empty to allow all.
+                  </p>
+                  <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {csmRecords.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No CSM records available</p>
+                    ) : (
+                      csmRecords.map((csm) => (
+                        <div key={csm.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`csm-access-${csm.id}`}
+                            checked={formData.assignedCsmIds.includes(csm.id)}
+                            onCheckedChange={() => toggleCsmAccess(csm.id)}
+                          />
+                          <label
+                            htmlFor={`csm-access-${csm.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {csm.name}
                           </label>
                         </div>
                       ))

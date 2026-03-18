@@ -12,6 +12,7 @@ interface AuthContextType {
   isContentManager: boolean;
   csmId: string | null;
   accessibleDepartments: string[];
+  accessibleCsmIds: string[];
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isContentManager, setIsContentManager] = useState(false);
   const [csmId, setCsmId] = useState<string | null>(null);
   const [accessibleDepartments, setAccessibleDepartments] = useState<string[]>([]);
+  const [accessibleCsmIds, setAccessibleCsmIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const lastCheckedUserIdRef = useRef<string | null>(null);
 
@@ -59,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsContentManager(false);
         setCsmId(null);
         setAccessibleDepartments([]);
+        setAccessibleCsmIds([]);
       }
     });
 
@@ -157,6 +160,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', userId);
     
     setAccessibleDepartments(accessData?.map(a => a.department_id) || []);
+
+    // Get accessible CSM IDs for department members
+    if (deptMemberData) {
+      const { data: csmAccessData } = await supabase
+        .from('member_csm_access')
+        .select('csm_id')
+        .eq('user_id', userId);
+      setAccessibleCsmIds(csmAccessData?.map(a => (a as any).csm_id) || []);
+    } else {
+      setAccessibleCsmIds([]);
+    }
   };
 
   const signOut = async () => {
@@ -170,10 +184,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsContentManager(false);
     setCsmId(null);
     setAccessibleDepartments([]);
+    setAccessibleCsmIds([]);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, csmId, accessibleDepartments, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, csmId, accessibleDepartments, accessibleCsmIds, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

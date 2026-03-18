@@ -17,7 +17,7 @@ import PptxGenJS from 'pptxgenjs';
 import { toast } from 'sonner';
 
 export default function ComplianceReport() {
-  const { user, isAdmin, isDepartmentHead, isDepartmentMember, loading: authLoading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember, accessibleCsmIds, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<string>('current');
   const [cardFilter, setCardFilter] = useState<ComplianceFilter>(null);
 
@@ -220,7 +220,15 @@ export default function ComplianceReport() {
 
     const csmMap = new Map(csms.map(c => [c.id, c]));
 
-    return customers.map(cust => {
+    return customers
+      .filter(cust => {
+        // Filter by accessible CSM IDs for department members
+        if (isDepartmentMember && accessibleCsmIds.length > 0) {
+          return accessibleCsmIds.includes(cust.csm_id!);
+        }
+        return true;
+      })
+      .map(cust => {
       const csm = csmMap.get(cust.csm_id!);
       const scoreInfo = scoresByCustomer.get(cust.id);
       const count = scoreInfo?.count || 0;
@@ -245,8 +253,8 @@ export default function ComplianceReport() {
     });
   };
 
-  const currentRows = useMemo(() => buildRows(currentScores, currentAvgs, prevAvgs), [currentScores, allTimeScores, customers, csms, customerExpectedMap, currentAvgs, prevAvgs]);
-  const allTimeRows = useMemo(() => buildRows(allTimeScores, allTimeAvgs, prevAvgs), [allTimeScores, customers, csms, customerExpectedMap, allTimeAvgs, prevAvgs]);
+  const currentRows = useMemo(() => buildRows(currentScores, currentAvgs, prevAvgs), [currentScores, allTimeScores, customers, csms, customerExpectedMap, currentAvgs, prevAvgs, isDepartmentMember, accessibleCsmIds]);
+  const allTimeRows = useMemo(() => buildRows(allTimeScores, allTimeAvgs, prevAvgs), [allTimeScores, customers, csms, customerExpectedMap, allTimeAvgs, prevAvgs, isDepartmentMember, accessibleCsmIds]);
 
   const computeStats = (rows: CustomerRow[]) => {
     const completed = rows.filter(r => r.status !== 'pending').length;

@@ -119,7 +119,7 @@ type ScoreMap = Record<string, number | null>;
 type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
 export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }: CSMDataEntryMatrixProps) {
-  const { user, isAdmin, isDepartmentHead, isDepartmentMember } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember, accessibleCsmIds } = useAuth();
   const { logActivity } = useActivityLog();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -345,6 +345,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       (customerFeatures || []).forEach((cf: any) => {
         if (!cf.customers) return;
         if (csmId && cf.customers.csm_id !== csmId) return;
+        // Filter by accessible CSM IDs for department members
+        if (isDepartmentMember && accessibleCsmIds.length > 0 && !accessibleCsmIds.includes(cf.customers.csm_id)) return;
         custNameMap.set(cf.customer_id, cf.customers.name);
         if (!custFeatureMap.has(cf.customer_id)) custFeatureMap.set(cf.customer_id, new Set());
         custFeatureMap.get(cf.customer_id)!.add(cf.feature_id);
