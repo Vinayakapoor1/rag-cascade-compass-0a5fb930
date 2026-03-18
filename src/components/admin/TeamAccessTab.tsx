@@ -58,6 +58,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     role: 'viewer' as 'admin' | 'department_head' | 'department_member' | 'viewer' | 'csm' | 'content_manager',
     departmentIds: [] as string[],
     linkedCsmId: '' as string,
+    assignedCsmIds: [] as string[],
   });
 
   useEffect(() => {
