@@ -9,6 +9,7 @@ import {
   ShieldOff,
   Loader2,
 } from 'lucide-react';
+import { FeedbackWidget } from '@/components/FeedbackWidget';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -216,6 +217,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="container py-8 relative">
         {children}
       </main>
+
+      {/* Global Feedback Widget */}
+      <FeedbackWidget />
 
       {/* Footer */}
       <footer className="glass border-t border-border/30 py-10 mt-auto">
