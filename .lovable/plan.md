@@ -1,17 +1,31 @@
 
 
-## Problem Found
+## Plan: Hide Sec+Tech Deployment Indicators from CSM Data Entry
 
-The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
+### Problem
+CSM users see the "Sec+Tech Deployment Indicators" sub-section in their data entry matrix. These should only appear under the Sec+Tech department's own data entry form (and for admins/CS department heads).
 
-## Plan
+### Change
 
-1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
-   ```sql
-   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
-   ```
+**File: `src/components/user/CSMDataEntryMatrix.tsx` (~line 622-623)**
 
-2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+Update the `hideSTIndicators` visibility rule to also hide ST indicators when a CSM (non-admin, non-department-head) is viewing the matrix:
 
-No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
+```typescript
+// Current:
+const hideSTIndicators = ((isDepartmentHead && !isSecTechDept && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin;
+
+// Updated — also hide for CSMs (who are not admin/dept-head):
+const isCSMOnly = !!csmId && !isAdmin && !isDepartmentHead;
+const hideSTIndicators = ((isDepartmentHead && !isSecTechDept && !isCustomerSuccessDept) || isDepartmentMember || isCSMOnly) && !isAdmin;
+```
+
+This ensures:
+- **CSM users** — ST Deployment indicators are hidden
+- **Admin users** — still see everything
+- **CS Department Heads** — still see ST indicators (existing logic)
+- **Sec+Tech department view** — still shows its own deployment indicators (handled by `isSTDepartment` branch)
+
+### Files Modified
+- `src/components/user/CSMDataEntryMatrix.tsx` — one line change to visibility rule
 
