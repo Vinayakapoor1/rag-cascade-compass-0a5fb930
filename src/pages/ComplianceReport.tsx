@@ -17,7 +17,7 @@ import PptxGenJS from 'pptxgenjs';
 import { toast } from 'sonner';
 
 export default function ComplianceReport() {
-  const { user, isAdmin, isDepartmentHead, isDepartmentMember, loading: authLoading } = useAuth();
+  const { user, isAdmin, isDepartmentHead, isDepartmentMember, accessibleCsmIds, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<string>('current');
   const [cardFilter, setCardFilter] = useState<ComplianceFilter>(null);
 

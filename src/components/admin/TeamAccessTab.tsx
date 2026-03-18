@@ -262,6 +262,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
     try {
       await supabase.from('user_roles').delete().eq('user_id', userToRemove.id);
       await supabase.from('department_access').delete().eq('user_id', userToRemove.id);
+      await supabase.from('member_csm_access').delete().eq('user_id', userToRemove.id);
       await supabase.from('csms').update({ user_id: null, email: null }).eq('user_id', userToRemove.id);
       await supabase.from('user_2fa').delete().eq('user_id', userToRemove.id);
       await supabase.from('profiles').delete().eq('user_id', userToRemove.id);
