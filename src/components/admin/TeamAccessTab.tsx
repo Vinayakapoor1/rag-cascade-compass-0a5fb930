@@ -478,6 +478,36 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                   </div>
                 </div>
               )}
+
+              {formData.role === 'department_member' && (
+                <div className="space-y-2">
+                  <Label>CSM Visibility</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Choose which CSMs' customers this member can see. Leave empty to allow all.
+                  </p>
+                  <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                    {csmRecords.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No CSM records available</p>
+                    ) : (
+                      csmRecords.map((csm) => (
+                        <div key={csm.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`csm-access-${csm.id}`}
+                            checked={formData.assignedCsmIds.includes(csm.id)}
+                            onCheckedChange={() => toggleCsmAccess(csm.id)}
+                          />
+                          <label
+                            htmlFor={`csm-access-${csm.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {csm.name}
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
