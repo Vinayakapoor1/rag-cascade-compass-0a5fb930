@@ -1,17 +1,28 @@
 
 
-## Problem Found
+## Plan: Scope Customers Page & Portfolio by CSM Visibility for Department Members
 
-The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
+### Problem
+Nitika (department member) sees all customers including Abhay's clients on the Portfolio and Customers pages. The `accessibleCsmIds` filtering was only applied to CSMDataEntryMatrix and ComplianceReport, but not to these two pages.
 
-## Plan
+### Changes
 
-1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
-   ```sql
-   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
-   ```
+**1. `src/pages/CustomersPage.tsx` (~line 88-103)**
+- Import `isDepartmentMember` and `accessibleCsmIds` from `useAuth()`
+- Add a new filter condition for department members:
+```typescript
+if (isDepartmentMember && !isAdmin && !isDepartmentHead && accessibleCsmIds.length > 0) {
+  return allCustomers.filter(c => accessibleCsmIds.includes(c.csmId));
+}
+```
+- Add `isDepartmentMember`, `accessibleCsmIds` to useMemo dependencies
 
-2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+**2. `src/pages/Portfolio.tsx` (~line 123, 199-235)**
+- Import `isDepartmentMember` and `accessibleCsmIds` from `useAuth()`
+- In the `scopedCounts` fetch, add a branch for department members that queries customers filtered by `csm_id IN accessibleCsmIds` and counts only their linked features
+- Add dependencies to the useEffect
 
-No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
+### Files Modified
+- `src/pages/CustomersPage.tsx` — Add department member CSM filtering to customer list
+- `src/pages/Portfolio.tsx` — Scope customer/feature counts by accessible CSMs for department members
 
