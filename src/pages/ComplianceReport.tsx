@@ -253,8 +253,8 @@ export default function ComplianceReport() {
     });
   };
 
-  const currentRows = useMemo(() => buildRows(currentScores, currentAvgs, prevAvgs), [currentScores, allTimeScores, customers, csms, customerExpectedMap, currentAvgs, prevAvgs]);
-  const allTimeRows = useMemo(() => buildRows(allTimeScores, allTimeAvgs, prevAvgs), [allTimeScores, customers, csms, customerExpectedMap, allTimeAvgs, prevAvgs]);
+  const currentRows = useMemo(() => buildRows(currentScores, currentAvgs, prevAvgs), [currentScores, allTimeScores, customers, csms, customerExpectedMap, currentAvgs, prevAvgs, isDepartmentMember, accessibleCsmIds]);
+  const allTimeRows = useMemo(() => buildRows(allTimeScores, allTimeAvgs, prevAvgs), [allTimeScores, customers, csms, customerExpectedMap, allTimeAvgs, prevAvgs, isDepartmentMember, accessibleCsmIds]);
 
   const computeStats = (rows: CustomerRow[]) => {
     const completed = rows.filter(r => r.status !== 'pending').length;
