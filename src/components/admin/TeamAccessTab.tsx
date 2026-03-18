@@ -206,6 +206,23 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           .eq('user_id', selectedUser.id);
       }
 
+      // Save member_csm_access for department_member role
+      await supabase
+        .from('member_csm_access')
+        .delete()
+        .eq('user_id', selectedUser.id);
+
+      if (formData.role === 'department_member' && formData.assignedCsmIds.length > 0) {
+        await supabase
+          .from('member_csm_access')
+          .insert(
+            formData.assignedCsmIds.map(csmId => ({
+              user_id: selectedUser.id,
+              csm_id: csmId,
+            }))
+          );
+      }
+
       toast.success('User access updated');
       setDialogOpen(false);
       fetchData();
