@@ -96,6 +96,11 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
       .select('id, name, user_id')
       .order('name');
 
+    // Fetch all member_csm_access entries
+    const { data: memberCsmAccess } = await supabase
+      .from('member_csm_access')
+      .select('user_id, csm_id');
+
     if (depts) setDepartments(depts);
     if (csms) setCsmRecords(csms);
 
@@ -104,6 +109,9 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
         const userRole = roles?.find((r) => r.user_id === p.user_id);
         const userAccess = access?.filter((a) => a.user_id === p.user_id) || [];
         const linkedCsm = csms?.find((c) => c.user_id === p.user_id);
+        const userCsmAccess = (memberCsmAccess || [])
+          .filter((a: any) => a.user_id === p.user_id)
+          .map((a: any) => a.csm_id);
         
         return {
           id: p.user_id,
@@ -116,6 +124,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           })),
           linkedCsmId: linkedCsm?.id || null,
           linkedCsmName: linkedCsm?.name || null,
+          assignedCsmIds: userCsmAccess,
         };
       });
 
