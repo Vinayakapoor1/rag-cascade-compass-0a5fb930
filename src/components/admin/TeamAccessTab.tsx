@@ -140,6 +140,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
       role: user.role || 'viewer',
       departmentIds: user.departments.map(d => d.id),
       linkedCsmId: user.linkedCsmId || '',
+      assignedCsmIds: user.assignedCsmIds || [],
     });
     setDialogOpen(true);
   };
