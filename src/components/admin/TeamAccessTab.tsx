@@ -337,6 +337,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>2FA</TableHead>
                   <TableHead>Departments</TableHead>
                   {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
