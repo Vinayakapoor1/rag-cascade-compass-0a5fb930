@@ -159,9 +159,9 @@ export default function CustomersPage() {
       const matchesTier = exclude === 'tier' || tierFilter === 'all' || c.tier === tierFilter;
       const matchesStatus = exclude === 'status' || statusFilter === 'all' || c.status === statusFilter;
       const matchesDeployment = exclude === 'deployment' || deploymentFilter === 'all' || (deploymentFilter === 'Unassigned' ? !c.deploymentType : c.deploymentType === deploymentFilter);
-      const matchesRegion = exclude === 'region' || regionFilter === 'all' || c.region === regionFilter;
-      const matchesIndustry = exclude === 'industry' || industryFilter === 'all' || c.industry === industryFilter;
-      const matchesCsm = exclude === 'csm' || csmFilter === 'all' || c.csmName === csmFilter;
+      const matchesRegion = exclude === 'region' || regionFilter === 'all' || (regionFilter === 'Unassigned' ? !c.region : c.region === regionFilter);
+      const matchesIndustry = exclude === 'industry' || industryFilter === 'all' || (industryFilter === 'Unassigned' ? !c.industry : c.industry === industryFilter);
+      const matchesCsm = exclude === 'csm' || csmFilter === 'all' || (csmFilter === 'Unassigned' ? !c.csmName : c.csmName === csmFilter);
       const matchesRag = exclude === 'rag' || ragFilter === 'all' || c.ragStatus === ragFilter;
       return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag;
     });
@@ -174,9 +174,9 @@ export default function CustomersPage() {
       tiers: [...new Set(filterExcluding('tier').map(c => c.tier))].sort(),
       statuses: [...new Set(filterExcluding('status').map(c => c.status))].sort(),
       deploymentTypes: [...new Set(filterExcluding('deployment').map(c => c.deploymentType || 'Unassigned'))].filter(d => d !== 'Cloud').sort() as string[],
-      regions: [...new Set(filterExcluding('region').map(c => c.region).filter(Boolean))].sort() as string[],
-      industries: [...new Set(filterExcluding('industry').map(c => c.industry).filter(Boolean))].sort() as string[],
-      csmNames: [...new Set(filterExcluding('csm').map(c => c.csmName).filter(Boolean))].sort() as string[],
+      regions: [...new Set(filterExcluding('region').map(c => c.region || 'Unassigned'))].sort() as string[],
+      industries: [...new Set(filterExcluding('industry').map(c => c.industry || 'Unassigned'))].sort() as string[],
+      csmNames: [...new Set(filterExcluding('csm').map(c => c.csmName || 'Unassigned'))].sort() as string[],
       ragOptions: [...new Set(filterExcluding('rag').map(c => c.ragStatus))].sort() as string[],
     };
   }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter]);
@@ -193,9 +193,9 @@ export default function CustomersPage() {
       const matchesTier = tierFilter === 'all' || c.tier === tierFilter;
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
       const matchesDeployment = deploymentFilter === 'all' || (deploymentFilter === 'Unassigned' ? !c.deploymentType : c.deploymentType === deploymentFilter);
-      const matchesRegion = regionFilter === 'all' || c.region === regionFilter;
-      const matchesIndustry = industryFilter === 'all' || c.industry === industryFilter;
-      const matchesCsm = csmFilter === 'all' || c.csmName === csmFilter;
+      const matchesRegion = regionFilter === 'all' || (regionFilter === 'Unassigned' ? !c.region : c.region === regionFilter);
+      const matchesIndustry = industryFilter === 'all' || (industryFilter === 'Unassigned' ? !c.industry : c.industry === industryFilter);
+      const matchesCsm = csmFilter === 'all' || (csmFilter === 'Unassigned' ? !c.csmName : c.csmName === csmFilter);
       const matchesRag = ragFilter === 'all' || c.ragStatus === ragFilter;
       return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag;
     });

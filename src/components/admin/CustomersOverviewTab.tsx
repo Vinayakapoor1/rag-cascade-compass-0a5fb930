@@ -26,6 +26,7 @@ export function CustomersOverviewTab() {
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [industryFilter, setIndustryFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchCustomers();
@@ -33,7 +34,7 @@ export function CustomersOverviewTab() {
 
   useEffect(() => {
     filterCustomers();
-  }, [customers, search, tierFilter, regionFilter]);
+  }, [customers, search, tierFilter, regionFilter, industryFilter]);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -65,13 +66,18 @@ export function CustomersOverviewTab() {
     }
 
     if (regionFilter !== 'all') {
-      filtered = filtered.filter(c => c.region === regionFilter);
+      filtered = filtered.filter(c => regionFilter === 'Unassigned' ? !c.region : c.region === regionFilter);
+    }
+
+    if (industryFilter !== 'all') {
+      filtered = filtered.filter(c => industryFilter === 'Unassigned' ? !c.industry : c.industry === industryFilter);
     }
 
     setFilteredCustomers(filtered);
   };
 
-  const uniqueRegions = [...new Set(customers.map(c => c.region).filter(Boolean))] as string[];
+  const uniqueRegions = [...new Set(customers.map(c => c.region || 'Unassigned'))].sort() as string[];
+  const uniqueIndustries = [...new Set(customers.map(c => c.industry || 'Unassigned'))].sort() as string[];
   const uniqueTiers = [...new Set(customers.map(c => c.tier))];
   const withManagedServices = customers.filter(c => c.managed_services === true).length;
   const withoutManagedServices = customers.filter(c => !c.managed_services).length;
@@ -121,6 +127,17 @@ export function CustomersOverviewTab() {
                 <SelectItem value="all">All Regions</SelectItem>
                 {uniqueRegions.map(region => (
                   <SelectItem key={region} value={region}>{region}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={industryFilter} onValueChange={setIndustryFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Industry" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Industries</SelectItem>
+                {uniqueIndustries.map(ind => (
+                  <SelectItem key={ind} value={ind}>{ind}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
