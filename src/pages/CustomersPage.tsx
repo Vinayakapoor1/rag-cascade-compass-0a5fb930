@@ -631,15 +631,81 @@ export default function CustomersPage() {
                     <div className="flex items-center gap-4">
                       {/* Sparkline Trend */}
                       <CustomerSparkline data={customer.trendData} ragStatus={customer.ragStatus} />
-                      {/* RAG Status */}
-                      <div className="flex flex-col items-center">
-                        <RAGBadge status={customer.ragStatus} size="md" />
-                        <span className="text-[10px] text-muted-foreground mt-1">Health</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <RAGBadge status={customer.healthMetricsRAG} size="md" />
-                        <span className="text-[10px] text-muted-foreground mt-1">Ops</span>
-                      </div>
+                      {/* Health RAG with hover tooltip */}
+                      <HoverCard openDelay={100} closeDelay={200}>
+                        <HoverCardTrigger asChild>
+                          <div className="flex flex-col items-center cursor-help">
+                            <RAGBadge status={customer.ragStatus} size="md" />
+                            <span className="text-[10px] text-muted-foreground mt-1">Health</span>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-72 z-50" side="top" align="center">
+                          <p className="text-xs font-semibold mb-2">Health Score Derivation</p>
+                          {customer.indicatorScore != null ? (
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">Linked KPIs</span>
+                                <span className="font-medium">{customer.linkedIndicatorCount}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">Avg Indicator Score</span>
+                                <span className="font-medium">{Math.round(customer.indicatorScore)}%</span>
+                              </div>
+                              {customer.healthMetricsScore != null && (
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Ops Health Score</span>
+                                  <span className="font-medium">{Math.round(customer.healthMetricsScore)}%</span>
+                                </div>
+                              )}
+                              <p className="text-[10px] text-muted-foreground pt-1 border-t border-border/40">
+                                Composite = avg of Indicator + Ops scores
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Health is derived from linked OKR indicators via customer features. No scored indicators yet — link features with KPIs to see health.
+                            </p>
+                          )}
+                        </HoverCardContent>
+                      </HoverCard>
+                      {/* Ops RAG with hover tooltip */}
+                      <HoverCard openDelay={100} closeDelay={200}>
+                        <HoverCardTrigger asChild>
+                          <div className="flex flex-col items-center cursor-help">
+                            <RAGBadge status={customer.healthMetricsRAG} size="md" />
+                            <span className="text-[10px] text-muted-foreground mt-1">Ops</span>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-72 z-50" side="top" align="center">
+                          <p className="text-xs font-semibold mb-2">Operational Health Breakdown</p>
+                          {customer.healthDimensions.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {customer.healthDimensions.map((dim) => (
+                                <div key={dim.label} className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={cn(
+                                      "h-2 w-2 rounded-full",
+                                      dim.rag === 'green' && "bg-emerald-500",
+                                      dim.rag === 'amber' && "bg-amber-500",
+                                      dim.rag === 'red' && "bg-red-500",
+                                      dim.rag === 'not-set' && "bg-muted-foreground/40",
+                                    )} />
+                                    <span className="text-muted-foreground">{dim.label}</span>
+                                  </div>
+                                  <span className="font-medium">{dim.value}</span>
+                                </div>
+                              ))}
+                              <p className="text-[10px] text-muted-foreground pt-1 border-t border-border/40">
+                                Composite Ops = avg of above dimensions
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Ops health is derived from Bug Count, Bug SLA Compliance, Promises Delivery, and NFR Compliance. No data recorded yet — enter via CSM Data Entry.
+                            </p>
+                          )}
+                        </HoverCardContent>
+                      </HoverCard>
                       <Link
                         to={`/customers/${customer.id}`}
                         className="text-right hover:opacity-80 transition-opacity"
