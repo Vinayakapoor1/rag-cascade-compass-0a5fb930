@@ -24,6 +24,7 @@ interface UserWithRole {
   linkedCsmId?: string | null;
   linkedCsmName?: string | null;
   assignedCsmIds?: string[];
+  has2FA?: boolean;
 }
 
 interface Department {
