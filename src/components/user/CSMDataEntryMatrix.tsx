@@ -2334,6 +2334,8 @@ function CustomerSectionCard({
                     cmBands={cmBands}
                     scores={scores}
                     onCellChange={onCellChange}
+                    remarks={remarks}
+                    onRemarkChange={onRemarkChange}
                   />
                 )}
 
@@ -2345,6 +2347,8 @@ function CustomerSectionCard({
                     stBands={stBands}
                     scores={scores}
                     onCellChange={onCellChange}
+                    remarks={remarks}
+                    onRemarkChange={onRemarkChange}
                   />
                 )}
 
@@ -2353,19 +2357,7 @@ function CustomerSectionCard({
                   customerId={section.id}
                   customerName={section.name}
                   period={period}
-                />
-
-                {/* ===== Remarks Section ===== */}
-                <RemarksSection
-                  customerId={section.id}
-                  indicators={section.indicators}
-                  features={section.features}
-                  indicatorFeatureMap={section.indicatorFeatureMap}
-                  cmIndicators={cmIndicators}
-                  stIndicators={stIndicators}
-                  scores={scores}
-                  remarks={remarks}
-                  onRemarkChange={onRemarkChange}
+                  onDataChange={(data) => onOpsDataChange(section.id, data)}
                 />
 
                 {/* Per-customer Save button */}
