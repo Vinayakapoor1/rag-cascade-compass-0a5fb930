@@ -1964,12 +1964,26 @@ function CustomerSectionCard({
                                 </Tooltip>
                               </TooltipProvider>
                             </td>
-                            <td className={cn('px-2 py-1.5 text-center border-r border-border/20', cellBg)}>
-                              <BandDropdown
-                                value={val}
-                                bands={getBandsForIndicator(ind.id)}
-                                onChange={(b) => onCellChange(ind.id, section.id, placeholderFeatId, b)}
-                              />
+                            <td className={cn('px-2 py-1.5 border-r border-border/20', cellBg)}>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <BandDropdown
+                                  value={val}
+                                  bands={getBandsForIndicator(ind.id)}
+                                  onChange={(b) => onCellChange(ind.id, section.id, placeholderFeatId, b)}
+                                />
+                                {val != null && (
+                                  <textarea
+                                    placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
+                                    value={remarks[key] || ''}
+                                    onChange={(e) => onRemarkChange(key, e.target.value)}
+                                    className={cn(
+                                      'w-full text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
+                                      ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
+                                    )}
+                                    rows={ragColor === 'red' ? 2 : 1}
+                                  />
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-1.5 text-center">
                               {val != null ? (
