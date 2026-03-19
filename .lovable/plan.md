@@ -1,71 +1,71 @@
 
 
-# Unified Save, NFR SLA % Field, and Inline Remarks
+# Fix Ops Health Inputs and Remark Layout
 
-## Three Problems to Fix
+## What Changes
 
-1. **Two save buttons** — "Save Ops Health" and "Save {customer}" are separate. Merging into one.
-2. **New Feature Requests should be a percentage** (NFR SLA Compliance %), scored with the platform-standard threshold (≥76% Green, ≥51% Amber, <51% Red).
-3. **Remarks missing** — the Remarks section exists at the bottom but users can't find it. Moving remark textareas inline directly under each score cell in the matrix.
+### 1. Operational Health — Use Standard Dropdowns
 
----
+Replace the current free-text numeric inputs with the platform-standard `BandDropdown` (Green/Amber/Red) for 3 of the 4 dimensions. Bug Count stays as a number input since it has a count-based threshold.
 
-## Database Migration
+**4 Ops Health indicators (down from 5 fields):**
+- **Bug Count** — Keep as `<Input type="number">`. Threshold: <5 Green, 5-10 Amber, >10 Red. Store raw count in `bug_count`.
+- **Bug SLA** — Replace with `BandDropdown` using `DEFAULT_BANDS`. Store weight (1/0.5/0) in `bug_sla_compliance`.
+- **NFR SLA** — Replace with `BandDropdown` using `DEFAULT_BANDS`. Store weight (1/0.5/0) in `new_feature_requests`.
+- **Promises Made vs Kept** — Merge the two separate fields (Promises Made + Promises Delivered) into a single `BandDropdown`. Store weight (1/0.5/0) in `promises_made`. Drop `promises_delivered` from the UI (keep column in DB, just stop writing to it).
 
-Change `new_feature_requests` from integer to numeric to store a percentage:
+### 2. Remarks — Separate Column, One Per Indicator
 
-```sql
-ALTER TABLE customer_health_metrics 
-  ALTER COLUMN new_feature_requests TYPE numeric USING new_feature_requests::numeric;
-```
+Currently remarks are crammed inside each score cell as a tiny textarea below the dropdown — looks terrible in multi-column layouts.
+
+**New approach:** Add a dedicated "Remarks" column at the end of each indicator row in the matrix table. One clean `Textarea` per indicator row (not per cell). This applies to all 4 rendering modes (standard Feature×KPI, CM direct, ST direct, direct mode).
+
+For Ops Health, add a single consolidated remarks field (already have `notes` column in `customer_health_metrics`).
 
 ---
 
 ## File Changes
 
-### 1. `src/hooks/useCustomerHealthMetrics.ts`
-- Change `new_feature_requests` type from `number | null` to `number | null` (numeric/percentage)
-- Replace `bugCountRAG`/`bugCountScore` for Feature Requests with `pctRAG`/`pctScore` (platform standard)
-- Update dimension label from "Feature Requests" to "NFR SLA"
-- Update dimension value display to show `%`
+### `src/components/user/CSMDataEntryMatrix.tsx`
 
-### 2. `src/components/user/CSMDataEntryMatrix.tsx`
+**OpsHealthSubSection:**
+- Replace Bug SLA, NFR SLA inputs with `BandDropdown` using `DEFAULT_BANDS`
+- Merge Promises Made + Delivered into one "Promises" `BandDropdown`
+- Keep Bug Count as number input with RAG dot
+- Update `onDataChange` signature: `{ bugCount: string; bugSla: string; promises: string; nfrSla: string }`
+- Add a `Textarea` for ops notes
 
-**Unified Save (merge ops health into per-customer save):**
-- Lift ops health state (`bugCount`, `bugSla`, `promisesMade`, `promisesDelivered`, `newFeatureRequests`) from `OpsHealthSubSection` up into `CustomerSectionCard`
-- Pass state + setters as props to `OpsHealthSubSection`
-- Remove `handleSaveOps` and the "Save Ops Health" button from `OpsHealthSubSection`
-- In `doSaveCustomer`, after saving scores, also call `upsertMutation.mutateAsync()` with the ops health data
-- The `useUpsertHealthMetric` hook is already imported at line 18
+**All matrix table modes (4 locations):**
+- Remove inline `<textarea>` from inside each score cell
+- Add a "Remarks" `<th>` column header
+- Add a `<td>` with `<Textarea>` at the end of each indicator row
+- The remark key stays the same (`cellKey(ind.id, custId, featId)`) — one remark per indicator per customer per feature
 
-**NFR field change:**
-- Rename "New Feature Requests" label to "NFR SLA Compliance %"
-- Change input to `type="number" min={0} max={100}` with placeholder "0-100"
+**CustomerSectionCard props:**
+- Update `onOpsDataChange` type to match new shape
 
-**Inline remarks:**
-- In the matrix table cells (both standard Feature×KPI matrix and CM/ST/direct modes), add a small `Textarea` directly below each `BandDropdown` — visible only when the cell has a score
-- Auto-expand textarea for red scores; collapsed single-line for others
-- Remove the separate `RemarksSection` component and its usage
+### `src/hooks/useCustomerHealthMetrics.ts`
+- Update `buildHealthSummary` to handle Bug SLA, NFR SLA, and Promises as weight values (1/0.5/0) instead of raw percentages
+- Bug Count remains count-based with existing `bugCountRAG`
 
-### 3. `src/components/CustomerHealthMetricsCard.tsx`
-- Update "Feature Requests" icon mapping to "NFR SLA"
+### `src/components/CustomerHealthMetricsCard.tsx`
+- Update dimension display for weight-based values (show "Green"/"Amber"/"Red" instead of raw numbers)
 
-### 4. `src/components/CustomerHealthMetricsForm.tsx`
-- Change `new_feature_requests` field from integer to percentage (max 100, label "NFR SLA Compliance %")
+### `src/components/CustomerHealthMetricsForm.tsx`
+- Replace numeric inputs for Bug SLA, NFR SLA, Promises with `BandDropdown`-style selectors
 
 ---
 
 ## Technical Notes
 
-- The `remark` field is already stored in `csm_customer_feature_scores` table and already included in `doSaveCustomer` upserts (line 847: `remark: remarks[key] || null`)
-- Remarks state management (`remarks`, `setRemarks`, `originalRemarks`) already exists at the parent level (lines 135-136)
-- `onRemarkChange` callback is already wired through to `CustomerSectionCard` (line 1611)
-- No new database columns needed for remarks — just a UI relocation
+- `DEFAULT_BANDS` already exists with Green(1)/Amber(0.5)/Red(0)
+- No database migration needed — existing numeric columns store 1/0.5/0
+- The `remark` column in `csm_customer_feature_scores` already stores per-cell remarks; we just move the UI to a separate column
+- Ops health notes use the existing `notes` column in `customer_health_metrics`
 
 ### Files Modified
-1. Migration SQL (type change for `new_feature_requests`)
-2. `src/hooks/useCustomerHealthMetrics.ts`
-3. `src/components/user/CSMDataEntryMatrix.tsx` (bulk of changes)
-4. `src/components/CustomerHealthMetricsCard.tsx`
-5. `src/components/CustomerHealthMetricsForm.tsx`
+1. `src/components/user/CSMDataEntryMatrix.tsx` — bulk of changes
+2. `src/hooks/useCustomerHealthMetrics.ts` — scoring logic
+3. `src/components/CustomerHealthMetricsCard.tsx` — display
+4. `src/components/CustomerHealthMetricsForm.tsx` — form inputs
 
