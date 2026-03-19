@@ -664,9 +664,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const previousPeriodLabel = matrixData?.previousPeriodLabel ?? null;
   const lastCheckInByCustomer = matrixData?.lastCheckInByCustomer ?? {};
 
-  // Initialize scores from query data only once per query result
+  // Initialize scores from query data - re-initialize whenever matrixData changes
   useEffect(() => {
-    if (matrixData && !scoresInitializedRef.current) {
+    if (matrixData) {
       const hydratedScores = {
         ...(matrixData.previousScores || {}),
         ...(matrixData.scores || {}),
