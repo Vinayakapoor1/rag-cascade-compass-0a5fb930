@@ -1797,7 +1797,7 @@ interface CustomerSectionCardProps {
   lastCheckInDate: string | null;
   remarks: RemarkMap;
   onRemarkChange: (key: string, text: string) => void;
-  onOpsDataChange: (customerId: string, data: { bugCount: string; bugSla: string; promisesMade: string; promisesDelivered: string; nfrSla: string }) => void;
+  onOpsDataChange: (customerId: string, data: { bugCount: string; bugSla: string; promises: string; nfrSla: string; notes: string }) => void;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
