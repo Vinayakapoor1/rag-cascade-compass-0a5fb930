@@ -2849,7 +2849,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
     onDataChange(dataRef.current);
   };
 
-  const bugRAG = (count: number): string => { if (count < 5) return 'green'; if (count <= 10) return 'amber'; return 'red'; };
+  const bugRAG = (w: string): string => { const n = Number(w); if (n >= 1) return 'green'; if (n >= 0.5) return 'amber'; if (w) return 'red'; return ''; };
   const weightColor = (w: string): string => { const n = Number(w); if (n >= 1) return 'green'; if (n >= 0.5) return 'amber'; return 'red'; };
 
   // Compute overall scored count for badge
