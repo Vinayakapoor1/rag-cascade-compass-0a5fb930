@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck, ClipboardCheck, Trash2 } from 'lucide-react';
+import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck, ClipboardCheck, Trash2, ShieldOff } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
