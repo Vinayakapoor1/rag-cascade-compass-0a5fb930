@@ -59,7 +59,7 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
       bug_sla_compliance: bugSla ? Number(bugSla) : null,
       promises_made: promisesMade ? Number(promisesMade) : null,
       promises_delivered: promisesDelivered ? Number(promisesDelivered) : null,
-      nfr_compliance: nfrCompliance ? Number(nfrCompliance) : null,
+      new_feature_requests: newFeatureRequests ? Number(newFeatureRequests) : null,
       notes: notes.trim() || null,
     };
 
