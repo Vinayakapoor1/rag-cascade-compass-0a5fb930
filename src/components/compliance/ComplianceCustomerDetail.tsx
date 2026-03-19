@@ -88,6 +88,7 @@ export function ComplianceCustomerDetail({
         filledCount,
         lastSubmission,
         status,
+        remarks: featureRemarks,
       };
     }).sort((a, b) => {
       const order = { pending: 0, partial: 1, complete: 2 };
