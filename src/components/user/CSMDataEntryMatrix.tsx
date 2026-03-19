@@ -2232,28 +2232,14 @@ function CustomerSectionCard({
                               const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
 
                               return (
-                                <td key={ind.id} className={cn('px-1 py-1 border-r border-border/20', cellBg)}>
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <BandDropdown
-                                      value={val ?? null}
-                                      bands={getBandsForIndicator(ind.id)}
-                                      onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
-                                    />
-                                    {val != null && (
-                                      <textarea
-                                        placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
-                                        value={remarks[key] || ''}
-                                        onChange={(e) => onRemarkChange(key, e.target.value)}
-                                        className={cn(
-                                          'w-full max-w-[130px] text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
-                                          ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
-                                        )}
-                                        rows={ragColor === 'red' ? 2 : 1}
-                                      />
-                                    )}
-                                  </div>
-                                </td>
-                              );
+                                 <td key={ind.id} className={cn('px-1 py-1 border-r border-border/20', cellBg)}>
+                                   <BandDropdown
+                                     value={val ?? null}
+                                     bands={getBandsForIndicator(ind.id)}
+                                     onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
+                                   />
+                                 </td>
+                               );
                             })}
                             <td className="px-3 py-1.5 text-center bg-muted/10">
                               {rowAvg != null && rowRag ? (
