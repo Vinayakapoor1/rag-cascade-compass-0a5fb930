@@ -389,6 +389,17 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                             <Pencil className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
+                          {user.has2FA && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-rag-amber hover:text-rag-amber hover:bg-rag-amber/10"
+                              onClick={() => { setUserToReset2FA(user); setReset2FADialogOpen(true); }}
+                            >
+                              <ShieldOff className="h-4 w-4 mr-1" />
+                              Reset 2FA
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
