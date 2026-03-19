@@ -102,6 +102,11 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
       .from('member_csm_access')
       .select('user_id, csm_id');
 
+    // Fetch 2FA status for all users
+    const { data: twoFaRecords } = await supabase
+      .from('user_2fa')
+      .select('user_id, is_enabled');
+
     if (depts) setDepartments(depts);
     if (csms) setCsmRecords(csms);
 
