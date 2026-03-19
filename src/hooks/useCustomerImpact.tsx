@@ -563,6 +563,8 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       managedServices: c.managed_services ?? null,
       healthMetricsRAG: healthSummary?.compositeRAG ?? 'not-set',
       healthMetricsScore: healthScore,
+      healthDimensions: healthSummary?.dimensions ?? [],
+      indicatorScore,
     };
   });
 }
