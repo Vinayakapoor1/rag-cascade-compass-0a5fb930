@@ -2064,6 +2064,14 @@ function CustomerSectionCard({
                     Clear All
                   </Button>
                 </div>
+                {/* ===== Operational Health Sub-Section ===== */}
+                <OpsHealthSubSection
+                  customerId={section.id}
+                  customerName={section.name}
+                  period={period}
+                  onDataChange={(data) => onOpsDataChange(section.id, data)}
+                />
+
                 {/* Per-customer Save button */}
                 <div className="flex justify-end pt-2">
                   <Button
