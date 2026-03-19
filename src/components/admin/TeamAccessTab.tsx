@@ -591,7 +591,8 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                 if (!userToReset2FA) return;
                 setResetting2FA(true);
                 try {
-                  await supabase.from('user_2fa').delete().eq('user_id', userToReset2FA.id);
+                  const { error } = await supabase.from('user_2fa').delete().eq('user_id', userToReset2FA.id);
+                  if (error) throw error;
                   toast.success(`2FA reset for ${userToReset2FA.email}`);
                   setReset2FADialogOpen(false);
                   setUserToReset2FA(null);
