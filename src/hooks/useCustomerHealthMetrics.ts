@@ -58,6 +58,24 @@ function pctScore(pct: number): number {
   return 30;
 }
 
+function weightToRAGStatus(w: number): RAGStatus {
+  if (w >= 1) return 'green';
+  if (w >= 0.5) return 'amber';
+  return 'red';
+}
+
+function weightToScore(w: number): number {
+  if (w >= 1) return 100;
+  if (w >= 0.5) return 60;
+  return 30;
+}
+
+function weightToLabel(w: number): string {
+  if (w >= 1) return 'Green';
+  if (w >= 0.5) return 'Amber';
+  return 'Red';
+}
+
 export function buildHealthSummary(row: HealthMetricRow): CustomerHealthSummary {
   const dimensions: HealthDimension[] = [];
   const scores: number[] = [];
@@ -69,22 +87,21 @@ export function buildHealthSummary(row: HealthMetricRow): CustomerHealthSummary 
   }
 
   if (row.bug_sla_compliance != null) {
-    const s = pctScore(row.bug_sla_compliance);
+    const s = weightToScore(row.bug_sla_compliance);
     scores.push(s);
-    dimensions.push({ label: 'Bug SLA', value: `${row.bug_sla_compliance}%`, rag: pctRAG(row.bug_sla_compliance), score: s });
+    dimensions.push({ label: 'Bug SLA', value: weightToLabel(row.bug_sla_compliance), rag: weightToRAGStatus(row.bug_sla_compliance), score: s });
   }
 
-  if (row.promises_made != null && row.promises_delivered != null && row.promises_made > 0) {
-    const pct = Math.round((row.promises_delivered / row.promises_made) * 100);
-    const s = pctScore(pct);
+  if (row.promises_made != null) {
+    const s = weightToScore(row.promises_made);
     scores.push(s);
-    dimensions.push({ label: 'Promises', value: `${row.promises_delivered}/${row.promises_made} (${pct}%)`, rag: pctRAG(pct), score: s });
+    dimensions.push({ label: 'Promises', value: weightToLabel(row.promises_made), rag: weightToRAGStatus(row.promises_made), score: s });
   }
 
   if (row.new_feature_requests != null) {
-    const s = pctScore(row.new_feature_requests);
+    const s = weightToScore(row.new_feature_requests);
     scores.push(s);
-    dimensions.push({ label: 'NFR SLA', value: `${row.new_feature_requests}%`, rag: pctRAG(row.new_feature_requests), score: s });
+    dimensions.push({ label: 'NFR SLA', value: weightToLabel(row.new_feature_requests), rag: weightToRAGStatus(row.new_feature_requests), score: s });
   }
 
   const compositeScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;

@@ -140,7 +140,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const [generalSkipReason, setGeneralSkipReason] = useState('');
   const [pendingSaveAction, setPendingSaveAction] = useState<'update' | 'no_update' | null>(null);
   const scoresInitializedRef = useRef(false);
-  const opsHealthDataRef = useRef<Record<string, { bugCount: string; bugSla: string; promisesMade: string; promisesDelivered: string; nfrSla: string }>>({});
+  const opsHealthDataRef = useRef<Record<string, { bugCount: string; bugSla: string; promises: string; nfrSla: string; notes: string }>>({});
 
   const { data: matrixData, isLoading: loading } = useQuery({
     queryKey: ['csm-matrix', departmentId, period, user?.id, isAdmin, isDepartmentHead, isDepartmentMember, managedServicesOnly],
@@ -963,9 +963,10 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
             period,
             bug_count: opsData.bugCount ? Number(opsData.bugCount) : null,
             bug_sla_compliance: opsData.bugSla ? Number(opsData.bugSla) : null,
-            promises_made: opsData.promisesMade ? Number(opsData.promisesMade) : null,
-            promises_delivered: opsData.promisesDelivered ? Number(opsData.promisesDelivered) : null,
+            promises_made: opsData.promises ? Number(opsData.promises) : null,
+            promises_delivered: null,
             new_feature_requests: opsData.nfrSla ? Number(opsData.nfrSla) : null,
+            notes: opsData.notes || null,
             created_by: user.id,
             updated_at: new Date().toISOString(),
           } as any, { onConflict: 'customer_id,period' });
@@ -1285,15 +1286,16 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       // Bulk save ops health for all customers
       const opsEntries = Object.entries(opsHealthDataRef.current);
       for (const [custId, opsData] of opsEntries) {
-        if (opsData.bugCount || opsData.bugSla || opsData.promisesMade || opsData.promisesDelivered || opsData.nfrSla) {
+        if (opsData.bugCount || opsData.bugSla || opsData.promises || opsData.nfrSla) {
           await supabase.from('customer_health_metrics').upsert({
             customer_id: custId,
             period,
             bug_count: opsData.bugCount ? Number(opsData.bugCount) : null,
             bug_sla_compliance: opsData.bugSla ? Number(opsData.bugSla) : null,
-            promises_made: opsData.promisesMade ? Number(opsData.promisesMade) : null,
-            promises_delivered: opsData.promisesDelivered ? Number(opsData.promisesDelivered) : null,
+            promises_made: opsData.promises ? Number(opsData.promises) : null,
+            promises_delivered: null,
             new_feature_requests: opsData.nfrSla ? Number(opsData.nfrSla) : null,
+            notes: opsData.notes || null,
             created_by: user.id,
             updated_at: new Date().toISOString(),
           } as any, { onConflict: 'customer_id,period' });
@@ -1795,7 +1797,7 @@ interface CustomerSectionCardProps {
   lastCheckInDate: string | null;
   remarks: RemarkMap;
   onRemarkChange: (key: string, text: string) => void;
-  onOpsDataChange: (customerId: string, data: { bugCount: string; bugSla: string; promisesMade: string; promisesDelivered: string; nfrSla: string }) => void;
+  onOpsDataChange: (customerId: string, data: { bugCount: string; bugSla: string; promises: string; nfrSla: string; notes: string }) => void;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1934,10 +1936,11 @@ function CustomerSectionCard({
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r border-border/20">KPI</th>
-                        <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r border-border/20">Score</th>
-                        <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
-                      </tr>
+                         <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r border-border/20">KPI</th>
+                         <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r border-border/20">Score</th>
+                         <th className="px-3 py-2 text-center font-semibold min-w-[100px] border-r border-border/20">RAG</th>
+                         <th className="px-3 py-2 text-left font-semibold min-w-[180px]">Remarks</th>
+                       </tr>
                     </thead>
                     <tbody>
                       {section.indicators.map(ind => {
@@ -1965,41 +1968,41 @@ function CustomerSectionCard({
                               </TooltipProvider>
                             </td>
                             <td className={cn('px-2 py-1.5 border-r border-border/20', cellBg)}>
-                              <div className="flex flex-col items-center gap-0.5">
-                                <BandDropdown
-                                  value={val}
-                                  bands={getBandsForIndicator(ind.id)}
-                                  onChange={(b) => onCellChange(ind.id, section.id, placeholderFeatId, b)}
-                                />
-                                {val != null && (
-                                  <textarea
-                                    placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
-                                    value={remarks[key] || ''}
-                                    onChange={(e) => onRemarkChange(key, e.target.value)}
-                                    className={cn(
-                                      'w-full text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
-                                      ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
-                                    )}
-                                    rows={ragColor === 'red' ? 2 : 1}
-                                  />
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 py-1.5 text-center">
-                              {val != null ? (
-                                <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
-                              ) : (
-                                <span className="text-muted-foreground/40 text-xs">—</span>
-                              )}
-                            </td>
-                          </tr>
+                               <BandDropdown
+                                 value={val}
+                                 bands={getBandsForIndicator(ind.id)}
+                                 onChange={(b) => onCellChange(ind.id, section.id, placeholderFeatId, b)}
+                               />
+                             </td>
+                             <td className="px-3 py-1.5 text-center border-r border-border/20">
+                               {val != null ? (
+                                 <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
+                               ) : (
+                                 <span className="text-muted-foreground/40 text-xs">—</span>
+                               )}
+                             </td>
+                             <td className="px-2 py-1.5 align-top">
+                               {val != null && (
+                                 <Textarea
+                                   placeholder={ragColor === 'red' ? 'Why red? (required)' : 'Add remark...'}
+                                   value={remarks[key] || ''}
+                                   onChange={(e) => onRemarkChange(key, e.target.value)}
+                                   className={cn(
+                                     'text-xs min-h-[32px] resize-none',
+                                     ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : ''
+                                   )}
+                                   rows={ragColor === 'red' ? 2 : 1}
+                                 />
+                               )}
+                             </td>
+                           </tr>
                         );
                       })}
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-border/30 bg-muted/30 font-semibold">
                         <td className="px-3 py-2 text-sm border-r border-border/20">Score Total</td>
-                        <td className="px-3 py-2 text-center text-xs border-r border-border/20" colSpan={2}>
+                        <td className="px-3 py-2 text-center text-xs border-r border-border/20" colSpan={3}>
                           {(() => {
                             const { greens, ambers, reds, total } = getScoreSummary();
                             if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
@@ -2101,21 +2104,24 @@ function CustomerSectionCard({
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r border-border/20">
-                          Feature
-                        </th>
-                        {section.indicators.map(ind => (
-                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={ind.description ? `${ind.fo_name} → ${ind.kr_name}\n${ind.description}` : `${ind.fo_name} → ${ind.kr_name}`}>
-                            <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
-                          </th>
-                        ))}
-                        <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
-                          Avg
-                        </th>
-                        <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l border-border/20">
-                          <span className="text-xs text-muted-foreground">Apply to Row</span>
-                        </th>
-                      </tr>
+                         <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r border-border/20">
+                           Feature
+                         </th>
+                         {section.indicators.map(ind => (
+                           <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={ind.description ? `${ind.fo_name} → ${ind.kr_name}\n${ind.description}` : `${ind.fo_name} → ${ind.kr_name}`}>
+                             <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
+                           </th>
+                         ))}
+                         <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
+                           Avg
+                         </th>
+                         <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l border-border/20">
+                           <span className="text-xs text-muted-foreground">Apply to Row</span>
+                         </th>
+                         <th className="px-2 py-2 text-left font-semibold min-w-[180px] bg-muted/30 border-l border-border/20">
+                           Remarks
+                         </th>
+                       </tr>
                       <tr className="bg-muted/20 border-t border-border/20">
                         <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r border-border/20">
                           Apply to Column ↓
@@ -2184,8 +2190,9 @@ function CustomerSectionCard({
                           );
                         })}
                         <td className="bg-muted/10" />
-                        <td className="bg-muted/10 border-l border-border/20" />
-                      </tr>
+                         <td className="bg-muted/10 border-l border-border/20" />
+                         <td className="bg-muted/10 border-l border-border/20" />
+                       </tr>
                     </thead>
                     <tbody>
                       {section.features.map(feat => {
@@ -2225,28 +2232,14 @@ function CustomerSectionCard({
                               const cellBg = ragColor ? RAG_CELL_BG[ragColor] : '';
 
                               return (
-                                <td key={ind.id} className={cn('px-1 py-1 border-r border-border/20', cellBg)}>
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <BandDropdown
-                                      value={val ?? null}
-                                      bands={getBandsForIndicator(ind.id)}
-                                      onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
-                                    />
-                                    {val != null && (
-                                      <textarea
-                                        placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
-                                        value={remarks[key] || ''}
-                                        onChange={(e) => onRemarkChange(key, e.target.value)}
-                                        className={cn(
-                                          'w-full max-w-[130px] text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
-                                          ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
-                                        )}
-                                        rows={ragColor === 'red' ? 2 : 1}
-                                      />
-                                    )}
-                                  </div>
-                                </td>
-                              );
+                                 <td key={ind.id} className={cn('px-1 py-1 border-r border-border/20', cellBg)}>
+                                   <BandDropdown
+                                     value={val ?? null}
+                                     bands={getBandsForIndicator(ind.id)}
+                                     onChange={(b) => onCellChange(ind.id, section.id, feat.id, b)}
+                                   />
+                                 </td>
+                               );
                             })}
                             <td className="px-3 py-1.5 text-center bg-muted/10">
                               {rowAvg != null && rowRag ? (
@@ -2319,8 +2312,29 @@ function CustomerSectionCard({
                                 </Button>
                               </div>
                             </td>
-                          </tr>
-                        );
+                            <td className="px-2 py-1.5 border-l border-border/20 align-top">
+                               <Textarea
+                                 placeholder="Add remark..."
+                                 value={(() => {
+                                   for (const ind of section.indicators) {
+                                     if (!section.indicatorFeatureMap[ind.id]?.has(feat.id)) continue;
+                                     const k = cellKey(ind.id, section.id, feat.id);
+                                     if (remarks[k]) return remarks[k];
+                                   }
+                                   return '';
+                                 })()}
+                                 onChange={(e) => {
+                                   for (const ind of section.indicators) {
+                                     if (!section.indicatorFeatureMap[ind.id]?.has(feat.id)) continue;
+                                     onRemarkChange(cellKey(ind.id, section.id, feat.id), e.target.value);
+                                   }
+                                 }}
+                                 className="text-xs min-h-[32px] resize-none"
+                                 rows={1}
+                               />
+                             </td>
+                           </tr>
+                         );
                       })}
                     </tbody>
                   </table>
@@ -2446,10 +2460,11 @@ function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellCh
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
-                  <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
-                  <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
-                </tr>
+                   <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
+                   <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
+                   <th className="px-3 py-2 text-center font-semibold min-w-[100px] border-r">RAG</th>
+                   <th className="px-3 py-2 text-left font-semibold min-w-[180px]">Remarks</th>
+                 </tr>
               </thead>
               <tbody>
                 {cmIndicators.map(ind => {
@@ -2477,41 +2492,41 @@ function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellCh
                         </TooltipProvider>
                       </td>
                       <td className={cn('px-2 py-1.5 border-r', cellBg)}>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <BandDropdown
-                            value={val}
-                            bands={getBandsForIndicator(ind.id)}
-                            onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
-                          />
-                          {val != null && (
-                            <textarea
-                              placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
-                              value={remarks[key] || ''}
-                              onChange={(e) => onRemarkChange(key, e.target.value)}
-                              className={cn(
-                                'w-full text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
-                                ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
-                              )}
-                              rows={ragColor === 'red' ? 2 : 1}
-                            />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        {val != null ? (
-                          <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
-                        ) : (
-                          <span className="text-muted-foreground/40 text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
+                         <BandDropdown
+                           value={val}
+                           bands={getBandsForIndicator(ind.id)}
+                           onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
+                         />
+                       </td>
+                       <td className="px-3 py-1.5 text-center border-r">
+                         {val != null ? (
+                           <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
+                         ) : (
+                           <span className="text-muted-foreground/40 text-xs">—</span>
+                         )}
+                       </td>
+                       <td className="px-2 py-1.5 align-top">
+                         {val != null && (
+                           <Textarea
+                             placeholder={ragColor === 'red' ? 'Why red? (required)' : 'Add remark...'}
+                             value={remarks[key] || ''}
+                             onChange={(e) => onRemarkChange(key, e.target.value)}
+                             className={cn(
+                               'text-xs min-h-[32px] resize-none',
+                               ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : ''
+                             )}
+                             rows={ragColor === 'red' ? 2 : 1}
+                           />
+                         )}
+                       </td>
+                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 bg-muted/30 font-semibold">
                   <td className="px-3 py-2 text-sm border-r">Score Total</td>
-                  <td className="px-3 py-2 text-center text-xs border-r" colSpan={2}>
+                  <td className="px-3 py-2 text-center text-xs border-r" colSpan={3}>
                     {(() => {
                       const { greens, ambers, reds, total } = getScoreSummary();
                       if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
@@ -2642,10 +2657,11 @@ function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, 
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
-                  <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
-                  <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
-                </tr>
+                   <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
+                   <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
+                   <th className="px-3 py-2 text-center font-semibold min-w-[100px] border-r">RAG</th>
+                   <th className="px-3 py-2 text-left font-semibold min-w-[180px]">Remarks</th>
+                 </tr>
               </thead>
               <tbody>
                 {stIndicators.map(ind => {
@@ -2672,41 +2688,41 @@ function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, 
                         </TooltipProvider>
                       </td>
                       <td className={cn('px-2 py-1.5 border-r', cellBg)}>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <BandDropdown
-                            value={val}
-                            bands={getBandsForIndicator(ind.id)}
-                            onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
-                          />
-                          {val != null && (
-                            <textarea
-                              placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
-                              value={remarks[key] || ''}
-                              onChange={(e) => onRemarkChange(key, e.target.value)}
-                              className={cn(
-                                'w-full text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
-                                ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
-                              )}
-                              rows={ragColor === 'red' ? 2 : 1}
-                            />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        {val != null ? (
-                          <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
-                        ) : (
-                          <span className="text-muted-foreground/40 text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
+                         <BandDropdown
+                           value={val}
+                           bands={getBandsForIndicator(ind.id)}
+                           onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
+                         />
+                       </td>
+                       <td className="px-3 py-1.5 text-center border-r">
+                         {val != null ? (
+                           <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
+                         ) : (
+                           <span className="text-muted-foreground/40 text-xs">—</span>
+                         )}
+                       </td>
+                       <td className="px-2 py-1.5 align-top">
+                         {val != null && (
+                           <Textarea
+                             placeholder={ragColor === 'red' ? 'Why red? (required)' : 'Add remark...'}
+                             value={remarks[key] || ''}
+                             onChange={(e) => onRemarkChange(key, e.target.value)}
+                             className={cn(
+                               'text-xs min-h-[32px] resize-none',
+                               ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : ''
+                             )}
+                             rows={ragColor === 'red' ? 2 : 1}
+                           />
+                         )}
+                       </td>
+                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 bg-muted/30 font-semibold">
                   <td className="px-3 py-2 text-sm border-r">Score Total</td>
-                  <td className="px-3 py-2 text-center text-xs border-r" colSpan={2}>
+                  <td className="px-3 py-2 text-center text-xs border-r" colSpan={3}>
                     {(() => {
                       const { greens, ambers, reds, total } = getScoreSummary();
                       if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
@@ -2787,20 +2803,19 @@ interface OpsHealthSubSectionProps {
   customerId: string;
   customerName: string;
   period: string;
-  onDataChange: (data: { bugCount: string; bugSla: string; promisesMade: string; promisesDelivered: string; nfrSla: string }) => void;
+  onDataChange: (data: { bugCount: string; bugSla: string; promises: string; nfrSla: string; notes: string }) => void;
 }
 
 function OpsHealthSubSection({ customerId, customerName, period, onDataChange }: OpsHealthSubSectionProps) {
   const [opsOpen, setOpsOpen] = useState(true);
   const [bugCount, setBugCount] = useState<string>('');
   const [bugSla, setBugSla] = useState<string>('');
-  const [promisesMade, setPromisesMade] = useState<string>('');
-  const [promisesDelivered, setPromisesDelivered] = useState<string>('');
+  const [promises, setPromises] = useState<string>('');
   const [nfrSla, setNfrSla] = useState<string>('');
+  const [opsNotes, setOpsNotes] = useState<string>('');
   const [loaded, setLoaded] = useState(false);
-  const dataRef = useRef({ bugCount: '', bugSla: '', promisesMade: '', promisesDelivered: '', nfrSla: '' });
+  const dataRef = useRef({ bugCount: '', bugSla: '', promises: '', nfrSla: '', notes: '' });
 
-  // Load existing data for this customer + period
   useEffect(() => {
     if (!opsOpen || loaded) return;
     (async () => {
@@ -2814,10 +2829,10 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
         const bc = data.bug_count != null ? String(data.bug_count) : '';
         const bs = data.bug_sla_compliance != null ? String(data.bug_sla_compliance) : '';
         const pm = data.promises_made != null ? String(data.promises_made) : '';
-        const pd = data.promises_delivered != null ? String(data.promises_delivered) : '';
         const nfr = (data as any).new_feature_requests != null ? String((data as any).new_feature_requests) : '';
-        setBugCount(bc); setBugSla(bs); setPromisesMade(pm); setPromisesDelivered(pd); setNfrSla(nfr);
-        dataRef.current = { bugCount: bc, bugSla: bs, promisesMade: pm, promisesDelivered: pd, nfrSla: nfr };
+        const nt = data.notes || '';
+        setBugCount(bc); setBugSla(bs); setPromises(pm); setNfrSla(nfr); setOpsNotes(nt);
+        dataRef.current = { bugCount: bc, bugSla: bs, promises: pm, nfrSla: nfr, notes: nt };
         onDataChange(dataRef.current);
       }
       setLoaded(true);
@@ -2826,19 +2841,16 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
 
   const update = (field: string, value: string) => {
     const setters: Record<string, (v: string) => void> = {
-      bugCount: setBugCount, bugSla: setBugSla, promisesMade: setPromisesMade,
-      promisesDelivered: setPromisesDelivered, nfrSla: setNfrSla,
+      bugCount: setBugCount, bugSla: setBugSla, promises: setPromises,
+      nfrSla: setNfrSla, notes: setOpsNotes,
     };
     setters[field]?.(value);
     dataRef.current = { ...dataRef.current, [field]: value };
     onDataChange(dataRef.current);
   };
 
-  // RAG helpers
   const bugRAG = (count: number): string => { if (count < 5) return 'green'; if (count <= 10) return 'amber'; return 'red'; };
-  const pctRAGLocal = (pct: number): string => { if (pct >= 76) return 'green'; if (pct >= 51) return 'amber'; return 'red'; };
-  const promisePct = promisesMade && promisesDelivered && Number(promisesMade) > 0
-    ? Math.round((Number(promisesDelivered) / Number(promisesMade)) * 100) : null;
+  const weightColor = (w: string): string => { const n = Number(w); if (n >= 1) return 'green'; if (n >= 0.5) return 'amber'; return 'red'; };
 
   return (
     <Collapsible open={opsOpen} onOpenChange={setOpsOpen}>
@@ -2848,7 +2860,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
         Operational Health
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-muted/30 rounded-lg border border-border/30">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-lg border border-border/30">
           <div className="space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               Bug Count
@@ -2862,44 +2874,79 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              Bug SLA %
-              {bugSla && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[pctRAGLocal(Number(bugSla))])} />}
+              Bug SLA
+              {bugSla && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[weightColor(bugSla)])} />}
             </label>
-            <Input
-              type="number" min={0} max={100} placeholder="0-100" value={bugSla}
-              onChange={(e) => update('bugSla', e.target.value)} className="h-8 text-sm"
-            />
+            <Select value={bugSla || 'unset'} onValueChange={(v) => update('bugSla', v === 'unset' ? '' : v)}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                {DEFAULT_BANDS.map(b => (
+                  <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
+                    <span className="flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
+                      {b.band_label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              Promises Made
-              {promisePct != null && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[pctRAGLocal(promisePct)])} />}
+              Promises
+              {promises && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[weightColor(promises)])} />}
             </label>
-            <Input
-              type="number" min={0} placeholder="0" value={promisesMade}
-              onChange={(e) => update('promisesMade', e.target.value)} className="h-8 text-sm"
-            />
-            {promisePct != null && <p className="text-[9px] text-muted-foreground">{promisePct}% delivered</p>}
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-              Promises Delivered
-            </label>
-            <Input
-              type="number" min={0} placeholder="0" value={promisesDelivered}
-              onChange={(e) => update('promisesDelivered', e.target.value)} className="h-8 text-sm"
-            />
+            <Select value={promises || 'unset'} onValueChange={(v) => update('promises', v === 'unset' ? '' : v)}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                {DEFAULT_BANDS.map(b => (
+                  <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
+                    <span className="flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
+                      {b.band_label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              NFR SLA %
-              {nfrSla && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[pctRAGLocal(Number(nfrSla))])} />}
+              NFR SLA
+              {nfrSla && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[weightColor(nfrSla)])} />}
             </label>
-            <Input
-              type="number" min={0} max={100} placeholder="0-100" value={nfrSla}
-              onChange={(e) => update('nfrSla', e.target.value)} className="h-8 text-sm"
-            />
+            <Select value={nfrSla || 'unset'} onValueChange={(v) => update('nfrSla', v === 'unset' ? '' : v)}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                {DEFAULT_BANDS.map(b => (
+                  <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
+                    <span className="flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
+                      {b.band_label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+        </div>
+        <div className="mt-2 px-1">
+          <Textarea
+            placeholder="Ops health notes..."
+            value={opsNotes}
+            onChange={(e) => update('notes', e.target.value)}
+            className="text-xs min-h-[32px] resize-none"
+            rows={1}
+          />
         </div>
       </CollapsibleContent>
     </Collapsible>
