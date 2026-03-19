@@ -146,6 +146,20 @@ export function ComplianceCustomerDetail({
                   )}
                 </TableCell>
               </TableRow>
+              {f.remarks.length > 0 && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={4} className="py-1 px-6">
+                    <div className="space-y-1">
+                      {f.remarks.map((r, i) => (
+                        <p key={i} className="text-[10px] italic text-muted-foreground flex items-start gap-1.5">
+                          <span className={`inline-flex h-2 w-2 rounded-full mt-0.5 shrink-0 ${r.value === 0 ? 'bg-rag-red' : r.value === 0.5 ? 'bg-rag-amber' : 'bg-rag-green'}`} />
+                          {r.remark}
+                        </p>
+                      ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
             ))}
           </TableBody>
         </Table>
