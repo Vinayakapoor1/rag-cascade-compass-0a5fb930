@@ -953,6 +953,26 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         return next;
       });
 
+      // Also save ops health data
+      const opsData = opsHealthDataRef.current[customerId];
+      if (opsData) {
+        const { error: opsErr } = await supabase
+          .from('customer_health_metrics')
+          .upsert({
+            customer_id: customerId,
+            period,
+            bug_count: opsData.bugCount ? Number(opsData.bugCount) : null,
+            bug_sla_compliance: opsData.bugSla ? Number(opsData.bugSla) : null,
+            promises_made: opsData.promisesMade ? Number(opsData.promisesMade) : null,
+            promises_delivered: opsData.promisesDelivered ? Number(opsData.promisesDelivered) : null,
+            new_feature_requests: opsData.nfrSla ? Number(opsData.nfrSla) : null,
+            created_by: user.id,
+            updated_at: new Date().toISOString(),
+          } as any, { onConflict: 'customer_id,period' });
+        if (opsErr) console.error('Error saving ops health:', opsErr);
+      }
+      queryClient.invalidateQueries({ queryKey: ['customer-health-metrics', customerId] });
+
       setSavedCustomers(prev => new Set(prev).add(customerId));
       toast.success(`Saved scores for ${section.name}`);
     } catch (err) {
