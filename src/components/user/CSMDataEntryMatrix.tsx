@@ -2859,7 +2859,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
   // Determine overall ops RAG color for border
   const opsOverallColor = (() => {
     const vals: string[] = [];
-    if (bugCount) vals.push(bugRAG(Number(bugCount)));
+    if (bugCount) vals.push(bugRAG(bugCount));
     if (bugSla) vals.push(weightColor(bugSla));
     if (promises) vals.push(weightColor(promises));
     if (nfrSla) vals.push(weightColor(nfrSla));
