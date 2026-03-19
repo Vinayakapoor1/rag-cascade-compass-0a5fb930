@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,9 +45,18 @@ function dateToPeriod(date: Date, mode: PeriodMode): string {
 
 export default function DataManagement() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, isAdmin, isDepartmentHead, isDepartmentMember, loading: authLoading, signOut } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeMainTab, setActiveMainTab] = useState('okr');
+
+  // Read ?tab= query param to auto-select tab (e.g. from notification link)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      setActiveMainTab(tabParam);
+    }
+  }, [searchParams]);
 
   // Department head state
   const [departments, setDepartments] = useState<Array<{ department_id: string; departments: { id: string; name: string } }>>([]);
