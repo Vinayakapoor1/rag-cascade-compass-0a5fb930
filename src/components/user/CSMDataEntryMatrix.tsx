@@ -421,8 +421,11 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       sections.sort((a, b) => a.name.localeCompare(b.name));
 
       const scoreMap: ScoreMap = {};
+      const remarkMap: RemarkMap = {};
       (existingScores || []).forEach((s: any) => {
-        scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+        const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+        scoreMap[k] = s.value != null ? Number(s.value) : null;
+        if (s.remark) remarkMap[k] = s.remark;
       });
 
       // Fetch CM department data for sub-section (skip if current dept IS CM or managedServicesOnly)
