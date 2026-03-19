@@ -306,8 +306,11 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         }));
 
         const directScoreMap: ScoreMap = {};
+        const directRemarkMap: RemarkMap = {};
         (existingScoresDirect || []).forEach((s: any) => {
-          directScoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+          const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+          directScoreMap[k] = s.value != null ? Number(s.value) : null;
+          if (s.remark) directRemarkMap[k] = s.remark;
         });
 
         // Fetch latest historical scores for fallback display
