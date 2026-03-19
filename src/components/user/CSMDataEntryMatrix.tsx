@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle, ShieldAlert, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle, ShieldAlert, ArrowRight, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CustomerAttachments } from './CustomerAttachments';
