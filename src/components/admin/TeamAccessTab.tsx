@@ -355,6 +355,15 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                     </TableCell>
                     <TableCell>{getRoleBadge(user.role, user.linkedCsmName)}</TableCell>
                     <TableCell>
+                      {user.has2FA ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <Shield className="h-3 w-3 mr-1" />Enabled
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Off</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {user.role === 'admin' ? (
                         <span className="text-sm text-muted-foreground">All (auto)</span>
                       ) : user.departments.length > 0 ? (
