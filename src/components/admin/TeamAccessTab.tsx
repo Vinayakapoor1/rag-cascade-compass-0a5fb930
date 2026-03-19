@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck, ClipboardCheck, Trash2 } from 'lucide-react';
+import { Users, Loader2, RefreshCw, Pencil, Shield, Building, UserCheck, ClipboardCheck, Trash2, ShieldOff } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -24,6 +24,7 @@ interface UserWithRole {
   linkedCsmId?: string | null;
   linkedCsmName?: string | null;
   assignedCsmIds?: string[];
+  has2FA?: boolean;
 }
 
 interface Department {
@@ -52,6 +53,9 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [userToRemove, setUserToRemove] = useState<UserWithRole | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [reset2FADialogOpen, setReset2FADialogOpen] = useState(false);
+  const [userToReset2FA, setUserToReset2FA] = useState<UserWithRole | null>(null);
+  const [resetting2FA, setResetting2FA] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -101,6 +105,11 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
       .from('member_csm_access')
       .select('user_id, csm_id');
 
+    // Fetch 2FA status for all users
+    const { data: twoFaRecords } = await supabase
+      .from('user_2fa')
+      .select('user_id, is_enabled');
+
     if (depts) setDepartments(depts);
     if (csms) setCsmRecords(csms);
 
@@ -112,6 +121,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
         const userCsmAccess = (memberCsmAccess || [])
           .filter((a: any) => a.user_id === p.user_id)
           .map((a: any) => a.csm_id);
+        const user2FA = twoFaRecords?.find((t) => t.user_id === p.user_id);
         
         return {
           id: p.user_id,
@@ -125,6 +135,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           linkedCsmId: linkedCsm?.id || null,
           linkedCsmName: linkedCsm?.name || null,
           assignedCsmIds: userCsmAccess,
+          has2FA: user2FA?.is_enabled === true,
         };
       });
 
@@ -329,6 +340,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>2FA</TableHead>
                   <TableHead>Departments</TableHead>
                   {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
@@ -345,6 +357,15 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                       </div>
                     </TableCell>
                     <TableCell>{getRoleBadge(user.role, user.linkedCsmName)}</TableCell>
+                    <TableCell>
+                      {user.has2FA ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <Shield className="h-3 w-3 mr-1" />Enabled
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Off</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {user.role === 'admin' ? (
                         <span className="text-sm text-muted-foreground">All (auto)</span>
@@ -371,6 +392,17 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
                             <Pencil className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
+                          {user.has2FA && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-rag-amber hover:text-rag-amber hover:bg-rag-amber/10"
+                              onClick={() => { setUserToReset2FA(user); setReset2FADialogOpen(true); }}
+                            >
+                              <ShieldOff className="h-4 w-4 mr-1" />
+                              Reset 2FA
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -538,6 +570,43 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
             >
               {removing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset 2FA Confirmation */}
+      <AlertDialog open={reset2FADialogOpen} onOpenChange={setReset2FADialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Two-Factor Authentication</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will disable 2FA for <strong>{userToReset2FA?.email}</strong>. They will need to set it up again from their account menu. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting2FA}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!userToReset2FA) return;
+                setResetting2FA(true);
+                try {
+                  await supabase.from('user_2fa').delete().eq('user_id', userToReset2FA.id);
+                  toast.success(`2FA reset for ${userToReset2FA.email}`);
+                  setReset2FADialogOpen(false);
+                  setUserToReset2FA(null);
+                  fetchData();
+                } catch {
+                  toast.error('Failed to reset 2FA');
+                } finally {
+                  setResetting2FA(false);
+                }
+              }}
+              disabled={resetting2FA}
+              className="bg-rag-amber text-white hover:bg-rag-amber/90"
+            >
+              {resetting2FA ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Reset 2FA
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
