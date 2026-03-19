@@ -1607,6 +1607,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           previousScores={previousScores}
           previousPeriodLabel={previousPeriodLabel}
           lastCheckInDate={lastCheckInByCustomer[section.id] || null}
+          remarks={remarks}
+          onRemarkChange={(key, text) => setRemarks(prev => ({ ...prev, [key]: text }))}
         />
       ))}
 
