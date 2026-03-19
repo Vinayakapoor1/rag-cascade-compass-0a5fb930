@@ -31,7 +31,7 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
   const [bugSla, setBugSla] = useState('');
   const [promisesMade, setPromisesMade] = useState('');
   const [promisesDelivered, setPromisesDelivered] = useState('');
-  const [nfrCompliance, setNfrCompliance] = useState('');
+  const [newFeatureRequests, setNewFeatureRequests] = useState('');
   const [notes, setNotes] = useState('');
 
   const { data: existingMetrics } = useCustomerHealthMetrics(customerId);
