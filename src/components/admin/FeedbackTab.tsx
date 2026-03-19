@@ -4,7 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, Trash2, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -15,6 +16,7 @@ interface Feedback {
   message: string;
   status: string;
   created_at: string;
+  screenshot_path: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,6 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 export function FeedbackTab() {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
 
   const fetchFeedbacks = async () => {
     setLoading(true);
@@ -33,7 +36,7 @@ export function FeedbackTab() {
       .from('feedbacks')
       .select('*')
       .order('created_at', { ascending: false });
-    setFeedbacks((data as Feedback[]) ?? []);
+    setFeedbacks((data as unknown as Feedback[]) ?? []);
     setLoading(false);
   };
 
@@ -52,6 +55,17 @@ export function FeedbackTab() {
     toast.success('Feedback deleted');
   };
 
+  const viewScreenshot = async (path: string) => {
+    const { data } = await supabase.storage
+      .from('feedback-screenshots')
+      .createSignedUrl(path, 300);
+    if (data?.signedUrl) {
+      setScreenshotUrl(data.signedUrl);
+    } else {
+      toast.error('Failed to load screenshot');
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
@@ -61,48 +75,69 @@ export function FeedbackTab() {
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[140px]">Date</TableHead>
-            <TableHead className="w-[180px]">User</TableHead>
-            <TableHead className="w-[160px]">Page</TableHead>
-            <TableHead>Message</TableHead>
-            <TableHead className="w-[130px]">Status</TableHead>
-            <TableHead className="w-[50px]" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {feedbacks.map(fb => (
-            <TableRow key={fb.id}>
-              <TableCell className="text-xs whitespace-nowrap">{format(new Date(fb.created_at), 'dd MMM yyyy HH:mm')}</TableCell>
-              <TableCell className="text-xs truncate max-w-[180px]">{fb.user_email ?? '—'}</TableCell>
-              <TableCell className="text-xs font-mono truncate max-w-[160px]" title={fb.page_url}>{fb.page_url}</TableCell>
-              <TableCell className="text-sm whitespace-pre-wrap break-words max-w-[300px]">{fb.message}</TableCell>
-              <TableCell>
-                <Select value={fb.status} onValueChange={(v) => updateStatus(fb.id, v)}>
-                  <SelectTrigger className="h-7 w-[110px] text-xs">
-                    <Badge variant="outline" className={STATUS_COLORS[fb.status] ?? ''}>
-                      {fb.status}
-                    </Badge>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="dismissed">Dismissed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteFeedback(fb.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TableCell>
+    <>
+      <div className="rounded-lg border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[140px]">Date</TableHead>
+              <TableHead className="w-[180px]">User</TableHead>
+              <TableHead className="w-[160px]">Page</TableHead>
+              <TableHead>Message</TableHead>
+              <TableHead className="w-[60px]">Screenshot</TableHead>
+              <TableHead className="w-[130px]">Status</TableHead>
+              <TableHead className="w-[50px]" />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {feedbacks.map(fb => (
+              <TableRow key={fb.id}>
+                <TableCell className="text-xs whitespace-nowrap">{format(new Date(fb.created_at), 'dd MMM yyyy HH:mm')}</TableCell>
+                <TableCell className="text-xs truncate max-w-[180px]">{fb.user_email ?? '—'}</TableCell>
+                <TableCell className="text-xs font-mono truncate max-w-[160px]" title={fb.page_url}>{fb.page_url}</TableCell>
+                <TableCell className="text-sm whitespace-pre-wrap break-words max-w-[300px]">{fb.message}</TableCell>
+                <TableCell>
+                  {fb.screenshot_path ? (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => viewScreenshot(fb.screenshot_path!)}>
+                      <ImageIcon className="h-4 w-4 text-primary" />
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Select value={fb.status} onValueChange={(v) => updateStatus(fb.id, v)}>
+                    <SelectTrigger className="h-7 w-[110px] text-xs">
+                      <Badge variant="outline" className={STATUS_COLORS[fb.status] ?? ''}>
+                        {fb.status}
+                      </Badge>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="dismissed">Dismissed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteFeedback(fb.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog open={!!screenshotUrl} onOpenChange={() => setScreenshotUrl(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogTitle>Feedback Screenshot</DialogTitle>
+          {screenshotUrl && (
+            <img src={screenshotUrl} alt="Page screenshot" className="w-full rounded-lg border" />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

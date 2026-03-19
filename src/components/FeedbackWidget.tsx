@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import html2canvas from 'html2canvas';
 
 export function FeedbackWidget() {
   const { user } = useAuth();
@@ -17,6 +18,37 @@ export function FeedbackWidget() {
 
   if (!user) return null;
 
+  const captureScreenshot = async (): Promise<string | null> => {
+    try {
+      const canvas = await html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 0.5, // reduce size
+        logging: false,
+        ignoreElements: (el) => el.closest?.('[data-feedback-widget]') !== null,
+      });
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/png', 0.7)
+      );
+      if (!blob) return null;
+
+      const fileName = `${user.id}/${Date.now()}.png`;
+      const { error } = await supabase.storage
+        .from('feedback-screenshots')
+        .upload(fileName, blob, { contentType: 'image/png' });
+
+      if (error) {
+        console.error('Screenshot upload failed:', error);
+        return null;
+      }
+      return fileName;
+    } catch (err) {
+      console.error('Screenshot capture failed:', err);
+      return null;
+    }
+  };
+
   const handleSubmit = async () => {
     const trimmed = message.trim();
     if (!trimmed || trimmed.length > 2000) {
@@ -25,12 +57,17 @@ export function FeedbackWidget() {
     }
 
     setSubmitting(true);
+
+    // Capture screenshot first (before closing the popover)
+    const screenshotPath = await captureScreenshot();
+
     const { error } = await supabase.from('feedbacks').insert({
       user_id: user.id,
       user_email: user.email ?? null,
       page_url: location.pathname,
       message: trimmed,
-    });
+      screenshot_path: screenshotPath,
+    } as any);
 
     setSubmitting(false);
     if (error) {
@@ -43,7 +80,7 @@ export function FeedbackWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 right-6 z-50" data-feedback-widget>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -56,7 +93,7 @@ export function FeedbackWidget() {
         </PopoverTrigger>
         <PopoverContent align="end" side="top" className="w-80 p-4 space-y-3">
           <p className="text-sm font-semibold">Send Feedback</p>
-          <p className="text-xs text-muted-foreground">Report a bug or suggest an improvement. We'll capture the current page automatically.</p>
+          <p className="text-xs text-muted-foreground">Report a bug or suggest an improvement. A screenshot will be captured automatically.</p>
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -69,7 +106,7 @@ export function FeedbackWidget() {
             <span className="text-xs text-muted-foreground">{message.length}/2000</span>
             <Button size="sm" onClick={handleSubmit} disabled={submitting || !message.trim()}>
               {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-              Submit
+              {submitting ? 'Capturing…' : 'Submit'}
             </Button>
           </div>
         </PopoverContent>
