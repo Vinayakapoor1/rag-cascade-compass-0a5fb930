@@ -45,6 +45,7 @@ export function SalesKPIScoringGrid({ departmentId, period }: SalesKPIScoringGri
   const [indicators, setIndicators] = useState<SalesIndicator[]>([]);
   const [bands, setBands] = useState<Record<string, RAGBand[]>>({});
   const [selections, setSelections] = useState<Record<string, string>>({});
+  const [originalSelections, setOriginalSelections] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
