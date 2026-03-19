@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsPopover } from '@/components/NotificationsPopover';
 import { BellNotifications } from '@/components/BellNotifications';
+import { FeedbackWidget } from '@/components/FeedbackWidget';
 import { toast } from 'sonner';
 
 interface AppLayoutProps {

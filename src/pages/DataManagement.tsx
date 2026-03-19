@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, AlertCircle, FolderTree, Settings, Users, LogOut, Home, Database, ClipboardCheck, Calendar as CalendarIcon, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Loader2, AlertCircle, FolderTree, Settings, Users, LogOut, Home, Database, ClipboardCheck, Calendar as CalendarIcon, ToggleLeft, ToggleRight, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { DepartmentUploader } from '@/components/admin/DepartmentUploader';

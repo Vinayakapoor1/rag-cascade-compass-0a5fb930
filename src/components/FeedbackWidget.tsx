@@ -1,0 +1,79 @@
+import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { MessageSquarePlus, Send, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export function FeedbackWidget() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!user) return null;
+
+  const handleSubmit = async () => {
+    const trimmed = message.trim();
+    if (!trimmed || trimmed.length > 2000) {
+      toast.error(trimmed ? 'Feedback must be under 2000 characters' : 'Please enter your feedback');
+      return;
+    }
+
+    setSubmitting(true);
+    const { error } = await supabase.from('feedbacks').insert({
+      user_id: user.id,
+      user_email: user.email ?? null,
+      page_url: location.pathname,
+      message: trimmed,
+    });
+
+    setSubmitting(false);
+    if (error) {
+      toast.error('Failed to submit feedback');
+    } else {
+      toast.success('Feedback submitted — thank you!');
+      setMessage('');
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            size="icon"
+            className="h-12 w-12 rounded-full shadow-lg shadow-primary/30 hover-glow"
+            title="Send feedback"
+          >
+            <MessageSquarePlus className="h-5 w-5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" side="top" className="w-80 p-4 space-y-3">
+          <p className="text-sm font-semibold">Send Feedback</p>
+          <p className="text-xs text-muted-foreground">Report a bug or suggest an improvement. We'll capture the current page automatically.</p>
+          <Textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Describe the issue or suggestion…"
+            rows={4}
+            maxLength={2000}
+            className="resize-none"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{message.length}/2000</span>
+            <Button size="sm" onClick={handleSubmit} disabled={submitting || !message.trim()}>
+              {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+              Submit
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
