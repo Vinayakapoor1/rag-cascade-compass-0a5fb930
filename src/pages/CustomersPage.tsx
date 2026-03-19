@@ -174,9 +174,9 @@ export default function CustomersPage() {
       tiers: [...new Set(filterExcluding('tier').map(c => c.tier))].sort(),
       statuses: [...new Set(filterExcluding('status').map(c => c.status))].sort(),
       deploymentTypes: [...new Set(filterExcluding('deployment').map(c => c.deploymentType || 'Unassigned'))].filter(d => d !== 'Cloud').sort() as string[],
-      regions: [...new Set(filterExcluding('region').map(c => c.region).filter(Boolean))].sort() as string[],
-      industries: [...new Set(filterExcluding('industry').map(c => c.industry).filter(Boolean))].sort() as string[],
-      csmNames: [...new Set(filterExcluding('csm').map(c => c.csmName).filter(Boolean))].sort() as string[],
+      regions: [...new Set(filterExcluding('region').map(c => c.region || 'Unassigned'))].sort() as string[],
+      industries: [...new Set(filterExcluding('industry').map(c => c.industry || 'Unassigned'))].sort() as string[],
+      csmNames: [...new Set(filterExcluding('csm').map(c => c.csmName || 'Unassigned'))].sort() as string[],
       ragOptions: [...new Set(filterExcluding('rag').map(c => c.ragStatus))].sort() as string[],
     };
   }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter]);
