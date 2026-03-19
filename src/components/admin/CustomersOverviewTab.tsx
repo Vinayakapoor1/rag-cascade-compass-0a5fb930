@@ -76,7 +76,8 @@ export function CustomersOverviewTab() {
     setFilteredCustomers(filtered);
   };
 
-  const uniqueRegions = [...new Set(customers.map(c => c.region).filter(Boolean))] as string[];
+  const uniqueRegions = [...new Set(customers.map(c => c.region || 'Unassigned'))].sort() as string[];
+  const uniqueIndustries = [...new Set(customers.map(c => c.industry || 'Unassigned'))].sort() as string[];
   const uniqueTiers = [...new Set(customers.map(c => c.tier))];
   const withManagedServices = customers.filter(c => c.managed_services === true).length;
   const withoutManagedServices = customers.filter(c => !c.managed_services).length;
