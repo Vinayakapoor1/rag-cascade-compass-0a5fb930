@@ -140,6 +140,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const [generalSkipReason, setGeneralSkipReason] = useState('');
   const [pendingSaveAction, setPendingSaveAction] = useState<'update' | 'no_update' | null>(null);
   const scoresInitializedRef = useRef(false);
+  const opsHealthDataRef = useRef<Record<string, { bugCount: string; bugSla: string; promisesMade: string; promisesDelivered: string; nfrSla: string }>>({});
 
   const { data: matrixData, isLoading: loading } = useQuery({
     queryKey: ['csm-matrix', departmentId, period, user?.id, isAdmin, isDepartmentHead, isDepartmentMember, managedServicesOnly],
