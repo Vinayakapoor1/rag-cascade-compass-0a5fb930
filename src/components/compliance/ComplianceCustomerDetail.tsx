@@ -60,6 +60,15 @@ export function ComplianceCustomerDetail({
       const filledCount = expectedIndicators.filter(id => filledIndicatorIds.has(id)).length;
       const expectedCount = expectedIndicators.length;
       
+      // Collect remarks for this feature
+      const featureRemarks = filledScores
+        .filter(s => s.remark?.trim())
+        .map(s => ({
+          indicatorId: s.indicator_id,
+          remark: s.remark!,
+          value: s.value,
+        }));
+
       // Last submission for this feature
       const featureScores = filledScores.filter(s => expectedIndicators.includes(s.indicator_id));
       const lastSubmission = featureScores.length > 0
