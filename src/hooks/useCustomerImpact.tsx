@@ -367,6 +367,8 @@ export interface CustomerWithImpact {
   csmName: string | null;
   csmId: string | null;
   managedServices: boolean | null;
+  healthMetricsRAG: RAGStatus;
+  healthMetricsScore: number | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
