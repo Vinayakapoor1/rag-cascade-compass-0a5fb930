@@ -84,11 +84,11 @@ export function FeedbackWidget() {
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
-            size="icon"
-            className="h-12 w-12 rounded-full shadow-lg shadow-primary/30 hover-glow"
+            className="rounded-full shadow-lg shadow-primary/30 hover-glow animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite] gap-2 px-4 h-12"
             title="Send feedback"
           >
             <MessageSquarePlus className="h-5 w-5" />
+            <span className="text-sm font-medium">Have a feedback? Report it</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" side="top" className="w-80 p-4 space-y-3">
