@@ -1,26 +1,24 @@
 
 
-# Fix Ops Health Inputs and Remark Layout
+# Fix Ops Health Dropdown Labels and Bug Count Selector
 
-## What Changes
+## Changes
 
-### 1. Operational Health — Use Standard Dropdowns
+### 1. Bug Count — Replace free-text input with a dropdown
+Replace the `<Input type="number">` with a `Select` dropdown offering 3 specific threshold options:
+- **< 5** (Green, rag_numeric: 1)
+- **5 – 10** (Amber, rag_numeric: 0.5)
+- **> 10** (Red, rag_numeric: 0)
 
-Replace the current free-text numeric inputs with the platform-standard `BandDropdown` (Green/Amber/Red) for 3 of the 4 dimensions. Bug Count stays as a number input since it has a count-based threshold.
+Store weight (1/0.5/0) in `bug_count` column instead of a raw count. The `bugCountRAG` helper in `useCustomerHealthMetrics.ts` already maps weights to RAG — will align it.
 
-**4 Ops Health indicators (down from 5 fields):**
-- **Bug Count** — Keep as `<Input type="number">`. Threshold: <5 Green, 5-10 Amber, >10 Red. Store raw count in `bug_count`.
-- **Bug SLA** — Replace with `BandDropdown` using `DEFAULT_BANDS`. Store weight (1/0.5/0) in `bug_sla_compliance`.
-- **NFR SLA** — Replace with `BandDropdown` using `DEFAULT_BANDS`. Store weight (1/0.5/0) in `new_feature_requests`.
-- **Promises Made vs Kept** — Merge the two separate fields (Promises Made + Promises Delivered) into a single `BandDropdown`. Store weight (1/0.5/0) in `promises_made`. Drop `promises_delivered` from the UI (keep column in DB, just stop writing to it).
+### 2. Bug SLA, Promises, NFR SLA — Show percentage thresholds instead of "Green/Amber/Red"
+Replace the current `DEFAULT_BANDS` labels ("Green", "Amber", "Red") with percentage-based labels:
+- **76 – 100%** (Green, rag_numeric: 1)
+- **51 – 75%** (Amber, rag_numeric: 0.5)
+- **0 – 50%** (Red, rag_numeric: 0)
 
-### 2. Remarks — Separate Column, One Per Indicator
-
-Currently remarks are crammed inside each score cell as a tiny textarea below the dropdown — looks terrible in multi-column layouts.
-
-**New approach:** Add a dedicated "Remarks" column at the end of each indicator row in the matrix table. One clean `Textarea` per indicator row (not per cell). This applies to all 4 rendering modes (standard Feature×KPI, CM direct, ST direct, direct mode).
-
-For Ops Health, add a single consolidated remarks field (already have `notes` column in `customer_health_metrics`).
+### 3. Rename "Promises" to "Promises Made vs Kept"
 
 ---
 
@@ -28,44 +26,41 @@ For Ops Health, add a single consolidated remarks field (already have `notes` co
 
 ### `src/components/user/CSMDataEntryMatrix.tsx`
 
-**OpsHealthSubSection:**
-- Replace Bug SLA, NFR SLA inputs with `BandDropdown` using `DEFAULT_BANDS`
-- Merge Promises Made + Delivered into one "Promises" `BandDropdown`
-- Keep Bug Count as number input with RAG dot
-- Update `onDataChange` signature: `{ bugCount: string; bugSla: string; promises: string; nfrSla: string }`
-- Add a `Textarea` for ops notes
+- Add two new band constants:
+  ```typescript
+  const BUG_COUNT_BANDS: KPIBand[] = [
+    { band_label: '< 5', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+    { band_label: '5 – 10', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+    { band_label: '> 10', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+  ];
 
-**All matrix table modes (4 locations):**
-- Remove inline `<textarea>` from inside each score cell
-- Add a "Remarks" `<th>` column header
-- Add a `<td>` with `<Textarea>` at the end of each indicator row
-- The remark key stays the same (`cellKey(ind.id, custId, featId)`) — one remark per indicator per customer per feature
+  const PCT_BANDS: KPIBand[] = [
+    { band_label: '76 – 100%', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+    { band_label: '51 – 75%', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+    { band_label: '0 – 50%', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+  ];
+  ```
 
-**CustomerSectionCard props:**
-- Update `onOpsDataChange` type to match new shape
+- **Bug Count**: Replace `<Input>` with a `<Select>` using `BUG_COUNT_BANDS`
+- **Bug SLA, NFR SLA, Promises**: Replace `DEFAULT_BANDS` with `PCT_BANDS`
+- Rename "Promises" label to "Promises Made vs Kept"
+- Update `bugRAG` helper (used for RAG dot) to use weight-based logic instead of count-based
+- Update `scoredCount` logic for bug count (check for non-empty string instead of truthy number)
 
 ### `src/hooks/useCustomerHealthMetrics.ts`
-- Update `buildHealthSummary` to handle Bug SLA, NFR SLA, and Promises as weight values (1/0.5/0) instead of raw percentages
-- Bug Count remains count-based with existing `bugCountRAG`
-
-### `src/components/CustomerHealthMetricsCard.tsx`
-- Update dimension display for weight-based values (show "Green"/"Amber"/"Red" instead of raw numbers)
+- Update `bugCountRAG` / `bugCountScore` to treat stored value as weight (1/0.5/0) instead of raw count
+- Update dimension value display for Bug Count to show threshold label ("< 5", "5 – 10", "> 10")
 
 ### `src/components/CustomerHealthMetricsForm.tsx`
-- Replace numeric inputs for Bug SLA, NFR SLA, Promises with `BandDropdown`-style selectors
+- Replace Bug Count `<Input>` with a Select dropdown using the same threshold options
+- Replace Bug SLA, Promises, NFR SLA selectors to show percentage labels
 
----
-
-## Technical Notes
-
-- `DEFAULT_BANDS` already exists with Green(1)/Amber(0.5)/Red(0)
-- No database migration needed — existing numeric columns store 1/0.5/0
-- The `remark` column in `csm_customer_feature_scores` already stores per-cell remarks; we just move the UI to a separate column
-- Ops health notes use the existing `notes` column in `customer_health_metrics`
+### `src/components/CustomerHealthMetricsCard.tsx`
+- Update Bug Count dimension display to show threshold label from weight value
 
 ### Files Modified
-1. `src/components/user/CSMDataEntryMatrix.tsx` — bulk of changes
-2. `src/hooks/useCustomerHealthMetrics.ts` — scoring logic
-3. `src/components/CustomerHealthMetricsCard.tsx` — display
-4. `src/components/CustomerHealthMetricsForm.tsx` — form inputs
+1. `src/components/user/CSMDataEntryMatrix.tsx`
+2. `src/hooks/useCustomerHealthMetrics.ts`
+3. `src/components/CustomerHealthMetricsForm.tsx`
+4. `src/components/CustomerHealthMetricsCard.tsx`
 
