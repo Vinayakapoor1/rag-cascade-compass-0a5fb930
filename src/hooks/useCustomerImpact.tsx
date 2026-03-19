@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RAGStatus } from '@/types/venture';
 import { percentageToRAG } from '@/lib/formulaUtils';
-import { buildHealthSummary, type HealthMetricRow } from '@/hooks/useCustomerHealthMetrics';
+import { buildHealthSummary, type HealthMetricRow, type HealthDimension } from '@/hooks/useCustomerHealthMetrics';
 
 export interface CustomerImpactIndicator {
   id: string;
