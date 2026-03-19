@@ -963,9 +963,10 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
             period,
             bug_count: opsData.bugCount ? Number(opsData.bugCount) : null,
             bug_sla_compliance: opsData.bugSla ? Number(opsData.bugSla) : null,
-            promises_made: opsData.promisesMade ? Number(opsData.promisesMade) : null,
-            promises_delivered: opsData.promisesDelivered ? Number(opsData.promisesDelivered) : null,
+            promises_made: opsData.promises ? Number(opsData.promises) : null,
+            promises_delivered: null,
             new_feature_requests: opsData.nfrSla ? Number(opsData.nfrSla) : null,
+            notes: opsData.notes || null,
             created_by: user.id,
             updated_at: new Date().toISOString(),
           } as any, { onConflict: 'customer_id,period' });
