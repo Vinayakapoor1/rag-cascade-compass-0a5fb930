@@ -118,48 +118,50 @@ export function ComplianceCustomerDetail({
           </TableHeader>
           <TableBody>
             {featureBreakdown.map(f => (
-              <TableRow key={f.featureId} className="hover:bg-muted/30">
-                <TableCell className="text-xs py-2 font-medium">{f.featureName}</TableCell>
-                <TableCell className="text-xs py-2 text-center font-mono">
-                  {f.filledCount}/{f.expectedCount}
-                </TableCell>
-                <TableCell className="text-xs py-2 text-muted-foreground">
-                  {f.lastSubmission
-                    ? formatDistanceToNow(new Date(f.lastSubmission), { addSuffix: true })
-                    : 'Never'}
-                </TableCell>
-                <TableCell className="text-xs py-2 text-center">
-                  {f.status === 'complete' && (
-                    <Badge className="bg-rag-green/15 text-rag-green border-rag-green/30 text-[9px] gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Filled
-                    </Badge>
-                  )}
-                  {f.status === 'partial' && (
-                    <Badge className="bg-rag-amber/15 text-rag-amber border-rag-amber/30 text-[9px] gap-1">
-                      <Clock className="h-3 w-3" /> Partial
-                    </Badge>
-                  )}
-                  {f.status === 'pending' && (
-                    <Badge variant="destructive" className="text-[9px] gap-1">
-                      <Clock className="h-3 w-3" /> Pending
-                    </Badge>
-                  )}
-                </TableCell>
-              </TableRow>
-              {f.remarks.length > 0 && (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={4} className="py-1 px-6">
-                    <div className="space-y-1">
-                      {f.remarks.map((r, i) => (
-                        <p key={i} className="text-[10px] italic text-muted-foreground flex items-start gap-1.5">
-                          <span className={`inline-flex h-2 w-2 rounded-full mt-0.5 shrink-0 ${r.value === 0 ? 'bg-rag-red' : r.value === 0.5 ? 'bg-rag-amber' : 'bg-rag-green'}`} />
-                          {r.remark}
-                        </p>
-                      ))}
-                    </div>
+              <React.Fragment key={f.featureId}>
+                <TableRow className="hover:bg-muted/30">
+                  <TableCell className="text-xs py-2 font-medium">{f.featureName}</TableCell>
+                  <TableCell className="text-xs py-2 text-center font-mono">
+                    {f.filledCount}/{f.expectedCount}
+                  </TableCell>
+                  <TableCell className="text-xs py-2 text-muted-foreground">
+                    {f.lastSubmission
+                      ? formatDistanceToNow(new Date(f.lastSubmission), { addSuffix: true })
+                      : 'Never'}
+                  </TableCell>
+                  <TableCell className="text-xs py-2 text-center">
+                    {f.status === 'complete' && (
+                      <Badge className="bg-rag-green/15 text-rag-green border-rag-green/30 text-[9px] gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Filled
+                      </Badge>
+                    )}
+                    {f.status === 'partial' && (
+                      <Badge className="bg-rag-amber/15 text-rag-amber border-rag-amber/30 text-[9px] gap-1">
+                        <Clock className="h-3 w-3" /> Partial
+                      </Badge>
+                    )}
+                    {f.status === 'pending' && (
+                      <Badge variant="destructive" className="text-[9px] gap-1">
+                        <Clock className="h-3 w-3" /> Pending
+                      </Badge>
+                    )}
                   </TableCell>
                 </TableRow>
-              )}
+                {f.remarks.length > 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={4} className="py-1 px-6">
+                      <div className="space-y-1">
+                        {f.remarks.map((r, i) => (
+                          <p key={i} className="text-[10px] italic text-muted-foreground flex items-start gap-1.5">
+                            <span className={`inline-flex h-2 w-2 rounded-full mt-0.5 shrink-0 ${r.value === 0 ? 'bg-rag-red' : r.value === 0.5 ? 'bg-rag-amber' : 'bg-rag-green'}`} />
+                            {r.remark}
+                          </p>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
             ))}
           </TableBody>
         </Table>
