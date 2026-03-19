@@ -678,7 +678,7 @@ export default function CustomersPage() {
                         </HoverCardTrigger>
                         <HoverCardContent className="w-72 z-50" side="top" align="center">
                           <p className="text-xs font-semibold mb-2">Operational Health Breakdown</p>
-                          {customer.healthDimensions.length > 0 ? (
+                          {(customer.healthDimensions?.length ?? 0) > 0 ? (
                             <div className="space-y-1.5">
                               {customer.healthDimensions.map((dim) => (
                                 <div key={dim.label} className="flex items-center justify-between text-xs">
