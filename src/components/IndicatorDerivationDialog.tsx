@@ -641,8 +641,7 @@ export function IndicatorDerivationDialog({
                 <p className="text-xs text-muted-foreground">
                   AVG of {breakdown.length} customer averages → ({breakdown.map(c => {
                     const pct = Math.round(c.average * 100);
-                    const label = getBandLabel(c.average, ragBands);
-                    return label ? label : `${pct}%`;
+                    return `${pct}%`;
                   }).join(' + ')}) ÷ {breakdown.length} = <span className="font-bold text-foreground">{Math.round(kpiAggregate * 10) / 10}%</span>
                 </p>
                 {hasActiveFilters && (
