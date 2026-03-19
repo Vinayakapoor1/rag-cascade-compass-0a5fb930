@@ -118,6 +118,7 @@ const RAG_BADGE_STYLES: Record<string, string> = {
 };
 
 type ScoreMap = Record<string, number | null>;
+type RemarkMap = Record<string, string>; // cellKey -> remark text
 type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
 export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }: CSMDataEntryMatrixProps) {
