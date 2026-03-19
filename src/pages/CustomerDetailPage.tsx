@@ -27,6 +27,7 @@ export default function CustomerDetailPage() {
   const { data: impact, isLoading, error, refetch } = useCustomerImpact(customerId || '');
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [healthMetricsOpen, setHealthMetricsOpen] = useState(false);
   const [features, setFeatures] = useState<any[]>([]);
 
   useEffect(() => {
