@@ -329,7 +329,7 @@ export type Database = {
           created_by: string | null
           customer_id: string
           id: string
-          nfr_compliance: number | null
+          new_feature_requests: number | null
           notes: string | null
           period: string
           promises_delivered: number | null
@@ -343,7 +343,7 @@ export type Database = {
           created_by?: string | null
           customer_id: string
           id?: string
-          nfr_compliance?: number | null
+          new_feature_requests?: number | null
           notes?: string | null
           period: string
           promises_delivered?: number | null
@@ -357,7 +357,7 @@ export type Database = {
           created_by?: string | null
           customer_id?: string
           id?: string
-          nfr_compliance?: number | null
+          new_feature_requests?: number | null
           notes?: string | null
           period?: string
           promises_delivered?: number | null

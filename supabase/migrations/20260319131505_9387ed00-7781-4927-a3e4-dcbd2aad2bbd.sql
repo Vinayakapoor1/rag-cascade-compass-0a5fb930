@@ -1,0 +1,2 @@
+ALTER TABLE customer_health_metrics RENAME COLUMN nfr_compliance TO new_feature_requests;
+ALTER TABLE customer_health_metrics ALTER COLUMN new_feature_requests TYPE integer USING new_feature_requests::integer;

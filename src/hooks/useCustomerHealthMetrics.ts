@@ -105,7 +105,7 @@ export function useCustomerHealthMetrics(customerId: string) {
         .eq('customer_id', customerId)
         .order('period', { ascending: false });
       if (error) throw error;
-      return (data as HealthMetricRow[]) || [];
+      return (data as unknown as HealthMetricRow[]) || [];
     },
     enabled: !!customerId,
   });
