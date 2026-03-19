@@ -2240,6 +2240,13 @@ function CustomerSectionCard({
                   />
                 )}
 
+                {/* ===== Operational Health Sub-Section ===== */}
+                <OpsHealthSubSection
+                  customerId={section.id}
+                  customerName={section.name}
+                  period={period}
+                />
+
                 {/* Per-customer Save button */}
                 <div className="flex justify-end pt-2">
                   <Button
