@@ -1795,6 +1795,7 @@ interface CustomerSectionCardProps {
   lastCheckInDate: string | null;
   remarks: RemarkMap;
   onRemarkChange: (key: string, text: string) => void;
+  onOpsDataChange: (customerId: string, data: { bugCount: string; bugSla: string; promisesMade: string; promisesDelivered: string; nfrSla: string }) => void;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1807,7 +1808,7 @@ function CustomerSectionCard({
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
   departmentId, period, isSaved, isSaving, onSaveCustomer, hasUnsavedChanges,
   cmIndicators, cmBands, stIndicators, stBands, previousScores, previousPeriodLabel, lastCheckInDate,
-  remarks, onRemarkChange,
+  remarks, onRemarkChange, onOpsDataChange,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
