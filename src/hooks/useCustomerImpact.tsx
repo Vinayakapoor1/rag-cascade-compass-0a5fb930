@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RAGStatus } from '@/types/venture';
 import { percentageToRAG } from '@/lib/formulaUtils';
-import { buildHealthSummary, type HealthMetricRow } from '@/hooks/useCustomerHealthMetrics';
+import { buildHealthSummary, type HealthMetricRow, type HealthDimension } from '@/hooks/useCustomerHealthMetrics';
 
 export interface CustomerImpactIndicator {
   id: string;
@@ -369,6 +369,8 @@ export interface CustomerWithImpact {
   managedServices: boolean | null;
   healthMetricsRAG: RAGStatus;
   healthMetricsScore: number | null;
+  healthDimensions: HealthDimension[];
+  indicatorScore: number | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
@@ -561,6 +563,8 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       managedServices: c.managed_services ?? null,
       healthMetricsRAG: healthSummary?.compositeRAG ?? 'not-set',
       healthMetricsScore: healthScore,
+      healthDimensions: healthSummary?.dimensions ?? [],
+      indicatorScore,
     };
   });
 }

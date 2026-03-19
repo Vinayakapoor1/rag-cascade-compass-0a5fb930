@@ -11,10 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle, ShieldAlert, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Upload, CopyCheck, X, ClipboardCheck, Check, AlertTriangle, ShieldAlert, ArrowRight, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CustomerAttachments } from './CustomerAttachments';
+import { useUpsertHealthMetric } from '@/hooks/useCustomerHealthMetrics';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
 import { notifyAdminsOfCompletion } from '@/lib/notifyAdmins';
 import {
@@ -2239,6 +2240,13 @@ function CustomerSectionCard({
                   />
                 )}
 
+                {/* ===== Operational Health Sub-Section ===== */}
+                <OpsHealthSubSection
+                  customerId={section.id}
+                  customerName={section.name}
+                  period={period}
+                />
+
                 {/* Per-customer Save button */}
                 <div className="flex justify-end pt-2">
                   <Button
@@ -2622,6 +2630,146 @@ function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, 
               Clear All
             </Button>
           </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// ============= Ops Health Sub-Section =============
+
+interface OpsHealthSubSectionProps {
+  customerId: string;
+  customerName: string;
+  period: string;
+}
+
+function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubSectionProps) {
+  const [opsOpen, setOpsOpen] = useState(false);
+  const [bugCount, setBugCount] = useState<string>('');
+  const [bugSla, setBugSla] = useState<string>('');
+  const [promisesMade, setPromisesMade] = useState<string>('');
+  const [promisesDelivered, setPromisesDelivered] = useState<string>('');
+  const [nfrCompliance, setNfrCompliance] = useState<string>('');
+  const [loaded, setLoaded] = useState(false);
+  const upsertMutation = useUpsertHealthMetric();
+
+  // Load existing data for this customer + period
+  useEffect(() => {
+    if (!opsOpen || loaded) return;
+    (async () => {
+      const { data } = await supabase
+        .from('customer_health_metrics')
+        .select('*')
+        .eq('customer_id', customerId)
+        .eq('period', period)
+        .maybeSingle();
+      if (data) {
+        setBugCount(data.bug_count != null ? String(data.bug_count) : '');
+        setBugSla(data.bug_sla_compliance != null ? String(data.bug_sla_compliance) : '');
+        setPromisesMade(data.promises_made != null ? String(data.promises_made) : '');
+        setPromisesDelivered(data.promises_delivered != null ? String(data.promises_delivered) : '');
+        setNfrCompliance(data.nfr_compliance != null ? String(data.nfr_compliance) : '');
+      }
+      setLoaded(true);
+    })();
+  }, [opsOpen, loaded, customerId, period]);
+
+  const handleSaveOps = async () => {
+    try {
+      await upsertMutation.mutateAsync({
+        customer_id: customerId,
+        period,
+        bug_count: bugCount ? Number(bugCount) : null,
+        bug_sla_compliance: bugSla ? Number(bugSla) : null,
+        promises_made: promisesMade ? Number(promisesMade) : null,
+        promises_delivered: promisesDelivered ? Number(promisesDelivered) : null,
+        nfr_compliance: nfrCompliance ? Number(nfrCompliance) : null,
+      });
+      toast.success(`Ops Health saved for ${customerName}`);
+    } catch (err: any) {
+      toast.error('Failed to save ops health: ' + (err?.message || 'Unknown error'));
+    }
+  };
+
+  return (
+    <Collapsible open={opsOpen} onOpenChange={setOpsOpen}>
+      <CollapsibleTrigger className="flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors py-2 w-full">
+        {opsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <Activity className="h-3 w-3" />
+        Operational Health
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-muted/30 rounded-lg border border-border/30">
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Bug Count</label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="0"
+              value={bugCount}
+              onChange={(e) => setBugCount(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Bug SLA %</label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="0-100"
+              value={bugSla}
+              onChange={(e) => setBugSla(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Promises Made</label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="0"
+              value={promisesMade}
+              onChange={(e) => setPromisesMade(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Promises Delivered</label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="0"
+              value={promisesDelivered}
+              onChange={(e) => setPromisesDelivered(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">NFR Compliance %</label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="0-100"
+              value={nfrCompliance}
+              onChange={(e) => setNfrCompliance(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end pt-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 text-xs"
+            disabled={upsertMutation.isPending}
+            onClick={handleSaveOps}
+          >
+            {upsertMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+            Save Ops Health
+          </Button>
         </div>
       </CollapsibleContent>
     </Collapsible>
