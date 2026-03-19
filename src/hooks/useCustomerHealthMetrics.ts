@@ -82,9 +82,9 @@ export function buildHealthSummary(row: HealthMetricRow): CustomerHealthSummary 
   }
 
   if (row.new_feature_requests != null) {
-    const s = bugCountScore(row.new_feature_requests);
+    const s = pctScore(row.new_feature_requests);
     scores.push(s);
-    dimensions.push({ label: 'Feature Requests', value: `${row.new_feature_requests}`, rag: bugCountRAG(row.new_feature_requests), score: s });
+    dimensions.push({ label: 'NFR SLA', value: `${row.new_feature_requests}%`, rag: pctRAG(row.new_feature_requests), score: s });
   }
 
   const compositeScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
