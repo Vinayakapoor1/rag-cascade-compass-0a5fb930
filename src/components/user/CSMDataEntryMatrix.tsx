@@ -498,7 +498,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                   .limit(10000);
 
                 (cmScores || []).forEach((s: any) => {
-                  scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+                  const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+                  scoreMap[k] = s.value != null ? Number(s.value) : null;
+                  if (s.remark) remarkMap[k] = s.remark;
                 });
               }
             }
