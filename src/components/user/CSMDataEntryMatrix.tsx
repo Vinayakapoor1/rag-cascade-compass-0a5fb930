@@ -2921,7 +2921,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                {DEFAULT_BANDS.map(b => (
+                {PCT_BANDS.map(b => (
                   <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
                     <span className="flex items-center gap-1.5">
                       <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
