@@ -1,0 +1,1 @@
+ALTER TABLE public.csm_customer_feature_scores ADD COLUMN IF NOT EXISTS remark text;
