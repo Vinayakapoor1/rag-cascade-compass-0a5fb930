@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CustomerFormDialog } from '@/components/CustomerFormDialog';
+import { CustomerHealthMetricsCard } from '@/components/CustomerHealthMetricsCard';
+import { CustomerHealthMetricsForm } from '@/components/CustomerHealthMetricsForm';
 import {
   Users, Target, Building2, BarChart3, Settings, Activity,
-  Loader2, ChevronRight, TrendingUp, Edit, Trash2, Tag
+  Loader2, ChevronRight, TrendingUp, Edit, Trash2, Tag, Plus
 } from 'lucide-react';
 import { getOrgObjectiveColorClasses, getRAGBorderColor, getRAGMutedBg } from '@/lib/ragUtils';
 import { cn } from '@/lib/utils';
