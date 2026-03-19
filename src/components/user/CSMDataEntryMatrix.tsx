@@ -2272,6 +2272,19 @@ function CustomerSectionCard({
                   period={period}
                 />
 
+                {/* ===== Remarks Section ===== */}
+                <RemarksSection
+                  customerId={section.id}
+                  indicators={section.indicators}
+                  features={section.features}
+                  indicatorFeatureMap={section.indicatorFeatureMap}
+                  cmIndicators={cmIndicators}
+                  stIndicators={stIndicators}
+                  scores={scores}
+                  remarks={remarks}
+                  onRemarkChange={(key, text) => setRemarks(prev => ({ ...prev, [key]: text }))}
+                />
+
                 {/* Per-customer Save button */}
                 <div className="flex justify-end pt-2">
                   <Button
