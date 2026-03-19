@@ -132,6 +132,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const [savedCustomers, setSavedCustomers] = useState<Set<string>>(new Set());
   const [scores, setScores] = useState<ScoreMap>({});
   const [originalScores, setOriginalScores] = useState<ScoreMap>({});
+  const [remarks, setRemarks] = useState<RemarkMap>({});
+  const [originalRemarks, setOriginalRemarks] = useState<RemarkMap>({});
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [skipReasonDialogOpen, setSkipReasonDialogOpen] = useState(false);
