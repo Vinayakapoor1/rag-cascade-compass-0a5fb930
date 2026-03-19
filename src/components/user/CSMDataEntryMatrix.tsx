@@ -2688,34 +2688,34 @@ function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, 
                         </TooltipProvider>
                       </td>
                       <td className={cn('px-2 py-1.5 border-r', cellBg)}>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <BandDropdown
-                            value={val}
-                            bands={getBandsForIndicator(ind.id)}
-                            onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
-                          />
-                          {val != null && (
-                            <textarea
-                              placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
-                              value={remarks[key] || ''}
-                              onChange={(e) => onRemarkChange(key, e.target.value)}
-                              className={cn(
-                                'w-full text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
-                                ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
-                              )}
-                              rows={ragColor === 'red' ? 2 : 1}
-                            />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        {val != null ? (
-                          <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
-                        ) : (
-                          <span className="text-muted-foreground/40 text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
+                         <BandDropdown
+                           value={val}
+                           bands={getBandsForIndicator(ind.id)}
+                           onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
+                         />
+                       </td>
+                       <td className="px-3 py-1.5 text-center border-r">
+                         {val != null ? (
+                           <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[ragColor] || 'bg-muted')} />
+                         ) : (
+                           <span className="text-muted-foreground/40 text-xs">—</span>
+                         )}
+                       </td>
+                       <td className="px-2 py-1.5 align-top">
+                         {val != null && (
+                           <Textarea
+                             placeholder={ragColor === 'red' ? 'Why red? (required)' : 'Add remark...'}
+                             value={remarks[key] || ''}
+                             onChange={(e) => onRemarkChange(key, e.target.value)}
+                             className={cn(
+                               'text-xs min-h-[32px] resize-none',
+                               ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : ''
+                             )}
+                             rows={ragColor === 'red' ? 2 : 1}
+                           />
+                         )}
+                       </td>
+                     </tr>
                   );
                 })}
               </tbody>
