@@ -2934,7 +2934,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              Promises
+              Promises Made vs Kept
               {promises && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[weightColor(promises)])} />}
             </label>
             <Select value={promises || 'unset'} onValueChange={(v) => update('promises', v === 'unset' ? '' : v)}>
