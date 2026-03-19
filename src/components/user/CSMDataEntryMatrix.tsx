@@ -193,7 +193,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         .from('functional_objectives')
         .select('id, name')
         .eq('department_id', departmentId);
-      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
+      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {}, remarks: {} as RemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: krs } = await supabase
         .from('key_results')
