@@ -1750,6 +1750,8 @@ interface CustomerSectionCardProps {
   previousScores: ScoreMap;
   previousPeriodLabel: string | null;
   lastCheckInDate: string | null;
+  remarks: RemarkMap;
+  onRemarkChange: (key: string, text: string) => void;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
