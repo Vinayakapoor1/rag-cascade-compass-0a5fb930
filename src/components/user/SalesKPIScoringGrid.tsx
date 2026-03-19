@@ -146,7 +146,9 @@ export function SalesKPIScoringGrid({ departmentId, period }: SalesKPIScoringGri
     setSelections(prev => ({ ...prev, [indicatorId]: ragNumeric }));
   };
 
-  const hasChanges = Object.keys(selections).length > 0;
+  const hasChanges = Object.entries(selections).some(
+    ([id, val]) => originalSelections[id] !== val
+  ) || Object.keys(selections).length !== Object.keys(originalSelections).length;
 
   const handleSaveAll = async () => {
     if (!hasChanges || !user) return;

@@ -354,10 +354,7 @@ export default function DepartmentDataEntry() {
                         toast.error(`Failed to upload evidence for ${indicator.name}`);
                         continue; // Skip this indicator if upload fails
                     } else {
-                        const { data } = supabase.storage
-                            .from('evidence-files')
-                            .getPublicUrl(filePath);
-                        evidenceUrl = filePath; // Store the path, not the public URL (bucket is private)
+                        evidenceUrl = filePath; // Store the path (bucket is private, use signed URLs to access)
                     }
                 }
 

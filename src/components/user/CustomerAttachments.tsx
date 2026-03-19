@@ -49,9 +49,15 @@ export function CustomerAttachments({ customerId, departmentId, period }: Custom
     setLoading(false);
   };
 
+  const MAX_FILE_SIZE_MB = 10;
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      toast.error(`File too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     setUploading(true);
     try {
       const filePath = `${customerId}/${period}/${Date.now()}_${file.name}`;
