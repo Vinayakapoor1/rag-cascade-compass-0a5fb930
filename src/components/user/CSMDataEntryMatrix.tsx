@@ -2190,8 +2190,9 @@ function CustomerSectionCard({
                           );
                         })}
                         <td className="bg-muted/10" />
-                        <td className="bg-muted/10 border-l border-border/20" />
-                      </tr>
+                         <td className="bg-muted/10 border-l border-border/20" />
+                         <td className="bg-muted/10 border-l border-border/20" />
+                       </tr>
                     </thead>
                     <tbody>
                       {section.features.map(feat => {
