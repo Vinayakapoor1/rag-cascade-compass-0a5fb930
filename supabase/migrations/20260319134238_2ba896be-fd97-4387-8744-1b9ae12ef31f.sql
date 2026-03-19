@@ -1,0 +1,1 @@
+ALTER TABLE customer_health_metrics ALTER COLUMN new_feature_requests TYPE numeric USING new_feature_requests::numeric;
