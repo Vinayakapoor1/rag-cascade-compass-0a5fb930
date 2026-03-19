@@ -1,28 +1,17 @@
 
 
-# Fix: 2FA Reset Not Showing New QR Code
+## Problem Found
 
-## Problem
-When an admin resets a user's 2FA (deletes the `user_2fa` record), the user should see a new QR code on next login. The login flow in `Auth.tsx` correctly detects no 2FA record and navigates to `/auth/verify-2fa?uid=...&setup=true`. However, the `setup-2fa` edge function uses `supabase.auth.getClaims(token)` which does not exist in the Supabase JS client v2, causing the function to fail silently with a 401 error. The QR code never appears.
+The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
 
-## Root Cause
-`supabase/functions/setup-2fa/index.ts` line 44-49: `getClaims()` is not a valid method on the Supabase JS v2 auth client. This causes every call to the setup function to return "Unauthorized".
+## Plan
 
-## Fix
+1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
+   ```sql
+   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
+   ```
 
-**File: `supabase/functions/setup-2fa/index.ts`**
-- Replace `getClaims(token)` with `getUser(token)` which is the correct v2 method
-- Extract `userId` and `email` from the user object instead of claims
+2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
 
-The corrected auth block:
-```typescript
-const { data: userData, error: userError } = await supabase.auth.getUser(token);
-if (userError || !userData?.user) {
-  return unauthorized response;
-}
-const userId = userData.user.id;
-const userEmail = userData.user.email || "user";
-```
-
-No other files need changes — the login flow, reset logic, and `Verify2FA.tsx` page are all correct. The only blocker is the broken edge function.
+No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
 
