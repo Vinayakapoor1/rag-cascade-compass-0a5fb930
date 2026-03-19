@@ -2398,9 +2398,11 @@ interface CMSubSectionBlockProps {
   cmBands: BandMap;
   scores: ScoreMap;
   onCellChange: (indicatorId: string, customerId: string, featureId: string, value: string) => void;
+  remarks: RemarkMap;
+  onRemarkChange: (key: string, text: string) => void;
 }
 
-function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellChange }: CMSubSectionBlockProps) {
+function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellChange, remarks, onRemarkChange }: CMSubSectionBlockProps) {
   const [cmOpen, setCmOpen] = useState(true);
   const placeholderFeatId = CM_DIRECT_FEATURE_ID;
 
