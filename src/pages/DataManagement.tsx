@@ -427,6 +427,12 @@ export default function DataManagement() {
               </TabsContent>
             </Tabs>
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="feedback">
+              <FeedbackTab />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </AppLayout>
