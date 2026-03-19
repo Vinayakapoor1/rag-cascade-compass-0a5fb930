@@ -372,8 +372,8 @@ export interface CustomerWithImpact {
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
-  // Fetch all customers, CSMs, customer_features, and indicator_feature_links in parallel
-  const [customersResult, csmsResult, cfResult, iflResult] = await Promise.all([
+  // Fetch all customers, CSMs, customer_features, indicator_feature_links, and health metrics in parallel
+  const [customersResult, csmsResult, cfResult, iflResult, healthResult] = await Promise.all([
     supabase
       .from('customers')
       .select('id, name, tier, region, industry, status, logo_url, deployment_type, csm_id, managed_services')
@@ -387,6 +387,10 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     supabase
       .from('indicator_feature_links')
       .select('feature_id, indicator_id'),
+    supabase
+      .from('customer_health_metrics')
+      .select('*')
+      .order('period', { ascending: false }),
   ]);
   
   if (customersResult.error) throw customersResult.error;
