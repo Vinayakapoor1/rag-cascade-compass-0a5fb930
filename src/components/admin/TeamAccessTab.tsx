@@ -118,6 +118,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
         const userCsmAccess = (memberCsmAccess || [])
           .filter((a: any) => a.user_id === p.user_id)
           .map((a: any) => a.csm_id);
+        const user2FA = twoFaRecords?.find((t) => t.user_id === p.user_id);
         
         return {
           id: p.user_id,
@@ -131,6 +132,7 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           linkedCsmId: linkedCsm?.id || null,
           linkedCsmName: linkedCsm?.name || null,
           assignedCsmIds: userCsmAccess,
+          has2FA: user2FA?.is_enabled === true,
         };
       });
 
