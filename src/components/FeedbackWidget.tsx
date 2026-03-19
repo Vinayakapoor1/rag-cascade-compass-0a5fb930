@@ -76,6 +76,27 @@ export function FeedbackWidget() {
       toast.success('Feedback submitted — thank you!');
       setMessage('');
       setOpen(false);
+
+      // Notify all admins about the new feedback
+      try {
+        const { data: adminRoles } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'admin');
+
+        if (adminRoles && adminRoles.length > 0) {
+          const notifications = adminRoles.map((r) => ({
+            user_id: r.user_id,
+            title: '💬 New Feedback Received',
+            message: `${user.email ?? 'A user'} submitted feedback from ${location.pathname}.`,
+            link: '/data-management?tab=feedback',
+            is_read: false,
+          }));
+          await supabase.from('notifications').insert(notifications);
+        }
+      } catch (err) {
+        console.error('Failed to notify admins of feedback:', err);
+      }
     }
   };
 
