@@ -2722,7 +2722,7 @@ function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, 
               <tfoot>
                 <tr className="border-t-2 bg-muted/30 font-semibold">
                   <td className="px-3 py-2 text-sm border-r">Score Total</td>
-                  <td className="px-3 py-2 text-center text-xs border-r" colSpan={2}>
+                  <td className="px-3 py-2 text-center text-xs border-r" colSpan={3}>
                     {(() => {
                       const { greens, ambers, reds, total } = getScoreSummary();
                       if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
