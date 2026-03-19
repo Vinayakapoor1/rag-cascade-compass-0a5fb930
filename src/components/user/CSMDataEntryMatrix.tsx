@@ -693,6 +693,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       };
       setScores(hydratedScores);
       setOriginalScores(hydratedScores);
+      const hydratedRemarks = { ...(matrixData.remarks || {}) };
+      setRemarks(hydratedRemarks);
+      setOriginalRemarks(hydratedRemarks);
       scoresInitializedRef.current = true;
     }
   }, [matrixData]);
