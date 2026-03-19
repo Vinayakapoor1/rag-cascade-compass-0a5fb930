@@ -653,6 +653,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         indicators: indicatorInfos,
         bands: bandsMap,
         scores: scoreMap,
+        remarks: remarkMap,
         cmIndicators: ((isDepartmentHead && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin ? [] as IndicatorInfo[] : cmIndicatorInfos,
         cmBands: ((isDepartmentHead && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin ? {} as BandMap : cmBandsMap,
         cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly && !isDepartmentMember && !((isDepartmentHead && !isCustomerSuccessDept)) ? cmDeptId : null,
