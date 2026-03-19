@@ -130,6 +130,17 @@ export function CustomersOverviewTab() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={industryFilter} onValueChange={setIndustryFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Industry" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Industries</SelectItem>
+                {uniqueIndustries.map(ind => (
+                  <SelectItem key={ind} value={ind}>{ind}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
