@@ -281,6 +281,12 @@ export default function DataManagement() {
               <Users className="h-4 w-4" />
               Team & Uploads
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="feedback" className="gap-2 px-4 py-2.5">
+                <MessageSquare className="h-4 w-4" />
+                Feedback
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="okr" className="space-y-4">
