@@ -1936,10 +1936,11 @@ function CustomerSectionCard({
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r border-border/20">KPI</th>
-                        <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r border-border/20">Score</th>
-                        <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
-                      </tr>
+                         <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r border-border/20">KPI</th>
+                         <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r border-border/20">Score</th>
+                         <th className="px-3 py-2 text-center font-semibold min-w-[100px] border-r border-border/20">RAG</th>
+                         <th className="px-3 py-2 text-left font-semibold min-w-[180px]">Remarks</th>
+                       </tr>
                     </thead>
                     <tbody>
                       {section.indicators.map(ind => {
