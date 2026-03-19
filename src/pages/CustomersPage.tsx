@@ -636,6 +636,10 @@ export default function CustomersPage() {
                         <RAGBadge status={customer.ragStatus} size="md" />
                         <span className="text-[10px] text-muted-foreground mt-1">Health</span>
                       </div>
+                      <div className="flex flex-col items-center">
+                        <RAGBadge status={customer.healthMetricsRAG} size="md" />
+                        <span className="text-[10px] text-muted-foreground mt-1">Ops</span>
+                      </div>
                       <Link
                         to={`/customers/${customer.id}`}
                         className="text-right hover:opacity-80 transition-opacity"
