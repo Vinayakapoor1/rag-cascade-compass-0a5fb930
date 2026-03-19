@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,7 @@ export function SalesKPIScoringGrid({ departmentId, period }: SalesKPIScoringGri
   const [indicators, setIndicators] = useState<SalesIndicator[]>([]);
   const [bands, setBands] = useState<Record<string, RAGBand[]>>({});
   const [selections, setSelections] = useState<Record<string, string>>({});
+  const [originalSelections, setOriginalSelections] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
@@ -131,6 +133,7 @@ export function SalesKPIScoringGrid({ departmentId, period }: SalesKPIScoringGri
           }
         }
         setSelections(preSelections);
+        setOriginalSelections({ ...preSelections });
       }
     } catch (error) {
       console.error('Error loading Sales KPI data:', error);
@@ -144,7 +147,11 @@ export function SalesKPIScoringGrid({ departmentId, period }: SalesKPIScoringGri
     setSelections(prev => ({ ...prev, [indicatorId]: ragNumeric }));
   };
 
-  const hasChanges = Object.keys(selections).length > 0;
+  const hasChanges = Object.entries(selections).some(
+    ([id, val]) => originalSelections[id] !== val
+  ) || Object.keys(selections).length !== Object.keys(originalSelections).length;
+
+  useUnsavedChangesGuard(hasChanges);
 
   const handleSaveAll = async () => {
     if (!hasChanges || !user) return;

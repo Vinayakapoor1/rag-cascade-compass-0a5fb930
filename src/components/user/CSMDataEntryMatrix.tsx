@@ -664,9 +664,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const previousPeriodLabel = matrixData?.previousPeriodLabel ?? null;
   const lastCheckInByCustomer = matrixData?.lastCheckInByCustomer ?? {};
 
-  // Initialize scores from query data only once per query result
+  // Initialize scores from query data - re-initialize whenever matrixData changes
   useEffect(() => {
-    if (matrixData && !scoresInitializedRef.current) {
+    if (matrixData) {
       const hydratedScores = {
         ...(matrixData.previousScores || {}),
         ...(matrixData.scores || {}),
@@ -871,14 +871,16 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           }
         }
       }
-      for (const del of deletes) {
-        await supabase
-          .from('csm_customer_feature_scores' as any)
-          .delete()
-          .eq('indicator_id', del.indicator_id)
-          .eq('customer_id', del.customer_id)
-          .eq('feature_id', del.feature_id)
-          .eq('period', period);
+      if (deletes.length > 0) {
+        await Promise.all(deletes.map(del =>
+          supabase
+            .from('csm_customer_feature_scores' as any)
+            .delete()
+            .eq('indicator_id', del.indicator_id)
+            .eq('customer_id', del.customer_id)
+            .eq('feature_id', del.feature_id)
+            .eq('period', period)
+        ));
       }
 
       if (upserts.length > 0) {
