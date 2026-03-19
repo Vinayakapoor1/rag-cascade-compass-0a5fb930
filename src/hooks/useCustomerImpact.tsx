@@ -403,7 +403,7 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
 
   // Build per-customer latest health metrics map
   const healthMetricsMap = new Map<string, HealthMetricRow>();
-  ((healthResult.data || []) as HealthMetricRow[]).forEach(row => {
+  ((healthResult.data || []) as unknown as HealthMetricRow[]).forEach(row => {
     // Already ordered desc by period, so first occurrence per customer is latest
     if (!healthMetricsMap.has(row.customer_id)) {
       healthMetricsMap.set(row.customer_id, row);

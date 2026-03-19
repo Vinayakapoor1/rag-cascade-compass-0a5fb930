@@ -2712,7 +2712,7 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
         setBugSla(data.bug_sla_compliance != null ? String(data.bug_sla_compliance) : '');
         setPromisesMade(data.promises_made != null ? String(data.promises_made) : '');
         setPromisesDelivered(data.promises_delivered != null ? String(data.promises_delivered) : '');
-        setNewFeatureRequests(data.new_feature_requests != null ? String(data.new_feature_requests) : '');
+        setNewFeatureRequests((data as any).new_feature_requests != null ? String((data as any).new_feature_requests) : '');
       }
       setLoaded(true);
     })();
