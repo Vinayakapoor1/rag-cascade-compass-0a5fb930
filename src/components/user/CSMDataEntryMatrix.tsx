@@ -2671,12 +2671,26 @@ function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, 
                           </Tooltip>
                         </TooltipProvider>
                       </td>
-                      <td className={cn('px-2 py-1.5 text-center border-r', cellBg)}>
-                        <BandDropdown
-                          value={val}
-                          bands={getBandsForIndicator(ind.id)}
-                          onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
-                        />
+                      <td className={cn('px-2 py-1.5 border-r', cellBg)}>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <BandDropdown
+                            value={val}
+                            bands={getBandsForIndicator(ind.id)}
+                            onChange={(b) => onCellChange(ind.id, customerId, placeholderFeatId, b)}
+                          />
+                          {val != null && (
+                            <textarea
+                              placeholder={ragColor === 'red' ? 'Why red?' : 'Remark'}
+                              value={remarks[key] || ''}
+                              onChange={(e) => onRemarkChange(key, e.target.value)}
+                              className={cn(
+                                'w-full text-[10px] px-1.5 py-0.5 rounded border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring',
+                                ragColor === 'red' && !remarks[key]?.trim() ? 'border-destructive/50 bg-destructive/5' : 'border-input'
+                              )}
+                              rows={ragColor === 'red' ? 2 : 1}
+                            />
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-1.5 text-center">
                         {val != null ? (
