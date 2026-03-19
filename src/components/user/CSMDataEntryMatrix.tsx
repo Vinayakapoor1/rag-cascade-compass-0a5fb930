@@ -1032,6 +1032,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 value: val,
                 period,
                 created_by: user.id,
+                remark: remarks[key] || null,
               });
             } else if (origVal != null && val === undefined) {
               deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: placeholderFeatureId });
