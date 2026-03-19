@@ -522,11 +522,24 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     const data = customerData.get(c.id);
     const linkedCount = data?.count || 0;
     
-    let ragStatus: RAGStatus = 'not-set';
+    // Indicator-based RAG
+    let indicatorScore: number | null = null;
     if (data && data.statuses.length > 0) {
-      const avgScore = data.statuses.reduce((sum, s) => {
+      indicatorScore = data.statuses.reduce((sum, s) => {
         return sum + (s === 'green' ? 100 : s === 'amber' ? 60 : s === 'red' ? 30 : 0);
       }, 0) / data.statuses.length;
+    }
+
+    // Health metrics RAG
+    const healthRow = healthMetricsMap.get(c.id);
+    const healthSummary = healthRow ? buildHealthSummary(healthRow) : null;
+    const healthScore = healthSummary && healthSummary.dimensions.length > 0 ? healthSummary.compositeScore : null;
+
+    // Composite RAG: average indicator score + health score
+    const allScores = [indicatorScore, healthScore].filter((s): s is number => s !== null);
+    let ragStatus: RAGStatus = 'not-set';
+    if (allScores.length > 0) {
+      const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
       ragStatus = percentageToRAG(avgScore);
     }
 
@@ -546,6 +559,8 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       csmName: c.csm_id ? (csmMap.get(c.csm_id) || null) : null,
       csmId: c.csm_id || null,
       managedServices: c.managed_services ?? null,
+      healthMetricsRAG: healthSummary?.compositeRAG ?? 'not-set',
+      healthMetricsScore: healthScore,
     };
   });
 }
