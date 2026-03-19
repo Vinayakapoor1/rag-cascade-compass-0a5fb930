@@ -151,6 +151,8 @@ export function SalesKPIScoringGrid({ departmentId, period }: SalesKPIScoringGri
     ([id, val]) => originalSelections[id] !== val
   ) || Object.keys(selections).length !== Object.keys(originalSelections).length;
 
+  useUnsavedChangesGuard(hasChanges);
+
   const handleSaveAll = async () => {
     if (!hasChanges || !user) return;
 
