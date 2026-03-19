@@ -2287,7 +2287,7 @@ function CustomerSectionCard({
                   stIndicators={stIndicators}
                   scores={scores}
                   remarks={remarks}
-                  onRemarkChange={(key, text) => setRemarks(prev => ({ ...prev, [key]: text }))}
+                  onRemarkChange={onRemarkChange}
                 />
 
                 {/* Per-customer Save button */}
