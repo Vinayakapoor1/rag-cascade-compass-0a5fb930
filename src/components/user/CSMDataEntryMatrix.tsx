@@ -2460,10 +2460,11 @@ function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellCh
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
-                  <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
-                  <th className="px-3 py-2 text-center font-semibold min-w-[100px]">RAG</th>
-                </tr>
+                   <th className="px-3 py-2 text-left font-semibold min-w-[200px] border-r">KPI</th>
+                   <th className="px-3 py-2 text-center font-semibold min-w-[180px] border-r">Score</th>
+                   <th className="px-3 py-2 text-center font-semibold min-w-[100px] border-r">RAG</th>
+                   <th className="px-3 py-2 text-left font-semibold min-w-[180px]">Remarks</th>
+                 </tr>
               </thead>
               <tbody>
                 {cmIndicators.map(ind => {
