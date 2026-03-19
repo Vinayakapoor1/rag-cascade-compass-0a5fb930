@@ -22,6 +22,7 @@ import { IndustryManager } from '@/components/admin/IndustryManager';
 import { TeamAccessTab } from '@/components/admin/TeamAccessTab';
 import { FormulasTab } from '@/components/admin/FormulasTab';
 import { SnapshotsTab } from '@/components/admin/SnapshotsTab';
+import { FeedbackTab } from '@/components/admin/FeedbackTab';
 import { AdminDashboardCard } from '@/components/admin/AdminDashboardCard';
 import { AdminDataControls } from '@/components/admin/AdminDataControls';
 import { RAGLegend } from '@/components/RAGLegend';
