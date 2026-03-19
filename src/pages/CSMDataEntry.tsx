@@ -172,7 +172,7 @@ export default function CSMDataEntry() {
         options.push(format(d, 'yyyy-MM'));
       }
     } else {
-      for (let i = -12; i <= 1; i++) {
+      for (let i = -12; i <= 0; i++) {
         const d = new Date(now.getTime() + i * 7 * 24 * 60 * 60 * 1000);
         options.push(getISOWeekString(d));
       }
