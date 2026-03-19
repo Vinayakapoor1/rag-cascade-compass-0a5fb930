@@ -2852,12 +2852,39 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
   const bugRAG = (count: number): string => { if (count < 5) return 'green'; if (count <= 10) return 'amber'; return 'red'; };
   const weightColor = (w: string): string => { const n = Number(w); if (n >= 1) return 'green'; if (n >= 0.5) return 'amber'; return 'red'; };
 
+  // Compute overall scored count for badge
+  const scoredCount = [bugCount, bugSla, promises, nfrSla].filter(v => v !== '').length;
+  const totalFields = 4;
+
+  // Determine overall ops RAG color for border
+  const opsOverallColor = (() => {
+    const vals: string[] = [];
+    if (bugCount) vals.push(bugRAG(Number(bugCount)));
+    if (bugSla) vals.push(weightColor(bugSla));
+    if (promises) vals.push(weightColor(promises));
+    if (nfrSla) vals.push(weightColor(nfrSla));
+    if (vals.length === 0) return 'muted';
+    if (vals.some(v => v === 'red')) return 'red';
+    if (vals.some(v => v === 'amber')) return 'amber';
+    return 'green';
+  })();
+
+  const borderColorClass = opsOverallColor === 'green' ? 'border-l-rag-green' : opsOverallColor === 'amber' ? 'border-l-rag-amber' : opsOverallColor === 'red' ? 'border-l-rag-red' : 'border-l-primary';
+  const bgColorClass = opsOverallColor === 'green' ? 'bg-rag-green/5 hover:bg-rag-green/10' : opsOverallColor === 'amber' ? 'bg-rag-amber/5 hover:bg-rag-amber/10' : opsOverallColor === 'red' ? 'bg-rag-red/5 hover:bg-rag-red/10' : 'bg-primary/5 hover:bg-primary/10';
+
   return (
-    <Collapsible open={opsOpen} onOpenChange={setOpsOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors py-2 w-full">
-        {opsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        <Activity className="h-3 w-3" />
-        Operational Health
+    <Collapsible open={opsOpen} onOpenChange={setOpsOpen} className="mt-4">
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" className={cn("w-full justify-between gap-2 text-sm font-semibold border-l-4", borderColorClass, bgColorClass)}>
+          <span className="flex items-center gap-2">
+            {opsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <Activity className="h-4 w-4" />
+            Operational Health
+          </span>
+          <Badge variant="secondary" className="text-xs">
+            {scoredCount}/{totalFields} scored
+          </Badge>
+        </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-lg border border-border/30">
