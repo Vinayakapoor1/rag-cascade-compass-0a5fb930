@@ -10,7 +10,7 @@ export interface HealthMetricRow {
   bug_sla_compliance: number | null;
   promises_made: number | null;
   promises_delivered: number | null;
-  nfr_compliance: number | null;
+  new_feature_requests: number | null;
   notes: string | null;
   created_by: string | null;
   created_at: string;
