@@ -50,6 +50,7 @@ interface CSMDataEntryMatrixProps {
 interface IndicatorInfo {
   id: string;
   name: string;
+  description?: string | null;
   current_value: number | null;
   target_value: number | null;
   kr_name: string;
