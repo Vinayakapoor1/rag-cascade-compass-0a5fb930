@@ -399,6 +399,15 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
   const customers = customersResult.data;
   const csmMap = new Map((csmsResult.data || []).map(c => [c.id, c.name]));
 
+  // Build per-customer latest health metrics map
+  const healthMetricsMap = new Map<string, HealthMetricRow>();
+  ((healthResult.data || []) as HealthMetricRow[]).forEach(row => {
+    // Already ordered desc by period, so first occurrence per customer is latest
+    if (!healthMetricsMap.has(row.customer_id)) {
+      healthMetricsMap.set(row.customer_id, row);
+    }
+  });
+
   // Build feature -> indicator mapping
   const featureToIndicators = new Map<string, Set<string>>();
   (iflResult.data || []).forEach(link => {
