@@ -216,6 +216,22 @@ export default function CustomerDetailPage() {
         </Card>
       )}
 
+      {/* Operational Health Metrics */}
+      <div className="flex items-center justify-between">
+        <div />
+        <Button variant="outline" size="sm" onClick={() => setHealthMetricsOpen(true)} className="gap-1">
+          <Plus className="h-4 w-4" />
+          Add Health Data
+        </Button>
+      </div>
+      <CustomerHealthMetricsCard customerId={customerId!} />
+
+      <CustomerHealthMetricsForm
+        customerId={customerId!}
+        open={healthMetricsOpen}
+        onOpenChange={setHealthMetricsOpen}
+      />
+
       {/* Features Section */}
       {features.length > 0 && (
         <Card>
