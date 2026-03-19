@@ -571,6 +571,43 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset 2FA Confirmation */}
+      <AlertDialog open={reset2FADialogOpen} onOpenChange={setReset2FADialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Two-Factor Authentication</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will disable 2FA for <strong>{userToReset2FA?.email}</strong>. They will need to set it up again from their account menu. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting2FA}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!userToReset2FA) return;
+                setResetting2FA(true);
+                try {
+                  await supabase.from('user_2fa').delete().eq('user_id', userToReset2FA.id);
+                  toast.success(`2FA reset for ${userToReset2FA.email}`);
+                  setReset2FADialogOpen(false);
+                  setUserToReset2FA(null);
+                  fetchData();
+                } catch {
+                  toast.error('Failed to reset 2FA');
+                } finally {
+                  setResetting2FA(false);
+                }
+              }}
+              disabled={resetting2FA}
+              className="bg-rag-amber text-white hover:bg-rag-amber/90"
+            >
+              {resetting2FA ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Reset 2FA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
