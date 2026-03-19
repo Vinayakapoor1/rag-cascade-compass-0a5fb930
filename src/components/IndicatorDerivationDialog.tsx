@@ -698,7 +698,6 @@ export function IndicatorDerivationDialog({
                         <TableCell className="text-center font-bold text-sm">
                           {(() => {
                             const avgPct = Math.round(customer.average * 100);
-                            const avgBandLabel = getBandLabel(customer.average, ragBands);
                             return (
                               <span className={
                                 avgPct >= 76 ? 'text-rag-green' :
@@ -706,7 +705,7 @@ export function IndicatorDerivationDialog({
                                 avgPct > 0 ? 'text-rag-red' :
                                 'text-muted-foreground'
                               }>
-                                {avgBandLabel ? `${avgBandLabel} (${avgPct}%)` : `${avgPct}%`}
+                                {avgPct}%
                               </span>
                             );
                           })()}
