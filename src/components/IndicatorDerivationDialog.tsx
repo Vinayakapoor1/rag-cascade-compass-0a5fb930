@@ -607,13 +607,7 @@ export function IndicatorDerivationDialog({
                       <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} />
                       <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value: number) => {
-                          if (ragBands.length > 0) {
-                            const bandLabel = getBandLabel(value / 100, ragBands);
-                            return [bandLabel ? `${bandLabel} (${value}%)` : `${value}%`, 'Avg Score'];
-                          }
-                          return [`${value}%`, 'Avg Score'];
-                        }}
+                        formatter={(value: number) => [`${value}%`, 'Avg Score']}
                         labelFormatter={(label: string, payload: any[]) => payload?.[0]?.payload?.fullName || label}
                       />
                       {targetValue !== null && (
@@ -704,7 +698,6 @@ export function IndicatorDerivationDialog({
                         <TableCell className="text-center font-bold text-sm">
                           {(() => {
                             const avgPct = Math.round(customer.average * 100);
-                            const avgBandLabel = getBandLabel(customer.average, ragBands);
                             return (
                               <span className={
                                 avgPct >= 76 ? 'text-rag-green' :
@@ -712,7 +705,7 @@ export function IndicatorDerivationDialog({
                                 avgPct > 0 ? 'text-rag-red' :
                                 'text-muted-foreground'
                               }>
-                                {avgBandLabel ? `${avgBandLabel} (${avgPct}%)` : `${avgPct}%`}
+                                {avgPct}%
                               </span>
                             );
                           })()}
