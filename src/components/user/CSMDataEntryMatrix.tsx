@@ -2840,9 +2840,9 @@ function RemarksSection({
   const [remarksOpen, setRemarksOpen] = useState(false);
   const placeholderFeatId = CM_DIRECT_FEATURE_ID;
 
-  // Collect all scored cells for this customer that are red or have existing remarks
+  // Collect ALL scored cells for this customer (every cell gets a remark field)
   const remarkableCells = useMemo(() => {
-    const cells: { key: string; indicatorName: string; featureName: string; value: number; ragColor: string }[] = [];
+    const cells: { key: string; indicatorName: string; featureName: string; value: number | null; ragColor: string }[] = [];
     const featureNameMap = new Map(features.map(f => [f.id, f.name]));
 
     // Main indicators
@@ -2852,12 +2852,8 @@ function RemarksSection({
       for (const fid of feats) {
         const key = cellKey(ind.id, customerId, fid);
         const val = scores[key];
-        if (val != null) {
-          const ragColor = weightToRAGColor(val);
-          if (ragColor === 'red' || remarks[key]) {
-            cells.push({ key, indicatorName: ind.name, featureName: featureNameMap.get(fid) || 'Score', value: val, ragColor });
-          }
-        }
+        const ragColor = val != null ? weightToRAGColor(val) : 'gray';
+        cells.push({ key, indicatorName: ind.name, featureName: featureNameMap.get(fid) || 'Score', value: val ?? null, ragColor });
       }
     }
 
@@ -2865,24 +2861,16 @@ function RemarksSection({
     for (const ind of cmIndicators) {
       const key = cellKey(ind.id, customerId, placeholderFeatId);
       const val = scores[key];
-      if (val != null) {
-        const ragColor = weightToRAGColor(val);
-        if (ragColor === 'red' || remarks[key]) {
-          cells.push({ key, indicatorName: ind.name, featureName: 'Content Mgmt', value: val, ragColor });
-        }
-      }
+      const ragColor = val != null ? weightToRAGColor(val) : 'gray';
+      cells.push({ key, indicatorName: ind.name, featureName: 'Content Mgmt', value: val ?? null, ragColor });
     }
 
     // ST indicators
     for (const ind of stIndicators) {
       const key = cellKey(ind.id, customerId, placeholderFeatId);
       const val = scores[key];
-      if (val != null) {
-        const ragColor = weightToRAGColor(val);
-        if (ragColor === 'red' || remarks[key]) {
-          cells.push({ key, indicatorName: ind.name, featureName: 'Deployment', value: val, ragColor });
-        }
-      }
+      const ragColor = val != null ? weightToRAGColor(val) : 'gray';
+      cells.push({ key, indicatorName: ind.name, featureName: 'Deployment', value: val ?? null, ragColor });
     }
 
     return cells;
