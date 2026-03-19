@@ -45,11 +45,11 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
       setBugSla(existing.bug_sla_compliance != null ? String(existing.bug_sla_compliance) : '');
       setPromisesMade(existing.promises_made != null ? String(existing.promises_made) : '');
       setPromisesDelivered(existing.promises_delivered != null ? String(existing.promises_delivered) : '');
-      setNfrCompliance(existing.nfr_compliance != null ? String(existing.nfr_compliance) : '');
+      setNewFeatureRequests(existing.new_feature_requests != null ? String(existing.new_feature_requests) : '');
       setNotes(existing.notes || '');
     } else {
       setBugCount(''); setBugSla(''); setPromisesMade('');
-      setPromisesDelivered(''); setNfrCompliance(''); setNotes('');
+      setPromisesDelivered(''); setNewFeatureRequests(''); setNotes('');
     }
   };
 
