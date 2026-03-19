@@ -26,6 +26,7 @@ export function CustomersOverviewTab() {
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [industryFilter, setIndustryFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchCustomers();
