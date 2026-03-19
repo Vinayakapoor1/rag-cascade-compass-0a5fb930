@@ -127,7 +127,7 @@ export function useUpsertHealthMetric() {
       bug_sla_compliance?: number | null;
       promises_made?: number | null;
       promises_delivered?: number | null;
-      nfr_compliance?: number | null;
+      new_feature_requests?: number | null;
       notes?: string | null;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();

@@ -2836,7 +2836,7 @@ function RemarksSection({
   customerId, indicators, features, indicatorFeatureMap,
   cmIndicators, stIndicators, scores, remarks, onRemarkChange,
 }: RemarksSectionProps) {
-  const [remarksOpen, setRemarksOpen] = useState(false);
+  const [remarksOpen, setRemarksOpen] = useState(true);
   const placeholderFeatId = CM_DIRECT_FEATURE_ID;
 
   // Collect ALL scored cells for this customer (every cell gets a remark field)

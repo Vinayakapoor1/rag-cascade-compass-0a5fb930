@@ -123,8 +123,8 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
           </div>
 
           <div>
-            <Label>NFR Compliance (%)</Label>
-            <Input type="number" min={0} max={100} value={nfrCompliance} onChange={e => setNfrCompliance(e.target.value)} placeholder="e.g. 90" />
+            <Label>New Feature Requests</Label>
+            <Input type="number" min={0} value={newFeatureRequests} onChange={e => setNewFeatureRequests(e.target.value)} placeholder="e.g. 3" />
           </div>
 
           <div>
