@@ -132,6 +132,7 @@ export function SalesKPIScoringGrid({ departmentId, period }: SalesKPIScoringGri
           }
         }
         setSelections(preSelections);
+        setOriginalSelections({ ...preSelections });
       }
     } catch (error) {
       console.error('Error loading Sales KPI data:', error);
