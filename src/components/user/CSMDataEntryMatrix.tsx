@@ -82,6 +82,18 @@ const DEFAULT_BANDS: KPIBand[] = [
   { band_label: 'Red', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
 ];
 
+const BUG_COUNT_BANDS: KPIBand[] = [
+  { band_label: '< 5', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+  { band_label: '5 – 10', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+  { band_label: '> 10', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+];
+
+const PCT_BANDS: KPIBand[] = [
+  { band_label: '76 – 100%', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+  { band_label: '51 – 75%', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+  { band_label: '0 – 50%', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+];
+
 const RAG_DOT_CLASS: Record<string, string> = {
   green: 'bg-rag-green',
   amber: 'bg-rag-amber',
@@ -2849,7 +2861,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
     onDataChange(dataRef.current);
   };
 
-  const bugRAG = (count: number): string => { if (count < 5) return 'green'; if (count <= 10) return 'amber'; return 'red'; };
+  const bugRAG = (w: string): string => { const n = Number(w); if (n >= 1) return 'green'; if (n >= 0.5) return 'amber'; if (w) return 'red'; return ''; };
   const weightColor = (w: string): string => { const n = Number(w); if (n >= 1) return 'green'; if (n >= 0.5) return 'amber'; return 'red'; };
 
   // Compute overall scored count for badge
@@ -2859,7 +2871,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
   // Determine overall ops RAG color for border
   const opsOverallColor = (() => {
     const vals: string[] = [];
-    if (bugCount) vals.push(bugRAG(Number(bugCount)));
+    if (bugCount) vals.push(bugRAG(bugCount));
     if (bugSla) vals.push(weightColor(bugSla));
     if (promises) vals.push(weightColor(promises));
     if (nfrSla) vals.push(weightColor(nfrSla));
@@ -2891,26 +2903,15 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
           <div className="space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               Bug Count
-              {bugCount && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[bugRAG(Number(bugCount))])} />}
+              {bugCount && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[bugRAG(bugCount)])} />}
             </label>
-            <Input
-              type="number" min={0} placeholder="0" value={bugCount}
-              onChange={(e) => update('bugCount', e.target.value)} className="h-8 text-sm"
-            />
-            <p className="text-[9px] text-muted-foreground">&lt;5 Green · 5-10 Amber · &gt;10 Red</p>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              Bug SLA
-              {bugSla && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[weightColor(bugSla)])} />}
-            </label>
-            <Select value={bugSla || 'unset'} onValueChange={(v) => update('bugSla', v === 'unset' ? '' : v)}>
+            <Select value={bugCount || 'unset'} onValueChange={(v) => update('bugCount', v === 'unset' ? '' : v)}>
               <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="—" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                {DEFAULT_BANDS.map(b => (
+                {BUG_COUNT_BANDS.map(b => (
                   <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
                     <span className="flex items-center gap-1.5">
                       <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
@@ -2923,7 +2924,29 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              Promises
+              Bug SLA
+              {bugSla && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[weightColor(bugSla)])} />}
+            </label>
+            <Select value={bugSla || 'unset'} onValueChange={(v) => update('bugSla', v === 'unset' ? '' : v)}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
+                {PCT_BANDS.map(b => (
+                  <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
+                    <span className="flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
+                      {b.band_label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              Promises Made vs Kept
               {promises && <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[weightColor(promises)])} />}
             </label>
             <Select value={promises || 'unset'} onValueChange={(v) => update('promises', v === 'unset' ? '' : v)}>
@@ -2932,7 +2955,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                {DEFAULT_BANDS.map(b => (
+                {PCT_BANDS.map(b => (
                   <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
                     <span className="flex items-center gap-1.5">
                       <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
@@ -2954,7 +2977,7 @@ function OpsHealthSubSection({ customerId, customerName, period, onDataChange }:
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unset"><span className="text-muted-foreground">—</span></SelectItem>
-                {DEFAULT_BANDS.map(b => (
+                {PCT_BANDS.map(b => (
                   <SelectItem key={b.rag_color} value={String(b.rag_numeric)}>
                     <span className="flex items-center gap-1.5">
                       <span className={cn('h-2 w-2 rounded-full', RAG_DOT_CLASS[b.rag_color])} />
