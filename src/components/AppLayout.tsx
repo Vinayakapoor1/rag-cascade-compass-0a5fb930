@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsPopover } from '@/components/NotificationsPopover';
 import { BellNotifications } from '@/components/BellNotifications';
+import { FeedbackWidget } from '@/components/FeedbackWidget';
 import { toast } from 'sonner';
 
 interface AppLayoutProps {
@@ -216,6 +217,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="container py-8 relative">
         {children}
       </main>
+
+      <FeedbackWidget />
 
       {/* Footer */}
       <footer className="glass border-t border-border/30 py-10 mt-auto">
