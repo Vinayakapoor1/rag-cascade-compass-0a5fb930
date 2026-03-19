@@ -81,10 +81,10 @@ export function buildHealthSummary(row: HealthMetricRow): CustomerHealthSummary 
     dimensions.push({ label: 'Promises', value: `${row.promises_delivered}/${row.promises_made} (${pct}%)`, rag: pctRAG(pct), score: s });
   }
 
-  if (row.nfr_compliance != null) {
-    const s = pctScore(row.nfr_compliance);
+  if (row.new_feature_requests != null) {
+    const s = bugCountScore(row.new_feature_requests);
     scores.push(s);
-    dimensions.push({ label: 'NFR Compliance', value: `${row.nfr_compliance}%`, rag: pctRAG(row.nfr_compliance), score: s });
+    dimensions.push({ label: 'Feature Requests', value: `${row.new_feature_requests}`, rag: bugCountRAG(row.new_feature_requests), score: s });
   }
 
   const compositeScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
