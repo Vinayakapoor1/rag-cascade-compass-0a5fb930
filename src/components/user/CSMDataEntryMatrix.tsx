@@ -2688,12 +2688,12 @@ interface OpsHealthSubSectionProps {
 }
 
 function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubSectionProps) {
-  const [opsOpen, setOpsOpen] = useState(false);
+  const [opsOpen, setOpsOpen] = useState(true);
   const [bugCount, setBugCount] = useState<string>('');
   const [bugSla, setBugSla] = useState<string>('');
   const [promisesMade, setPromisesMade] = useState<string>('');
   const [promisesDelivered, setPromisesDelivered] = useState<string>('');
-  const [nfrCompliance, setNfrCompliance] = useState<string>('');
+  const [newFeatureRequests, setNewFeatureRequests] = useState<string>('');
   const [loaded, setLoaded] = useState(false);
   const upsertMutation = useUpsertHealthMetric();
 
@@ -2712,7 +2712,7 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
         setBugSla(data.bug_sla_compliance != null ? String(data.bug_sla_compliance) : '');
         setPromisesMade(data.promises_made != null ? String(data.promises_made) : '');
         setPromisesDelivered(data.promises_delivered != null ? String(data.promises_delivered) : '');
-        setNfrCompliance(data.nfr_compliance != null ? String(data.nfr_compliance) : '');
+        setNewFeatureRequests(data.new_feature_requests != null ? String(data.new_feature_requests) : '');
       }
       setLoaded(true);
     })();
