@@ -339,7 +339,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           });
         }
 
-        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: lastKnownScoresDirect, previousPeriodLabel: null as string | null, lastCheckInByCustomer: lastCheckInDirect };
+        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, remarks: directRemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: lastKnownScoresDirect, previousPeriodLabel: null as string | null, lastCheckInByCustomer: lastCheckInDirect };
       }
 
       if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
