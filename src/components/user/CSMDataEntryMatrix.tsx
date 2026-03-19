@@ -2002,7 +2002,7 @@ function CustomerSectionCard({
                     <tfoot>
                       <tr className="border-t-2 border-border/30 bg-muted/30 font-semibold">
                         <td className="px-3 py-2 text-sm border-r border-border/20">Score Total</td>
-                        <td className="px-3 py-2 text-center text-xs border-r border-border/20" colSpan={2}>
+                        <td className="px-3 py-2 text-center text-xs border-r border-border/20" colSpan={3}>
                           {(() => {
                             const { greens, ambers, reds, total } = getScoreSummary();
                             if (total === 0) return <span className="text-muted-foreground">No scores entered</span>;
