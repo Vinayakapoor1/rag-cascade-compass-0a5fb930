@@ -12,6 +12,7 @@ export interface ScoreRecord {
   period: string;
   value?: number | null;
   updated_at?: string;
+  remark?: string | null;
 }
 
 interface FeatureLink {

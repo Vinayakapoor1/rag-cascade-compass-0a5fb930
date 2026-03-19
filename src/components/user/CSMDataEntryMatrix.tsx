@@ -2818,3 +2818,128 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
     </Collapsible>
   );
 }
+
+// ============= Remarks Section =============
+
+interface RemarksSectionProps {
+  customerId: string;
+  indicators: IndicatorInfo[];
+  features: { id: string; name: string }[];
+  indicatorFeatureMap: Record<string, Set<string>>;
+  cmIndicators: IndicatorInfo[];
+  stIndicators: IndicatorInfo[];
+  scores: ScoreMap;
+  remarks: RemarkMap;
+  onRemarkChange: (key: string, text: string) => void;
+}
+
+function RemarksSection({
+  customerId, indicators, features, indicatorFeatureMap,
+  cmIndicators, stIndicators, scores, remarks, onRemarkChange,
+}: RemarksSectionProps) {
+  const [remarksOpen, setRemarksOpen] = useState(false);
+  const placeholderFeatId = CM_DIRECT_FEATURE_ID;
+
+  // Collect all scored cells for this customer that are red or have existing remarks
+  const remarkableCells = useMemo(() => {
+    const cells: { key: string; indicatorName: string; featureName: string; value: number; ragColor: string }[] = [];
+    const featureNameMap = new Map(features.map(f => [f.id, f.name]));
+
+    // Main indicators
+    for (const ind of indicators) {
+      const feats = indicatorFeatureMap[ind.id];
+      if (!feats) continue;
+      for (const fid of feats) {
+        const key = cellKey(ind.id, customerId, fid);
+        const val = scores[key];
+        if (val != null) {
+          const ragColor = weightToRAGColor(val);
+          if (ragColor === 'red' || remarks[key]) {
+            cells.push({ key, indicatorName: ind.name, featureName: featureNameMap.get(fid) || 'Score', value: val, ragColor });
+          }
+        }
+      }
+    }
+
+    // CM indicators
+    for (const ind of cmIndicators) {
+      const key = cellKey(ind.id, customerId, placeholderFeatId);
+      const val = scores[key];
+      if (val != null) {
+        const ragColor = weightToRAGColor(val);
+        if (ragColor === 'red' || remarks[key]) {
+          cells.push({ key, indicatorName: ind.name, featureName: 'Content Mgmt', value: val, ragColor });
+        }
+      }
+    }
+
+    // ST indicators
+    for (const ind of stIndicators) {
+      const key = cellKey(ind.id, customerId, placeholderFeatId);
+      const val = scores[key];
+      if (val != null) {
+        const ragColor = weightToRAGColor(val);
+        if (ragColor === 'red' || remarks[key]) {
+          cells.push({ key, indicatorName: ind.name, featureName: 'Deployment', value: val, ragColor });
+        }
+      }
+    }
+
+    return cells;
+  }, [customerId, indicators, features, indicatorFeatureMap, cmIndicators, stIndicators, scores, remarks]);
+
+  const redCount = remarkableCells.filter(c => c.ragColor === 'red').length;
+  const withRemarkCount = remarkableCells.filter(c => remarks[c.key]?.trim()).length;
+
+  if (remarkableCells.length === 0) return null;
+
+  return (
+    <Collapsible open={remarksOpen} onOpenChange={setRemarksOpen} className="mt-4">
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" className="w-full justify-between gap-2 text-sm font-semibold border-l-4 border-l-destructive bg-destructive/5 hover:bg-destructive/10">
+          <span className="flex items-center gap-2">
+            {remarksOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            Remarks & Justifications
+          </span>
+          <div className="flex items-center gap-2">
+            {redCount > 0 && (
+              <Badge variant="destructive" className="text-[10px]">
+                {redCount} red
+              </Badge>
+            )}
+            <Badge variant="secondary" className="text-[10px]">
+              {withRemarkCount}/{remarkableCells.length} remarked
+            </Badge>
+          </div>
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3">
+        <div className="space-y-3">
+          {remarkableCells.map(cell => (
+            <div key={cell.key} className="flex gap-3 items-start rounded-md border border-border/50 bg-muted/20 p-3">
+              <div className="shrink-0 mt-1">
+                <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[cell.ragColor] || 'bg-muted')} />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div>
+                  <p className="text-xs font-semibold">{cell.indicatorName}</p>
+                  <p className="text-[10px] text-muted-foreground">{cell.featureName}</p>
+                </div>
+                <Textarea
+                  placeholder={cell.ragColor === 'red' ? 'Required: Why is this red? Explain the reason...' : 'Optional remark...'}
+                  value={remarks[cell.key] || ''}
+                  onChange={(e) => onRemarkChange(cell.key, e.target.value)}
+                  className={cn(
+                    'min-h-[60px] text-xs',
+                    cell.ragColor === 'red' && !remarks[cell.key]?.trim() && 'border-destructive/50 bg-destructive/5'
+                  )}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
