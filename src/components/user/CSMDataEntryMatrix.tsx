@@ -440,7 +440,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
             const { data: cmInds } = await supabase
               .from('indicators')
-              .select('id, name, current_value, target_value, key_result_id')
+              .select('id, name, description, current_value, target_value, key_result_id')
               .in('key_result_id', cmKrs.map(k => k.id));
 
             if (cmInds?.length) {
