@@ -1,42 +1,71 @@
 
 
-# Add "Unassigned" Filter Options Across Customer Views
+# Unified Save, NFR SLA % Field, and Inline Remarks
 
-## Problem
+## Three Problems to Fix
 
-Several filter dropdowns across the app exclude null/empty values, making it impossible to find customers missing key data:
-
-1. **CSM Filter** (Customers page): No "Unassigned" option — customers without a CSM are invisible in the filter. This is the "7 unassigned customers" issue.
-2. **Region Filter** (Customers page): Null regions are excluded by `.filter(Boolean)` — no way to find customers missing a region.
-3. **Industry Filter** (Customers page): Same issue — null industries filtered out.
-4. **Admin CustomersOverviewTab**: No CSM filter at all, no way to see unassigned customers. Region filter also excludes nulls.
-
-## Plan
-
-### File 1: `src/pages/CustomersPage.tsx`
-
-- **CSM filter options** (line ~179): Include "Unassigned" in the `csmNames` list when any customer has a null/empty `csmName`
-- **CSM filter logic** (line ~164): When `csmFilter === 'Unassigned'`, match customers where `csmName` is null/undefined/empty
-- **Region filter options** (line ~178): Include "Unassigned" when any customer has null region
-- **Region filter logic** (line ~162 area): When `regionFilter === 'Unassigned'`, match null regions
-- **Industry filter options** (line ~178): Include "Unassigned" when any customer has null industry
-- **Industry filter logic**: When `industryFilter === 'Unassigned'`, match null industries
-
-### File 2: `src/components/admin/CustomersOverviewTab.tsx`
-
-- Add a **CSM filter** dropdown (fetching CSM names via joined query or from the `csms` table)
-- Add "Unassigned" option to CSM, Region filters
-- Update `filterCustomers` logic to handle "Unassigned" matching for all filters
+1. **Two save buttons** — "Save Ops Health" and "Save {customer}" are separate. Merging into one.
+2. **New Feature Requests should be a percentage** (NFR SLA Compliance %), scored with the platform-standard threshold (≥76% Green, ≥51% Amber, <51% Red).
+3. **Remarks missing** — the Remarks section exists at the bottom but users can't find it. Moving remark textareas inline directly under each score cell in the matrix.
 
 ---
 
-## Technical Details
+## Database Migration
 
-No database changes needed. All changes are client-side filter logic.
+Change `new_feature_requests` from integer to numeric to store a percentage:
 
-The pattern is consistent: replace `.filter(Boolean)` with logic that keeps null values as "Unassigned", and add matching logic in the filter functions for `=== 'Unassigned'` → check for falsy source value.
+```sql
+ALTER TABLE customer_health_metrics 
+  ALTER COLUMN new_feature_requests TYPE numeric USING new_feature_requests::numeric;
+```
+
+---
+
+## File Changes
+
+### 1. `src/hooks/useCustomerHealthMetrics.ts`
+- Change `new_feature_requests` type from `number | null` to `number | null` (numeric/percentage)
+- Replace `bugCountRAG`/`bugCountScore` for Feature Requests with `pctRAG`/`pctScore` (platform standard)
+- Update dimension label from "Feature Requests" to "NFR SLA"
+- Update dimension value display to show `%`
+
+### 2. `src/components/user/CSMDataEntryMatrix.tsx`
+
+**Unified Save (merge ops health into per-customer save):**
+- Lift ops health state (`bugCount`, `bugSla`, `promisesMade`, `promisesDelivered`, `newFeatureRequests`) from `OpsHealthSubSection` up into `CustomerSectionCard`
+- Pass state + setters as props to `OpsHealthSubSection`
+- Remove `handleSaveOps` and the "Save Ops Health" button from `OpsHealthSubSection`
+- In `doSaveCustomer`, after saving scores, also call `upsertMutation.mutateAsync()` with the ops health data
+- The `useUpsertHealthMetric` hook is already imported at line 18
+
+**NFR field change:**
+- Rename "New Feature Requests" label to "NFR SLA Compliance %"
+- Change input to `type="number" min={0} max={100}` with placeholder "0-100"
+
+**Inline remarks:**
+- In the matrix table cells (both standard Feature×KPI matrix and CM/ST/direct modes), add a small `Textarea` directly below each `BandDropdown` — visible only when the cell has a score
+- Auto-expand textarea for red scores; collapsed single-line for others
+- Remove the separate `RemarksSection` component and its usage
+
+### 3. `src/components/CustomerHealthMetricsCard.tsx`
+- Update "Feature Requests" icon mapping to "NFR SLA"
+
+### 4. `src/components/CustomerHealthMetricsForm.tsx`
+- Change `new_feature_requests` field from integer to percentage (max 100, label "NFR SLA Compliance %")
+
+---
+
+## Technical Notes
+
+- The `remark` field is already stored in `csm_customer_feature_scores` table and already included in `doSaveCustomer` upserts (line 847: `remark: remarks[key] || null`)
+- Remarks state management (`remarks`, `setRemarks`, `originalRemarks`) already exists at the parent level (lines 135-136)
+- `onRemarkChange` callback is already wired through to `CustomerSectionCard` (line 1611)
+- No new database columns needed for remarks — just a UI relocation
 
 ### Files Modified
-1. `src/pages/CustomersPage.tsx` — add Unassigned option to CSM, Region, Industry filters
-2. `src/components/admin/CustomersOverviewTab.tsx` — add CSM filter, add Unassigned options
+1. Migration SQL (type change for `new_feature_requests`)
+2. `src/hooks/useCustomerHealthMetrics.ts`
+3. `src/components/user/CSMDataEntryMatrix.tsx` (bulk of changes)
+4. `src/components/CustomerHealthMetricsCard.tsx`
+5. `src/components/CustomerHealthMetricsForm.tsx`
 
