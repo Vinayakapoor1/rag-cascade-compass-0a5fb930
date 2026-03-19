@@ -497,6 +497,36 @@ export type Database = {
           },
         ]
       }
+      daily_backups: {
+        Row: {
+          backup_type: string
+          created_at: string
+          data: Json
+          id: string
+          row_counts: Json | null
+          size_bytes: number | null
+          tables_included: string[]
+        }
+        Insert: {
+          backup_type?: string
+          created_at?: string
+          data: Json
+          id?: string
+          row_counts?: Json | null
+          size_bytes?: number | null
+          tables_included: string[]
+        }
+        Update: {
+          backup_type?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          row_counts?: Json | null
+          size_bytes?: number | null
+          tables_included?: string[]
+        }
+        Relationships: []
+      }
       department_access: {
         Row: {
           created_at: string | null
