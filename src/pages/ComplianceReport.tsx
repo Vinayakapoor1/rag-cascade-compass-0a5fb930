@@ -77,7 +77,7 @@ export default function ComplianceReport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('csm_customer_feature_scores')
-        .select('customer_id, feature_id, indicator_id, period, created_at, value, updated_at')
+        .select('customer_id, feature_id, indicator_id, period, created_at, value, updated_at, remark')
         .eq('period', currentPeriod)
         .limit(50000);
       if (error) throw error;
