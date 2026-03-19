@@ -34,7 +34,7 @@ export function CustomersOverviewTab() {
 
   useEffect(() => {
     filterCustomers();
-  }, [customers, search, tierFilter, regionFilter]);
+  }, [customers, search, tierFilter, regionFilter, industryFilter]);
 
   const fetchCustomers = async () => {
     setLoading(true);

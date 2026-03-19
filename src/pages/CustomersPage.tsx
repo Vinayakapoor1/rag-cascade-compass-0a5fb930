@@ -193,9 +193,9 @@ export default function CustomersPage() {
       const matchesTier = tierFilter === 'all' || c.tier === tierFilter;
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
       const matchesDeployment = deploymentFilter === 'all' || (deploymentFilter === 'Unassigned' ? !c.deploymentType : c.deploymentType === deploymentFilter);
-      const matchesRegion = regionFilter === 'all' || c.region === regionFilter;
-      const matchesIndustry = industryFilter === 'all' || c.industry === industryFilter;
-      const matchesCsm = csmFilter === 'all' || c.csmName === csmFilter;
+      const matchesRegion = regionFilter === 'all' || (regionFilter === 'Unassigned' ? !c.region : c.region === regionFilter);
+      const matchesIndustry = industryFilter === 'all' || (industryFilter === 'Unassigned' ? !c.industry : c.industry === industryFilter);
+      const matchesCsm = csmFilter === 'all' || (csmFilter === 'Unassigned' ? !c.csmName : c.csmName === csmFilter);
       const matchesRag = ragFilter === 'all' || c.ragStatus === ragFilter;
       return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag;
     });
