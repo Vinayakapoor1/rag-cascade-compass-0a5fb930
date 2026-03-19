@@ -167,7 +167,7 @@ export default function CSMDataEntry() {
     const options: string[] = [];
     const now = new Date();
     if (periodMode === 'monthly') {
-      for (let i = -12; i <= 1; i++) {
+      for (let i = -12; i <= 0; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
         options.push(format(d, 'yyyy-MM'));
       }
