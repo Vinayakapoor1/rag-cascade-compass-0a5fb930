@@ -53,6 +53,9 @@ export function TeamAccessTab({ isAdmin }: TeamAccessTabProps) {
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [userToRemove, setUserToRemove] = useState<UserWithRole | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [reset2FADialogOpen, setReset2FADialogOpen] = useState(false);
+  const [userToReset2FA, setUserToReset2FA] = useState<UserWithRole | null>(null);
+  const [resetting2FA, setResetting2FA] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
