@@ -50,6 +50,7 @@ interface CSMDataEntryMatrixProps {
 interface IndicatorInfo {
   id: string;
   name: string;
+  description?: string | null;
   current_value: number | null;
   target_value: number | null;
   kr_name: string;
@@ -198,7 +199,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
       const { data: indicators } = await supabase
         .from('indicators')
-        .select('id, name, current_value, target_value, key_result_id')
+        .select('id, name, description, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
       if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
@@ -212,6 +213,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         return {
           id: ind.id,
           name: ind.name,
+          description: ind.description,
           current_value: ind.current_value != null ? Number(ind.current_value) : null,
           target_value: ind.target_value != null ? Number(ind.target_value) : null,
           kr_name: kr?.name || '',
@@ -438,7 +440,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
             const { data: cmInds } = await supabase
               .from('indicators')
-              .select('id, name, current_value, target_value, key_result_id')
+              .select('id, name, description, current_value, target_value, key_result_id')
               .in('key_result_id', cmKrs.map(k => k.id));
 
             if (cmInds?.length) {
@@ -448,6 +450,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 return {
                   id: ind.id,
                   name: ind.name,
+                  description: ind.description,
                   current_value: ind.current_value != null ? Number(ind.current_value) : null,
                   target_value: ind.target_value != null ? Number(ind.target_value) : null,
                   kr_name: kr?.name || '',
@@ -1883,6 +1886,7 @@ function CustomerSectionCard({
                                   <TooltipContent side="right" className="max-w-xs">
                                     <p className="font-semibold text-sm">{ind.name}</p>
                                     <p className="text-xs text-muted-foreground mt-0.5">{ind.fo_name} → {ind.kr_name}</p>
+                                    {ind.description && <p className="text-xs text-muted-foreground/80 mt-1 italic">{ind.description}</p>}
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -2006,7 +2010,7 @@ function CustomerSectionCard({
                           Feature
                         </th>
                         {section.indicators.map(ind => (
-                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={`${ind.fo_name} → ${ind.kr_name}`}>
+                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={ind.description ? `${ind.fo_name} → ${ind.kr_name}\n${ind.description}` : `${ind.fo_name} → ${ind.kr_name}`}>
                             <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
                           </th>
                         ))}
@@ -2344,6 +2348,7 @@ function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellCh
                             <TooltipContent side="right" className="max-w-xs">
                               <p className="font-semibold text-sm">{ind.name}</p>
                               <p className="text-xs text-muted-foreground mt-0.5">{ind.fo_name} → {ind.kr_name}</p>
+                              {ind.description && <p className="text-xs text-muted-foreground/80 mt-1 italic">{ind.description}</p>}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
