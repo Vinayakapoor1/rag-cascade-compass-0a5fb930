@@ -2348,6 +2348,7 @@ function CMSubSectionBlock({ customerId, cmIndicators, cmBands, scores, onCellCh
                             <TooltipContent side="right" className="max-w-xs">
                               <p className="font-semibold text-sm">{ind.name}</p>
                               <p className="text-xs text-muted-foreground mt-0.5">{ind.fo_name} → {ind.kr_name}</p>
+                              {ind.description && <p className="text-xs text-muted-foreground/80 mt-1 italic">{ind.description}</p>}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
