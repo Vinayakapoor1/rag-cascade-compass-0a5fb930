@@ -2010,7 +2010,7 @@ function CustomerSectionCard({
                           Feature
                         </th>
                         {section.indicators.map(ind => (
-                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={`${ind.fo_name} → ${ind.kr_name}`}>
+                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={ind.description ? `${ind.fo_name} → ${ind.kr_name}\n${ind.description}` : `${ind.fo_name} → ${ind.kr_name}`}>
                             <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
                           </th>
                         ))}
