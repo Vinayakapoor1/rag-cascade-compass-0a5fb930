@@ -199,7 +199,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         .from('key_results')
         .select('id, name, functional_objective_id')
         .in('functional_objective_id', fos.map(f => f.id));
-      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
+      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {}, remarks: {} as RemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: indicators } = await supabase
         .from('indicators')
