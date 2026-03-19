@@ -699,6 +699,7 @@ export default function DepartmentDataEntry() {
                                                 type="month"
                                                 value={period}
                                                 onChange={(e) => setPeriod(e.target.value)}
+                                                max={new Date().toISOString().slice(0, 7)}
                                                 className="w-48"
                                             />
                                         </div>
