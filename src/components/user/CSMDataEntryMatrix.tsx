@@ -205,7 +205,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         .from('indicators')
         .select('id, name, description, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
-      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
+      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, remarks: {} as RemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const indIds = indicators.map(i => i.id);
       const krMap = new Map(krs.map(k => [k.id, k]));
