@@ -14,7 +14,7 @@ const schema = z.object({
   bug_sla_compliance: z.number().min(0).max(100).nullable(),
   promises_made: z.number().int().min(0).max(9999).nullable(),
   promises_delivered: z.number().int().min(0).max(9999).nullable(),
-  nfr_compliance: z.number().min(0).max(100).nullable(),
+  new_feature_requests: z.number().int().min(0).max(9999).nullable(),
   notes: z.string().max(1000).nullable(),
 });
 
