@@ -8,7 +8,7 @@ const DIMENSION_ICONS: Record<string, React.ReactNode> = {
   'Bug Count': <Bug className="h-4 w-4" />,
   'Bug SLA': <Shield className="h-4 w-4" />,
   'Promises': <Handshake className="h-4 w-4" />,
-  'NFR Compliance': <FileCheck className="h-4 w-4" />,
+  'Feature Requests': <FileCheck className="h-4 w-4" />,
 };
 
 interface Props {

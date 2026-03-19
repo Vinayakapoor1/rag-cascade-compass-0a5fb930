@@ -14,7 +14,7 @@ const schema = z.object({
   bug_sla_compliance: z.number().min(0).max(100).nullable(),
   promises_made: z.number().int().min(0).max(9999).nullable(),
   promises_delivered: z.number().int().min(0).max(9999).nullable(),
-  nfr_compliance: z.number().min(0).max(100).nullable(),
+  new_feature_requests: z.number().int().min(0).max(9999).nullable(),
   notes: z.string().max(1000).nullable(),
 });
 
@@ -31,7 +31,7 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
   const [bugSla, setBugSla] = useState('');
   const [promisesMade, setPromisesMade] = useState('');
   const [promisesDelivered, setPromisesDelivered] = useState('');
-  const [nfrCompliance, setNfrCompliance] = useState('');
+  const [newFeatureRequests, setNewFeatureRequests] = useState('');
   const [notes, setNotes] = useState('');
 
   const { data: existingMetrics } = useCustomerHealthMetrics(customerId);
@@ -45,11 +45,11 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
       setBugSla(existing.bug_sla_compliance != null ? String(existing.bug_sla_compliance) : '');
       setPromisesMade(existing.promises_made != null ? String(existing.promises_made) : '');
       setPromisesDelivered(existing.promises_delivered != null ? String(existing.promises_delivered) : '');
-      setNfrCompliance(existing.nfr_compliance != null ? String(existing.nfr_compliance) : '');
+      setNewFeatureRequests(existing.new_feature_requests != null ? String(existing.new_feature_requests) : '');
       setNotes(existing.notes || '');
     } else {
       setBugCount(''); setBugSla(''); setPromisesMade('');
-      setPromisesDelivered(''); setNfrCompliance(''); setNotes('');
+      setPromisesDelivered(''); setNewFeatureRequests(''); setNotes('');
     }
   };
 
@@ -59,7 +59,7 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
       bug_sla_compliance: bugSla ? Number(bugSla) : null,
       promises_made: promisesMade ? Number(promisesMade) : null,
       promises_delivered: promisesDelivered ? Number(promisesDelivered) : null,
-      nfr_compliance: nfrCompliance ? Number(nfrCompliance) : null,
+      new_feature_requests: newFeatureRequests ? Number(newFeatureRequests) : null,
       notes: notes.trim() || null,
     };
 
@@ -123,8 +123,8 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
           </div>
 
           <div>
-            <Label>NFR Compliance (%)</Label>
-            <Input type="number" min={0} max={100} value={nfrCompliance} onChange={e => setNfrCompliance(e.target.value)} placeholder="e.g. 90" />
+            <Label>New Feature Requests</Label>
+            <Input type="number" min={0} value={newFeatureRequests} onChange={e => setNewFeatureRequests(e.target.value)} placeholder="e.g. 3" />
           </div>
 
           <div>

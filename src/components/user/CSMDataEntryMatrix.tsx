@@ -2688,12 +2688,12 @@ interface OpsHealthSubSectionProps {
 }
 
 function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubSectionProps) {
-  const [opsOpen, setOpsOpen] = useState(false);
+  const [opsOpen, setOpsOpen] = useState(true);
   const [bugCount, setBugCount] = useState<string>('');
   const [bugSla, setBugSla] = useState<string>('');
   const [promisesMade, setPromisesMade] = useState<string>('');
   const [promisesDelivered, setPromisesDelivered] = useState<string>('');
-  const [nfrCompliance, setNfrCompliance] = useState<string>('');
+  const [newFeatureRequests, setNewFeatureRequests] = useState<string>('');
   const [loaded, setLoaded] = useState(false);
   const upsertMutation = useUpsertHealthMetric();
 
@@ -2712,7 +2712,7 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
         setBugSla(data.bug_sla_compliance != null ? String(data.bug_sla_compliance) : '');
         setPromisesMade(data.promises_made != null ? String(data.promises_made) : '');
         setPromisesDelivered(data.promises_delivered != null ? String(data.promises_delivered) : '');
-        setNfrCompliance(data.nfr_compliance != null ? String(data.nfr_compliance) : '');
+        setNewFeatureRequests((data as any).new_feature_requests != null ? String((data as any).new_feature_requests) : '');
       }
       setLoaded(true);
     })();
@@ -2727,7 +2727,7 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
         bug_sla_compliance: bugSla ? Number(bugSla) : null,
         promises_made: promisesMade ? Number(promisesMade) : null,
         promises_delivered: promisesDelivered ? Number(promisesDelivered) : null,
-        nfr_compliance: nfrCompliance ? Number(nfrCompliance) : null,
+        new_feature_requests: newFeatureRequests ? Number(newFeatureRequests) : null,
       });
       toast.success(`Ops Health saved for ${customerName}`);
     } catch (err: any) {
@@ -2790,14 +2790,13 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">NFR Compliance %</label>
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">New Feature Requests</label>
             <Input
               type="number"
               min={0}
-              max={100}
-              placeholder="0-100"
-              value={nfrCompliance}
-              onChange={(e) => setNfrCompliance(e.target.value)}
+              placeholder="0"
+              value={newFeatureRequests}
+              onChange={(e) => setNewFeatureRequests(e.target.value)}
               className="h-8 text-sm"
             />
           </div>
@@ -2837,7 +2836,7 @@ function RemarksSection({
   customerId, indicators, features, indicatorFeatureMap,
   cmIndicators, stIndicators, scores, remarks, onRemarkChange,
 }: RemarksSectionProps) {
-  const [remarksOpen, setRemarksOpen] = useState(false);
+  const [remarksOpen, setRemarksOpen] = useState(true);
   const placeholderFeatId = CM_DIRECT_FEATURE_ID;
 
   // Collect ALL scored cells for this customer (every cell gets a remark field)
