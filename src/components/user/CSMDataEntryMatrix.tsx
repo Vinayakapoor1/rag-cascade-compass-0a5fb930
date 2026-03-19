@@ -2594,9 +2594,11 @@ interface DeploymentSubSectionBlockProps {
   stBands: BandMap;
   scores: ScoreMap;
   onCellChange: (indicatorId: string, customerId: string, featureId: string, value: string) => void;
+  remarks: RemarkMap;
+  onRemarkChange: (key: string, text: string) => void;
 }
 
-function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, onCellChange }: DeploymentSubSectionBlockProps) {
+function DeploymentSubSectionBlock({ customerId, stIndicators, stBands, scores, onCellChange, remarks, onRemarkChange }: DeploymentSubSectionBlockProps) {
   const [stOpen, setStOpen] = useState(true);
   const placeholderFeatId = CM_DIRECT_FEATURE_ID;
 
