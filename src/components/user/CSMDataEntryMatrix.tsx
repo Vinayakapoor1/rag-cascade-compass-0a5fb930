@@ -2104,21 +2104,24 @@ function CustomerSectionCard({
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r border-border/20">
-                          Feature
-                        </th>
-                        {section.indicators.map(ind => (
-                          <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={ind.description ? `${ind.fo_name} → ${ind.kr_name}\n${ind.description}` : `${ind.fo_name} → ${ind.kr_name}`}>
-                            <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
-                          </th>
-                        ))}
-                        <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
-                          Avg
-                        </th>
-                        <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l border-border/20">
-                          <span className="text-xs text-muted-foreground">Apply to Row</span>
-                        </th>
-                      </tr>
+                         <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-semibold min-w-[160px] border-r border-border/20">
+                           Feature
+                         </th>
+                         {section.indicators.map(ind => (
+                           <th key={ind.id} className="px-2 py-2 text-center font-medium min-w-[140px] border-r border-border/20" title={ind.description ? `${ind.fo_name} → ${ind.kr_name}\n${ind.description}` : `${ind.fo_name} → ${ind.kr_name}`}>
+                             <span className="block mx-auto text-xs whitespace-normal leading-tight">{ind.name}</span>
+                           </th>
+                         ))}
+                         <th className="px-3 py-2 text-center font-semibold min-w-[70px] bg-muted/30">
+                           Avg
+                         </th>
+                         <th className="px-2 py-2 text-center font-medium min-w-[150px] bg-muted/30 border-l border-border/20">
+                           <span className="text-xs text-muted-foreground">Apply to Row</span>
+                         </th>
+                         <th className="px-2 py-2 text-left font-semibold min-w-[180px] bg-muted/30 border-l border-border/20">
+                           Remarks
+                         </th>
+                       </tr>
                       <tr className="bg-muted/20 border-t border-border/20">
                         <td className="sticky left-0 z-10 bg-muted/20 px-3 py-1 text-xs text-muted-foreground font-medium border-r border-border/20">
                           Apply to Column ↓
