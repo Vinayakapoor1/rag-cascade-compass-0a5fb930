@@ -450,6 +450,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 return {
                   id: ind.id,
                   name: ind.name,
+                  description: ind.description,
                   current_value: ind.current_value != null ? Number(ind.current_value) : null,
                   target_value: ind.target_value != null ? Number(ind.target_value) : null,
                   kr_name: kr?.name || '',
