@@ -547,6 +547,7 @@ export type Database = {
           id: string
           message: string
           page_url: string
+          screenshot_path: string | null
           status: string
           user_email: string | null
           user_id: string
@@ -556,6 +557,7 @@ export type Database = {
           id?: string
           message: string
           page_url: string
+          screenshot_path?: string | null
           status?: string
           user_email?: string | null
           user_id: string
@@ -565,6 +567,7 @@ export type Database = {
           id?: string
           message?: string
           page_url?: string
+          screenshot_path?: string | null
           status?: string
           user_email?: string | null
           user_id?: string
