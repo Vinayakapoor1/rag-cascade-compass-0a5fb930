@@ -1,17 +1,43 @@
 
 
-## Problem Found
+## Plan: Feedback Widget + Admin Feedback Panel
 
-The indicator name stored in the database contains a **line break** (`Platform\nAvailability %`) while the code checks for `'Platform Availability %'` (no line break). This mismatch means the indicator never matches the `DEPLOYMENT_INDICATOR_NAMES` filter and does not appear in the Deployment sub-section.
+### What We'll Build
 
-## Plan
+1. **Floating feedback widget** — a small button (e.g., "?" or "Feedback") fixed to the bottom-right corner of every page. Clicking it opens a popover/dialog where users can type feedback and submit. It auto-captures the current page URL and user email.
 
-1. **Fix the database** — Run a migration to clean the indicator name, removing the newline:
-   ```sql
-   UPDATE indicators SET name = 'Platform Availability %' WHERE id = '182d7aea-4003-4e87-8038-002e42e2f53d';
-   ```
+2. **Admin Feedback tab** — a new tab in the Data Management page (`/data`) showing all submitted feedback with status management (open/resolved/dismissed).
 
-2. **Defensive code fix** — Update the name-matching logic in `CSMDataEntryMatrix.tsx` to trim/normalize whitespace when comparing indicator names against the `DEPLOYMENT_INDICATOR_NAMES` arrays, preventing similar issues in the future.
+### Database
 
-No other changes needed — once the name matches, the existing Deployment sub-section code will automatically include it.
+The `feedbacks` table already exists with columns: `id`, `user_id`, `user_email`, `page_url`, `message`, `status`, `created_at`. RLS policies already allow users to insert their own and admins to read/update/delete. No migration needed.
+
+### Implementation
+
+**File 1: `src/components/FeedbackWidget.tsx` (new)**
+- Fixed-position button at bottom-right corner with a `MessageSquare` icon
+- Clicking opens a popover with a textarea + submit button
+- On submit: inserts into `feedbacks` table with `user_id`, `user_email`, `page_url` (from `useLocation`), `message`
+- Shows toast on success, resets form
+- Only renders when user is logged in
+
+**File 2: `src/components/AppLayout.tsx`**
+- Import and render `<FeedbackWidget />` inside the layout (before closing `</div>`)
+
+**File 3: `src/components/admin/FeedbackTab.tsx` (new)**
+- Table listing all feedbacks sorted by newest first
+- Columns: Date, User Email, Page, Message, Status
+- Status badge (open = yellow, resolved = green, dismissed = gray)
+- Dropdown to change status (update via supabase)
+- Delete button for admins
+
+**File 4: `src/pages/DataManagement.tsx`**
+- Add a "Feedback" tab in the admin tabs section
+- Render `<FeedbackTab />` in that tab content
+
+### Files Modified
+- `src/components/FeedbackWidget.tsx` — new floating widget
+- `src/components/AppLayout.tsx` — include widget
+- `src/components/admin/FeedbackTab.tsx` — new admin panel
+- `src/pages/DataManagement.tsx` — add Feedback tab
 
