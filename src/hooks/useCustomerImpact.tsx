@@ -369,6 +369,8 @@ export interface CustomerWithImpact {
   managedServices: boolean | null;
   healthMetricsRAG: RAGStatus;
   healthMetricsScore: number | null;
+  healthDimensions: HealthDimension[];
+  indicatorScore: number | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
