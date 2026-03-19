@@ -2312,8 +2312,29 @@ function CustomerSectionCard({
                                 </Button>
                               </div>
                             </td>
-                          </tr>
-                        );
+                            <td className="px-2 py-1.5 border-l border-border/20 align-top">
+                               <Textarea
+                                 placeholder="Add remark..."
+                                 value={(() => {
+                                   for (const ind of section.indicators) {
+                                     if (!section.indicatorFeatureMap[ind.id]?.has(feat.id)) continue;
+                                     const k = cellKey(ind.id, section.id, feat.id);
+                                     if (remarks[k]) return remarks[k];
+                                   }
+                                   return '';
+                                 })()}
+                                 onChange={(e) => {
+                                   for (const ind of section.indicators) {
+                                     if (!section.indicatorFeatureMap[ind.id]?.has(feat.id)) continue;
+                                     onRemarkChange(cellKey(ind.id, section.id, feat.id), e.target.value);
+                                   }
+                                 }}
+                                 className="text-xs min-h-[32px] resize-none"
+                                 rows={1}
+                               />
+                             </td>
+                           </tr>
+                         );
                       })}
                     </tbody>
                   </table>
