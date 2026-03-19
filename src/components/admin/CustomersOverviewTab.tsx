@@ -65,7 +65,11 @@ export function CustomersOverviewTab() {
     }
 
     if (regionFilter !== 'all') {
-      filtered = filtered.filter(c => c.region === regionFilter);
+      filtered = filtered.filter(c => regionFilter === 'Unassigned' ? !c.region : c.region === regionFilter);
+    }
+
+    if (industryFilter !== 'all') {
+      filtered = filtered.filter(c => industryFilter === 'Unassigned' ? !c.industry : c.industry === industryFilter);
     }
 
     setFilteredCustomers(filtered);
