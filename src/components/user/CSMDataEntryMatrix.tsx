@@ -199,7 +199,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
 
       const { data: indicators } = await supabase
         .from('indicators')
-        .select('id, name, current_value, target_value, key_result_id')
+        .select('id, name, description, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
       if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
