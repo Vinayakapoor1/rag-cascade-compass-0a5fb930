@@ -1282,11 +1282,30 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         });
       }
 
+      // Bulk save ops health for all customers
+      const opsEntries = Object.entries(opsHealthDataRef.current);
+      for (const [custId, opsData] of opsEntries) {
+        if (opsData.bugCount || opsData.bugSla || opsData.promisesMade || opsData.promisesDelivered || opsData.nfrSla) {
+          await supabase.from('customer_health_metrics').upsert({
+            customer_id: custId,
+            period,
+            bug_count: opsData.bugCount ? Number(opsData.bugCount) : null,
+            bug_sla_compliance: opsData.bugSla ? Number(opsData.bugSla) : null,
+            promises_made: opsData.promisesMade ? Number(opsData.promisesMade) : null,
+            promises_delivered: opsData.promisesDelivered ? Number(opsData.promisesDelivered) : null,
+            new_feature_requests: opsData.nfrSla ? Number(opsData.nfrSla) : null,
+            created_by: user.id,
+            updated_at: new Date().toISOString(),
+          } as any, { onConflict: 'customer_id,period' });
+        }
+      }
+
       toast.success(`Saved ${upserts.length} score(s) and updated KPI values`);
       setOriginalScores({ ...scores });
       setSavedCustomers(new Set());
       setGeneralSkipReason('');
       queryClient.invalidateQueries({ queryKey: ['csm-matrix', departmentId, period] });
+      queryClient.invalidateQueries({ queryKey: ['customer-health-metrics'] });
 
       // Notify admins of completion
       const { data: deptInfo } = await supabase.from('departments').select('name').eq('id', departmentId).single();
