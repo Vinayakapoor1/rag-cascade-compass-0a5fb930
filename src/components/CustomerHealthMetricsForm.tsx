@@ -10,10 +10,22 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-const RAG_OPTIONS = [
-  { value: '1', label: 'Green', color: 'bg-rag-green' },
-  { value: '0.5', label: 'Amber', color: 'bg-rag-amber' },
-  { value: '0', label: 'Red', color: 'bg-rag-red' },
+const RAG_DOT: Record<string, string> = {
+  green: 'bg-rag-green',
+  amber: 'bg-rag-amber',
+  red: 'bg-rag-red',
+};
+
+const BUG_COUNT_OPTIONS = [
+  { value: '1', label: '< 5', color: 'green' },
+  { value: '0.5', label: '5 – 10', color: 'amber' },
+  { value: '0', label: '> 10', color: 'red' },
+];
+
+const PCT_OPTIONS = [
+  { value: '1', label: '76 – 100%', color: 'green' },
+  { value: '0.5', label: '51 – 75%', color: 'amber' },
+  { value: '0', label: '0 – 50%', color: 'red' },
 ];
 
 interface Props {
@@ -66,6 +78,26 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
     }
   };
 
+  const renderSelect = (label: string, value: string, onChange: (v: string) => void, options: typeof PCT_OPTIONS) => (
+    <div>
+      <Label>{label}</Label>
+      <Select value={value || 'unset'} onValueChange={(v) => onChange(v === 'unset' ? '' : v)}>
+        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="unset">—</SelectItem>
+          {options.map(o => (
+            <SelectItem key={o.value} value={o.value}>
+              <span className="flex items-center gap-1.5">
+                <span className={cn('h-2 w-2 rounded-full', RAG_DOT[o.color])} />
+                {o.label}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -82,64 +114,11 @@ export function CustomerHealthMetricsForm({ customerId, open, onOpenChange }: Pr
             />
           </div>
 
-          <div>
-            <Label>Bug Count (monthly)</Label>
-            <Input type="number" min={0} max={9999} value={bugCount} onChange={e => setBugCount(e.target.value)} placeholder="e.g. 3" />
-            <p className="text-xs text-muted-foreground mt-1">&lt;5 Green, 5-10 Amber, &gt;10 Red</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label>Bug SLA</Label>
-              <Select value={bugSla || 'unset'} onValueChange={(v) => setBugSla(v === 'unset' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unset">—</SelectItem>
-                  {RAG_OPTIONS.map(o => (
-                    <SelectItem key={o.value} value={o.value}>
-                      <span className="flex items-center gap-1.5">
-                        <span className={cn('h-2 w-2 rounded-full', o.color)} />
-                        {o.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Promises</Label>
-              <Select value={promises || 'unset'} onValueChange={(v) => setPromises(v === 'unset' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unset">—</SelectItem>
-                  {RAG_OPTIONS.map(o => (
-                    <SelectItem key={o.value} value={o.value}>
-                      <span className="flex items-center gap-1.5">
-                        <span className={cn('h-2 w-2 rounded-full', o.color)} />
-                        {o.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>NFR SLA</Label>
-              <Select value={nfrSla || 'unset'} onValueChange={(v) => setNfrSla(v === 'unset' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unset">—</SelectItem>
-                  {RAG_OPTIONS.map(o => (
-                    <SelectItem key={o.value} value={o.value}>
-                      <span className="flex items-center gap-1.5">
-                        <span className={cn('h-2 w-2 rounded-full', o.color)} />
-                        {o.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-2 gap-4">
+            {renderSelect('Bug Count', bugCount, setBugCount, BUG_COUNT_OPTIONS)}
+            {renderSelect('Bug SLA', bugSla, setBugSla, PCT_OPTIONS)}
+            {renderSelect('Promises Made vs Kept', promises, setPromises, PCT_OPTIONS)}
+            {renderSelect('NFR SLA', nfrSla, setNfrSla, PCT_OPTIONS)}
           </div>
 
           <div>

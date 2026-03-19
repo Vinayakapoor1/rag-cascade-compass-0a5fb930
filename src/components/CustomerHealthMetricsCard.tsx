@@ -7,7 +7,7 @@ import { Bug, Shield, Handshake, FileCheck, Loader2 } from 'lucide-react';
 const DIMENSION_ICONS: Record<string, React.ReactNode> = {
   'Bug Count': <Bug className="h-4 w-4" />,
   'Bug SLA': <Shield className="h-4 w-4" />,
-  'Promises': <Handshake className="h-4 w-4" />,
+  'Promises Made vs Kept': <Handshake className="h-4 w-4" />,
   'NFR SLA': <FileCheck className="h-4 w-4" />,
 };
 

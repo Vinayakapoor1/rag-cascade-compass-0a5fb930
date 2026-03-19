@@ -82,6 +82,18 @@ const DEFAULT_BANDS: KPIBand[] = [
   { band_label: 'Red', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
 ];
 
+const BUG_COUNT_BANDS: KPIBand[] = [
+  { band_label: '< 5', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+  { band_label: '5 – 10', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+  { band_label: '> 10', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+];
+
+const PCT_BANDS: KPIBand[] = [
+  { band_label: '76 – 100%', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
+  { band_label: '51 – 75%', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
+  { band_label: '0 – 50%', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
+];
+
 const RAG_DOT_CLASS: Record<string, string> = {
   green: 'bg-rag-green',
   amber: 'bg-rag-amber',

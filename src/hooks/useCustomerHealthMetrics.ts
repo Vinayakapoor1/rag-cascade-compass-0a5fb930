@@ -32,31 +32,7 @@ export interface CustomerHealthSummary {
   raw: HealthMetricRow;
 }
 
-// --- RAG helpers ---
-
-export function bugCountRAG(count: number): RAGStatus {
-  if (count < 5) return 'green';
-  if (count <= 10) return 'amber';
-  return 'red';
-}
-
-function bugCountScore(count: number): number {
-  if (count < 5) return 100;
-  if (count <= 10) return 60;
-  return 30;
-}
-
-export function pctRAG(pct: number): RAGStatus {
-  if (pct >= 76) return 'green';
-  if (pct >= 51) return 'amber';
-  return 'red';
-}
-
-function pctScore(pct: number): number {
-  if (pct >= 76) return 100;
-  if (pct >= 51) return 60;
-  return 30;
-}
+// --- RAG helpers (all weight-based: 1=green, 0.5=amber, 0=red) ---
 
 function weightToRAGStatus(w: number): RAGStatus {
   if (w >= 1) return 'green';
@@ -70,10 +46,27 @@ function weightToScore(w: number): number {
   return 30;
 }
 
-function weightToLabel(w: number): string {
-  if (w >= 1) return 'Green';
-  if (w >= 0.5) return 'Amber';
-  return 'Red';
+function bugCountLabel(w: number): string {
+  if (w >= 1) return '< 5';
+  if (w >= 0.5) return '5 – 10';
+  return '> 10';
+}
+
+function pctLabel(w: number): string {
+  if (w >= 1) return '76 – 100%';
+  if (w >= 0.5) return '51 – 75%';
+  return '0 – 50%';
+}
+
+// Keep exported for backward compat
+export function bugCountRAG(w: number): RAGStatus {
+  return weightToRAGStatus(w);
+}
+
+export function pctRAG(pct: number): RAGStatus {
+  if (pct >= 76) return 'green';
+  if (pct >= 51) return 'amber';
+  return 'red';
 }
 
 export function buildHealthSummary(row: HealthMetricRow): CustomerHealthSummary {
@@ -81,27 +74,27 @@ export function buildHealthSummary(row: HealthMetricRow): CustomerHealthSummary 
   const scores: number[] = [];
 
   if (row.bug_count != null) {
-    const s = bugCountScore(row.bug_count);
+    const s = weightToScore(row.bug_count);
     scores.push(s);
-    dimensions.push({ label: 'Bug Count', value: `${row.bug_count}`, rag: bugCountRAG(row.bug_count), score: s });
+    dimensions.push({ label: 'Bug Count', value: bugCountLabel(row.bug_count), rag: weightToRAGStatus(row.bug_count), score: s });
   }
 
   if (row.bug_sla_compliance != null) {
     const s = weightToScore(row.bug_sla_compliance);
     scores.push(s);
-    dimensions.push({ label: 'Bug SLA', value: weightToLabel(row.bug_sla_compliance), rag: weightToRAGStatus(row.bug_sla_compliance), score: s });
+    dimensions.push({ label: 'Bug SLA', value: pctLabel(row.bug_sla_compliance), rag: weightToRAGStatus(row.bug_sla_compliance), score: s });
   }
 
   if (row.promises_made != null) {
     const s = weightToScore(row.promises_made);
     scores.push(s);
-    dimensions.push({ label: 'Promises', value: weightToLabel(row.promises_made), rag: weightToRAGStatus(row.promises_made), score: s });
+    dimensions.push({ label: 'Promises Made vs Kept', value: pctLabel(row.promises_made), rag: weightToRAGStatus(row.promises_made), score: s });
   }
 
   if (row.new_feature_requests != null) {
     const s = weightToScore(row.new_feature_requests);
     scores.push(s);
-    dimensions.push({ label: 'NFR SLA', value: weightToLabel(row.new_feature_requests), rag: weightToRAGStatus(row.new_feature_requests), score: s });
+    dimensions.push({ label: 'NFR SLA', value: pctLabel(row.new_feature_requests), rag: weightToRAGStatus(row.new_feature_requests), score: s });
   }
 
   const compositeScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
