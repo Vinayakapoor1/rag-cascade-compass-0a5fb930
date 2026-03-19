@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RAGStatus } from '@/types/venture';
 import { percentageToRAG } from '@/lib/formulaUtils';
+import { buildHealthSummary, type HealthMetricRow } from '@/hooks/useCustomerHealthMetrics';
 
 export interface CustomerImpactIndicator {
   id: string;
@@ -366,11 +367,13 @@ export interface CustomerWithImpact {
   csmName: string | null;
   csmId: string | null;
   managedServices: boolean | null;
+  healthMetricsRAG: RAGStatus;
+  healthMetricsScore: number | null;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
-  // Fetch all customers, CSMs, customer_features, and indicator_feature_links in parallel
-  const [customersResult, csmsResult, cfResult, iflResult] = await Promise.all([
+  // Fetch all customers, CSMs, customer_features, indicator_feature_links, and health metrics in parallel
+  const [customersResult, csmsResult, cfResult, iflResult, healthResult] = await Promise.all([
     supabase
       .from('customers')
       .select('id, name, tier, region, industry, status, logo_url, deployment_type, csm_id, managed_services')
@@ -384,6 +387,10 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     supabase
       .from('indicator_feature_links')
       .select('feature_id, indicator_id'),
+    supabase
+      .from('customer_health_metrics')
+      .select('*')
+      .order('period', { ascending: false }),
   ]);
   
   if (customersResult.error) throw customersResult.error;
@@ -391,6 +398,15 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
   
   const customers = customersResult.data;
   const csmMap = new Map((csmsResult.data || []).map(c => [c.id, c.name]));
+
+  // Build per-customer latest health metrics map
+  const healthMetricsMap = new Map<string, HealthMetricRow>();
+  ((healthResult.data || []) as HealthMetricRow[]).forEach(row => {
+    // Already ordered desc by period, so first occurrence per customer is latest
+    if (!healthMetricsMap.has(row.customer_id)) {
+      healthMetricsMap.set(row.customer_id, row);
+    }
+  });
 
   // Build feature -> indicator mapping
   const featureToIndicators = new Map<string, Set<string>>();
@@ -506,11 +522,24 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
     const data = customerData.get(c.id);
     const linkedCount = data?.count || 0;
     
-    let ragStatus: RAGStatus = 'not-set';
+    // Indicator-based RAG
+    let indicatorScore: number | null = null;
     if (data && data.statuses.length > 0) {
-      const avgScore = data.statuses.reduce((sum, s) => {
+      indicatorScore = data.statuses.reduce((sum, s) => {
         return sum + (s === 'green' ? 100 : s === 'amber' ? 60 : s === 'red' ? 30 : 0);
       }, 0) / data.statuses.length;
+    }
+
+    // Health metrics RAG
+    const healthRow = healthMetricsMap.get(c.id);
+    const healthSummary = healthRow ? buildHealthSummary(healthRow) : null;
+    const healthScore = healthSummary && healthSummary.dimensions.length > 0 ? healthSummary.compositeScore : null;
+
+    // Composite RAG: average indicator score + health score
+    const allScores = [indicatorScore, healthScore].filter((s): s is number => s !== null);
+    let ragStatus: RAGStatus = 'not-set';
+    if (allScores.length > 0) {
+      const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
       ragStatus = percentageToRAG(avgScore);
     }
 
@@ -530,6 +559,8 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       csmName: c.csm_id ? (csmMap.get(c.csm_id) || null) : null,
       csmId: c.csm_id || null,
       managedServices: c.managed_services ?? null,
+      healthMetricsRAG: healthSummary?.compositeRAG ?? 'not-set',
+      healthMetricsScore: healthScore,
     };
   });
 }

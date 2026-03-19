@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CustomerFormDialog } from '@/components/CustomerFormDialog';
+import { CustomerHealthMetricsCard } from '@/components/CustomerHealthMetricsCard';
+import { CustomerHealthMetricsForm } from '@/components/CustomerHealthMetricsForm';
 import {
   Users, Target, Building2, BarChart3, Settings, Activity,
-  Loader2, ChevronRight, TrendingUp, Edit, Trash2, Tag
+  Loader2, ChevronRight, TrendingUp, Edit, Trash2, Tag, Plus
 } from 'lucide-react';
 import { getOrgObjectiveColorClasses, getRAGBorderColor, getRAGMutedBg } from '@/lib/ragUtils';
 import { cn } from '@/lib/utils';
@@ -25,6 +27,7 @@ export default function CustomerDetailPage() {
   const { data: impact, isLoading, error, refetch } = useCustomerImpact(customerId || '');
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [healthMetricsOpen, setHealthMetricsOpen] = useState(false);
   const [features, setFeatures] = useState<any[]>([]);
 
   useEffect(() => {
@@ -212,6 +215,22 @@ export default function CustomerDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Operational Health Metrics */}
+      <div className="flex items-center justify-between">
+        <div />
+        <Button variant="outline" size="sm" onClick={() => setHealthMetricsOpen(true)} className="gap-1">
+          <Plus className="h-4 w-4" />
+          Add Health Data
+        </Button>
+      </div>
+      <CustomerHealthMetricsCard customerId={customerId!} />
+
+      <CustomerHealthMetricsForm
+        customerId={customerId!}
+        open={healthMetricsOpen}
+        onOpenChange={setHealthMetricsOpen}
+      />
 
       {/* Features Section */}
       {features.length > 0 && (

@@ -318,6 +318,59 @@ export type Database = {
           },
         ]
       }
+      customer_health_metrics: {
+        Row: {
+          bug_count: number | null
+          bug_sla_compliance: number | null
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          nfr_compliance: number | null
+          notes: string | null
+          period: string
+          promises_delivered: number | null
+          promises_made: number | null
+          updated_at: string
+        }
+        Insert: {
+          bug_count?: number | null
+          bug_sla_compliance?: number | null
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          nfr_compliance?: number | null
+          notes?: string | null
+          period: string
+          promises_delivered?: number | null
+          promises_made?: number | null
+          updated_at?: string
+        }
+        Update: {
+          bug_count?: number | null
+          bug_sla_compliance?: number | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          nfr_compliance?: number | null
+          notes?: string | null
+          period?: string
+          promises_delivered?: number | null
+          promises_made?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_health_metrics_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_indicator_values: {
         Row: {
           created_at: string | null
