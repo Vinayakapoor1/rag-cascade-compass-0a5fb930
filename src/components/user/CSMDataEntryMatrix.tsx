@@ -15,6 +15,7 @@ import { Save, Loader2, Info, ChevronDown, ChevronRight, Search, Download, Uploa
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CustomerAttachments } from './CustomerAttachments';
+import { useUpsertHealthMetric } from '@/hooks/useCustomerHealthMetrics';
 import { generateMatrixTemplate, parseMatrixExcel } from '@/lib/matrixExcelHelper';
 import { notifyAdminsOfCompletion } from '@/lib/notifyAdmins';
 import {
