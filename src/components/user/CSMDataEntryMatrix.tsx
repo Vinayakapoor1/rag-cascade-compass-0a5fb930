@@ -2790,14 +2790,13 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">NFR Compliance %</label>
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">New Feature Requests</label>
             <Input
               type="number"
               min={0}
-              max={100}
-              placeholder="0-100"
-              value={nfrCompliance}
-              onChange={(e) => setNfrCompliance(e.target.value)}
+              placeholder="0"
+              value={newFeatureRequests}
+              onChange={(e) => setNewFeatureRequests(e.target.value)}
               className="h-8 text-sm"
             />
           </div>
