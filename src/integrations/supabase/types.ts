@@ -119,6 +119,7 @@ export type Database = {
           id: string
           indicator_id: string
           period: string
+          remark: string | null
           updated_at: string
           value: number | null
         }
@@ -130,6 +131,7 @@ export type Database = {
           id?: string
           indicator_id: string
           period: string
+          remark?: string | null
           updated_at?: string
           value?: number | null
         }
@@ -141,6 +143,7 @@ export type Database = {
           id?: string
           indicator_id?: string
           period?: string
+          remark?: string | null
           updated_at?: string
           value?: number | null
         }

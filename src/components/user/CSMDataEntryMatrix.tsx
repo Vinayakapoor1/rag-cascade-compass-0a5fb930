@@ -118,6 +118,7 @@ const RAG_BADGE_STYLES: Record<string, string> = {
 };
 
 type ScoreMap = Record<string, number | null>;
+type RemarkMap = Record<string, string>; // cellKey -> remark text
 type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
 export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }: CSMDataEntryMatrixProps) {
@@ -131,6 +132,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
   const [savedCustomers, setSavedCustomers] = useState<Set<string>>(new Set());
   const [scores, setScores] = useState<ScoreMap>({});
   const [originalScores, setOriginalScores] = useState<ScoreMap>({});
+  const [remarks, setRemarks] = useState<RemarkMap>({});
+  const [originalRemarks, setOriginalRemarks] = useState<RemarkMap>({});
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [skipReasonDialogOpen, setSkipReasonDialogOpen] = useState(false);
@@ -190,19 +193,19 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         .from('functional_objectives')
         .select('id, name')
         .eq('department_id', departmentId);
-      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
+      if (!fos?.length) return { sections: [], indicators: [], bands: {}, scores: {}, remarks: {} as RemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: krs } = await supabase
         .from('key_results')
         .select('id, name, functional_objective_id')
         .in('functional_objective_id', fos.map(f => f.id));
-      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
+      if (!krs?.length) return { sections: [], indicators: [], bands: {}, scores: {}, remarks: {} as RemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: indicators } = await supabase
         .from('indicators')
         .select('id, name, description, current_value, target_value, key_result_id')
         .in('key_result_id', krs.map(k => k.id));
-      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
+      if (!indicators?.length) return { sections: [], indicators: [], bands: {}, scores: {}, remarks: {} as RemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const indIds = indicators.map(i => i.id);
       const krMap = new Map(krs.map(k => [k.id, k]));
@@ -303,8 +306,11 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         }));
 
         const directScoreMap: ScoreMap = {};
+        const directRemarkMap: RemarkMap = {};
         (existingScoresDirect || []).forEach((s: any) => {
-          directScoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+          const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+          directScoreMap[k] = s.value != null ? Number(s.value) : null;
+          if (s.remark) directRemarkMap[k] = s.remark;
         });
 
         // Fetch latest historical scores for fallback display
@@ -333,10 +339,10 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           });
         }
 
-        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: lastKnownScoresDirect, previousPeriodLabel: null as string | null, lastCheckInByCustomer: lastCheckInDirect };
+        return { sections: directSections, indicators: indicatorInfos, bands: bandsMap, scores: directScoreMap, remarks: directRemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: lastKnownScoresDirect, previousPeriodLabel: null as string | null, lastCheckInByCustomer: lastCheckInDirect };
       }
 
-      if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {}, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
+      if (allLinkedFeatureIds.size === 0) return { sections: [], indicators: indicatorInfos, bands: bandsMap, scores: {}, remarks: {} as RemarkMap, cmIndicators: [] as IndicatorInfo[], cmBands: {} as BandMap, cmDepartmentId: null, stIndicators: [] as IndicatorInfo[], stBands: {} as BandMap, stDepartmentId: null, previousScores: {} as ScoreMap, previousPeriodLabel: null as string | null, lastCheckInByCustomer: {} as Record<string, string> };
 
       const { data: customerFeatures } = await supabase
         .from('customer_features')
@@ -415,8 +421,11 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       sections.sort((a, b) => a.name.localeCompare(b.name));
 
       const scoreMap: ScoreMap = {};
+      const remarkMap: RemarkMap = {};
       (existingScores || []).forEach((s: any) => {
-        scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+        const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+        scoreMap[k] = s.value != null ? Number(s.value) : null;
+        if (s.remark) remarkMap[k] = s.remark;
       });
 
       // Fetch CM department data for sub-section (skip if current dept IS CM or managedServicesOnly)
@@ -489,7 +498,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                   .limit(10000);
 
                 (cmScores || []).forEach((s: any) => {
-                  scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+                  const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+                  scoreMap[k] = s.value != null ? Number(s.value) : null;
+                  if (s.remark) remarkMap[k] = s.remark;
                 });
               }
             }
@@ -574,7 +585,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                   .limit(10000);
 
                 (stScores || []).forEach((s: any) => {
-                  scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+                  const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+                  scoreMap[k] = s.value != null ? Number(s.value) : null;
+                  if (s.remark) remarkMap[k] = s.remark;
                 });
               }
             }
@@ -600,7 +613,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           .limit(10000);
 
         (selfDeployScores || []).forEach((s: any) => {
-          scoreMap[cellKey(s.indicator_id, s.customer_id, s.feature_id)] = s.value != null ? Number(s.value) : null;
+          const k = cellKey(s.indicator_id, s.customer_id, s.feature_id);
+          scoreMap[k] = s.value != null ? Number(s.value) : null;
+          if (s.remark) remarkMap[k] = s.remark;
         });
       }
 
@@ -638,6 +653,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
         indicators: indicatorInfos,
         bands: bandsMap,
         scores: scoreMap,
+        remarks: remarkMap,
         cmIndicators: ((isDepartmentHead && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin ? [] as IndicatorInfo[] : cmIndicatorInfos,
         cmBands: ((isDepartmentHead && !isCustomerSuccessDept) || isDepartmentMember) && !isAdmin ? {} as BandMap : cmBandsMap,
         cmDepartmentId: cmDeptId && !isCMDepartment && !managedServicesOnly && !isDepartmentMember && !((isDepartmentHead && !isCustomerSuccessDept)) ? cmDeptId : null,
@@ -677,6 +693,9 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
       };
       setScores(hydratedScores);
       setOriginalScores(hydratedScores);
+      const hydratedRemarks = { ...(matrixData.remarks || {}) };
+      setRemarks(hydratedRemarks);
+      setOriginalRemarks(hydratedRemarks);
       scoresInitializedRef.current = true;
     }
   }, [matrixData]);
@@ -825,6 +844,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
               value: val,
               period,
               created_by: user.id,
+              remark: remarks[key] || null,
             });
           } else if (origVal != null && val === undefined) {
             deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: feat.id });
@@ -847,6 +867,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
               value: val,
               period,
               created_by: user.id,
+              remark: remarks[key] || null,
             });
           } else if (origVal != null && val === undefined) {
             deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: placeholderFeatureId });
@@ -869,6 +890,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
               value: val,
               period,
               created_by: user.id,
+              remark: remarks[key] || null,
             });
           } else if (origVal != null && val === undefined) {
             deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: placeholderFeatureId });
@@ -988,6 +1010,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 value: val,
                 period,
                 created_by: user.id,
+                remark: remarks[key] || null,
               });
             } else if (origVal != null && val === undefined) {
               deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: feat.id });
@@ -1009,6 +1032,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 value: val,
                 period,
                 created_by: user.id,
+                remark: remarks[key] || null,
               });
             } else if (origVal != null && val === undefined) {
               deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: placeholderFeatureId });
@@ -1030,6 +1054,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
                 value: val,
                 period,
                 created_by: user.id,
+                remark: remarks[key] || null,
               });
             } else if (origVal != null && val === undefined) {
               deletes.push({ indicator_id: ind.id, customer_id: section.id, feature_id: placeholderFeatureId });
@@ -1582,6 +1607,8 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           previousScores={previousScores}
           previousPeriodLabel={previousPeriodLabel}
           lastCheckInDate={lastCheckInByCustomer[section.id] || null}
+          remarks={remarks}
+          onRemarkChange={(key, text) => setRemarks(prev => ({ ...prev, [key]: text }))}
         />
       ))}
 
@@ -1725,6 +1752,8 @@ interface CustomerSectionCardProps {
   previousScores: ScoreMap;
   previousPeriodLabel: string | null;
   lastCheckInDate: string | null;
+  remarks: RemarkMap;
+  onRemarkChange: (key: string, text: string) => void;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1737,6 +1766,7 @@ function CustomerSectionCard({
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
   departmentId, period, isSaved, isSaving, onSaveCustomer, hasUnsavedChanges,
   cmIndicators, cmBands, stIndicators, stBands, previousScores, previousPeriodLabel, lastCheckInDate,
+  remarks, onRemarkChange,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
@@ -2245,6 +2275,19 @@ function CustomerSectionCard({
                   customerId={section.id}
                   customerName={section.name}
                   period={period}
+                />
+
+                {/* ===== Remarks Section ===== */}
+                <RemarksSection
+                  customerId={section.id}
+                  indicators={section.indicators}
+                  features={section.features}
+                  indicatorFeatureMap={section.indicatorFeatureMap}
+                  cmIndicators={cmIndicators}
+                  stIndicators={stIndicators}
+                  scores={scores}
+                  remarks={remarks}
+                  onRemarkChange={onRemarkChange}
                 />
 
                 {/* Per-customer Save button */}
@@ -2770,6 +2813,131 @@ function OpsHealthSubSection({ customerId, customerName, period }: OpsHealthSubS
             {upsertMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
             Save Ops Health
           </Button>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// ============= Remarks Section =============
+
+interface RemarksSectionProps {
+  customerId: string;
+  indicators: IndicatorInfo[];
+  features: { id: string; name: string }[];
+  indicatorFeatureMap: Record<string, Set<string>>;
+  cmIndicators: IndicatorInfo[];
+  stIndicators: IndicatorInfo[];
+  scores: ScoreMap;
+  remarks: RemarkMap;
+  onRemarkChange: (key: string, text: string) => void;
+}
+
+function RemarksSection({
+  customerId, indicators, features, indicatorFeatureMap,
+  cmIndicators, stIndicators, scores, remarks, onRemarkChange,
+}: RemarksSectionProps) {
+  const [remarksOpen, setRemarksOpen] = useState(false);
+  const placeholderFeatId = CM_DIRECT_FEATURE_ID;
+
+  // Collect all scored cells for this customer that are red or have existing remarks
+  const remarkableCells = useMemo(() => {
+    const cells: { key: string; indicatorName: string; featureName: string; value: number; ragColor: string }[] = [];
+    const featureNameMap = new Map(features.map(f => [f.id, f.name]));
+
+    // Main indicators
+    for (const ind of indicators) {
+      const feats = indicatorFeatureMap[ind.id];
+      if (!feats) continue;
+      for (const fid of feats) {
+        const key = cellKey(ind.id, customerId, fid);
+        const val = scores[key];
+        if (val != null) {
+          const ragColor = weightToRAGColor(val);
+          if (ragColor === 'red' || remarks[key]) {
+            cells.push({ key, indicatorName: ind.name, featureName: featureNameMap.get(fid) || 'Score', value: val, ragColor });
+          }
+        }
+      }
+    }
+
+    // CM indicators
+    for (const ind of cmIndicators) {
+      const key = cellKey(ind.id, customerId, placeholderFeatId);
+      const val = scores[key];
+      if (val != null) {
+        const ragColor = weightToRAGColor(val);
+        if (ragColor === 'red' || remarks[key]) {
+          cells.push({ key, indicatorName: ind.name, featureName: 'Content Mgmt', value: val, ragColor });
+        }
+      }
+    }
+
+    // ST indicators
+    for (const ind of stIndicators) {
+      const key = cellKey(ind.id, customerId, placeholderFeatId);
+      const val = scores[key];
+      if (val != null) {
+        const ragColor = weightToRAGColor(val);
+        if (ragColor === 'red' || remarks[key]) {
+          cells.push({ key, indicatorName: ind.name, featureName: 'Deployment', value: val, ragColor });
+        }
+      }
+    }
+
+    return cells;
+  }, [customerId, indicators, features, indicatorFeatureMap, cmIndicators, stIndicators, scores, remarks]);
+
+  const redCount = remarkableCells.filter(c => c.ragColor === 'red').length;
+  const withRemarkCount = remarkableCells.filter(c => remarks[c.key]?.trim()).length;
+
+  if (remarkableCells.length === 0) return null;
+
+  return (
+    <Collapsible open={remarksOpen} onOpenChange={setRemarksOpen} className="mt-4">
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" className="w-full justify-between gap-2 text-sm font-semibold border-l-4 border-l-destructive bg-destructive/5 hover:bg-destructive/10">
+          <span className="flex items-center gap-2">
+            {remarksOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            Remarks & Justifications
+          </span>
+          <div className="flex items-center gap-2">
+            {redCount > 0 && (
+              <Badge variant="destructive" className="text-[10px]">
+                {redCount} red
+              </Badge>
+            )}
+            <Badge variant="secondary" className="text-[10px]">
+              {withRemarkCount}/{remarkableCells.length} remarked
+            </Badge>
+          </div>
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3">
+        <div className="space-y-3">
+          {remarkableCells.map(cell => (
+            <div key={cell.key} className="flex gap-3 items-start rounded-md border border-border/50 bg-muted/20 p-3">
+              <div className="shrink-0 mt-1">
+                <span className={cn('inline-flex h-3 w-3 rounded-full', RAG_DOT_CLASS[cell.ragColor] || 'bg-muted')} />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div>
+                  <p className="text-xs font-semibold">{cell.indicatorName}</p>
+                  <p className="text-[10px] text-muted-foreground">{cell.featureName}</p>
+                </div>
+                <Textarea
+                  placeholder={cell.ragColor === 'red' ? 'Required: Why is this red? Explain the reason...' : 'Optional remark...'}
+                  value={remarks[cell.key] || ''}
+                  onChange={(e) => onRemarkChange(cell.key, e.target.value)}
+                  className={cn(
+                    'min-h-[60px] text-xs',
+                    cell.ragColor === 'red' && !remarks[cell.key]?.trim() && 'border-destructive/50 bg-destructive/5'
+                  )}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       </CollapsibleContent>
     </Collapsible>
