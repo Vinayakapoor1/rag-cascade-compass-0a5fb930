@@ -113,6 +113,7 @@ export default function CustomersPage() {
   const [industryFilter, setIndustryFilter] = useState<string>('all');
   const [csmFilter, setCsmFilter] = useState<string>('all');
   const [ragFilter, setRagFilter] = useState<string>('all');
+  const [opsHealthFilter, setOpsHealthFilter] = useState<string>('all');
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
