@@ -573,7 +573,7 @@ export default function CustomersPage() {
             <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No customers found</h3>
             <p className="text-muted-foreground">
-            {searchQuery || tierFilter !== 'all' || statusFilter !== 'all' || deploymentFilter !== 'all' || regionFilter !== 'all' || industryFilter !== 'all' || csmFilter !== 'all' || ragFilter !== 'all'
+            {searchQuery || tierFilter !== 'all' || statusFilter !== 'all' || deploymentFilter !== 'all' || regionFilter !== 'all' || industryFilter !== 'all' || csmFilter !== 'all' || ragFilter !== 'all' || opsHealthFilter !== 'all'
                 ? 'Try adjusting your filters.'
                 : 'No customers have been added yet.'}
             </p>
