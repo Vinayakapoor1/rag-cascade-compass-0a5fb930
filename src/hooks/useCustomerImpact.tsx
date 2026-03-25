@@ -371,6 +371,7 @@ export interface CustomerWithImpact {
   healthMetricsScore: number | null;
   healthDimensions: HealthDimension[];
   indicatorScore: number | null;
+  opsWorstRAG: RAGStatus;
 }
 
 async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
