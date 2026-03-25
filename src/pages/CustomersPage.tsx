@@ -686,7 +686,7 @@ export default function CustomersPage() {
                           </div>
                         </HoverCardTrigger>
                         <HoverCardContent className="w-72 z-50" side="top" align="center">
-                          <p className="text-xs font-semibold mb-2">Health Score Derivation</p>
+                          <p className="text-xs font-semibold mb-2">KPI-Driven Score Derivation</p>
                           {customer.indicatorScore != null ? (
                             <div className="space-y-1.5">
                               <div className="flex justify-between text-xs">
