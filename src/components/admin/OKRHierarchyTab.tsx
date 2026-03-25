@@ -937,86 +937,114 @@ export function OKRHierarchyTab() {
         <CardContent className="p-0">
           <ScrollArea className="h-[500px]">
             <div className="p-2">
-              {departments.map(dept => {
-                if (!filterMatch(dept.name) && 
-                    !dept.functional_objectives.some(fo => filterMatch(fo.name) ||
-                      fo.key_results.some(kr => filterMatch(kr.name) ||
-                        kr.indicators.some(ind => filterMatch(ind.name))))) {
-                  return null;
-                }
-                
+              {orgObjectiveNodes.map(objNode => {
+                const objDepts = objNode.departments;
+                const matchesAnyChild = objDepts.some(dept =>
+                  filterMatch(dept.name) ||
+                  dept.functional_objectives.some(fo => filterMatch(fo.name) ||
+                    fo.key_results.some(kr => filterMatch(kr.name) ||
+                      kr.indicators.some(ind => filterMatch(ind.name))))
+                );
+                if (!filterMatch(objNode.name) && !matchesAnyChild) return null;
+
                 return (
-                  <div key={dept.id}>
+                  <div key={objNode.id}>
                     <TreeNode
-                      icon="📁"
-                      label={dept.name}
-                      colorDot={getColorClass(dept.color)}
-                      badge={`${dept.functional_objectives.length} FOs`}
-                      isSelected={selectedItem?.type === 'department' && selectedItem.data.id === dept.id}
-                      onClick={() => setSelectedItem({ type: 'department', data: dept })}
-                      onExpand={() => toggleDept(dept.id)}
-                      isExpanded={expandedDepts.has(dept.id)}
-                      hasChildren={dept.functional_objectives.length > 0}
+                      icon="🎯"
+                      label={objNode.name}
+                      colorDot={getColorClass(objNode.color)}
+                      badge={`${objNode.departments.length} depts`}
+                      isSelected={false}
+                      onClick={() => toggleObj(objNode.id)}
+                      onExpand={() => toggleObj(objNode.id)}
+                      isExpanded={expandedObjs.has(objNode.id)}
+                      hasChildren={objNode.departments.length > 0}
                       level={0}
                     />
-                    
-                    {expandedDepts.has(dept.id) && dept.functional_objectives.map(fo => {
-                      if (!filterMatch(fo.name) && 
-                          !fo.key_results.some(kr => filterMatch(kr.name) ||
-                            kr.indicators.some(ind => filterMatch(ind.name)))) {
+
+                    {expandedObjs.has(objNode.id) && objDepts.map(dept => {
+                      if (!filterMatch(dept.name) && 
+                          !dept.functional_objectives.some(fo => filterMatch(fo.name) ||
+                            fo.key_results.some(kr => filterMatch(kr.name) ||
+                              kr.indicators.some(ind => filterMatch(ind.name))))) {
                         return null;
                       }
                       
                       return (
-                        <div key={fo.id}>
+                        <div key={dept.id}>
                           <TreeNode
-                            icon="📋"
-                            label={fo.name}
-                            badge={`${fo.key_results.length} KRs`}
-                            isSelected={selectedItem?.type === 'fo' && selectedItem.data.id === fo.id}
-                            onClick={() => setSelectedItem({ type: 'fo', data: fo, departmentId: dept.id })}
-                            onExpand={() => toggleFO(fo.id)}
-                            isExpanded={expandedFOs.has(fo.id)}
-                            hasChildren={fo.key_results.length > 0}
+                            icon="📁"
+                            label={dept.name}
+                            colorDot={getColorClass(dept.color)}
+                            badge={`${dept.functional_objectives.length} FOs`}
+                            isSelected={selectedItem?.type === 'department' && selectedItem.data.id === dept.id}
+                            onClick={() => setSelectedItem({ type: 'department', data: dept })}
+                            onExpand={() => toggleDept(dept.id)}
+                            isExpanded={expandedDepts.has(dept.id)}
+                            hasChildren={dept.functional_objectives.length > 0}
                             level={1}
                           />
                           
-                          {expandedFOs.has(fo.id) && fo.key_results.map(kr => {
-                            if (!filterMatch(kr.name) && 
-                                !kr.indicators.some(ind => filterMatch(ind.name))) {
+                          {expandedDepts.has(dept.id) && dept.functional_objectives.map(fo => {
+                            if (!filterMatch(fo.name) && 
+                                !fo.key_results.some(kr => filterMatch(kr.name) ||
+                                  kr.indicators.some(ind => filterMatch(ind.name)))) {
                               return null;
                             }
                             
                             return (
-                              <div key={kr.id}>
+                              <div key={fo.id}>
                                 <TreeNode
-                                  icon="🎯"
-                                  label={kr.name}
-                                  badge={`${kr.indicators.length} KPIs`}
-                                  isSelected={selectedItem?.type === 'kr' && selectedItem.data.id === kr.id}
-                                  onClick={() => setSelectedItem({ type: 'kr', data: kr, foId: fo.id })}
-                                  onExpand={() => toggleKR(kr.id)}
-                                  isExpanded={expandedKRs.has(kr.id)}
-                                  hasChildren={kr.indicators.length > 0}
+                                  icon="📋"
+                                  label={fo.name}
+                                  badge={`${fo.key_results.length} KRs`}
+                                  isSelected={selectedItem?.type === 'fo' && selectedItem.data.id === fo.id}
+                                  onClick={() => setSelectedItem({ type: 'fo', data: fo, departmentId: dept.id })}
+                                  onExpand={() => toggleFO(fo.id)}
+                                  isExpanded={expandedFOs.has(fo.id)}
+                                  hasChildren={fo.key_results.length > 0}
                                   level={2}
                                 />
                                 
-                                {expandedKRs.has(kr.id) && kr.indicators.map(ind => {
-                                  if (!filterMatch(ind.name)) return null;
-                                  
-                                  const ragStatus = calculateRAGStatus(ind.current_value, ind.target_value);
+                                {expandedFOs.has(fo.id) && fo.key_results.map(kr => {
+                                  if (!filterMatch(kr.name) && 
+                                      !kr.indicators.some(ind => filterMatch(ind.name))) {
+                                    return null;
+                                  }
                                   
                                   return (
-                                    <TreeNode
-                                      key={ind.id}
-                                      icon="📈"
-                                      label={ind.name}
-                                      ragStatus={ragStatus}
-                                      isSelected={selectedItem?.type === 'indicator' && selectedItem.data.id === ind.id}
-                                      onClick={() => setSelectedItem({ type: 'indicator', data: ind, krId: kr.id })}
-                                      hasChildren={false}
-                                      level={3}
-                                    />
+                                    <div key={kr.id}>
+                                      <TreeNode
+                                        icon="🎯"
+                                        label={kr.name}
+                                        badge={`${kr.indicators.length} KPIs`}
+                                        isSelected={selectedItem?.type === 'kr' && selectedItem.data.id === kr.id}
+                                        onClick={() => setSelectedItem({ type: 'kr', data: kr, foId: fo.id })}
+                                        onExpand={() => toggleKR(kr.id)}
+                                        isExpanded={expandedKRs.has(kr.id)}
+                                        hasChildren={kr.indicators.length > 0}
+                                        level={3}
+                                      />
+                                      
+                                      {expandedKRs.has(kr.id) && kr.indicators.map(ind => {
+                                        if (!filterMatch(ind.name)) return null;
+                                        
+                                        const ragStatus = calculateRAGStatus(ind.current_value, ind.target_value);
+                                        
+                                        return (
+                                          <TreeNode
+                                            key={ind.id}
+                                            icon="📈"
+                                            label={ind.name}
+                                            ragStatus={ragStatus}
+                                            isSelected={selectedItem?.type === 'indicator' && selectedItem.data.id === ind.id}
+                                            onClick={() => setSelectedItem({ type: 'indicator', data: ind, krId: kr.id })}
+                                            hasChildren={false}
+                                            level={4}
+                                          />
+                                        );
+                                      })}
+                                    </div>
                                   );
                                 })}
                               </div>
