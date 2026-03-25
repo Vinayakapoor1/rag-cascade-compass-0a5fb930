@@ -199,9 +199,10 @@ export default function CustomersPage() {
       const matchesIndustry = industryFilter === 'all' || (industryFilter === 'Unassigned' ? !c.industry : c.industry === industryFilter);
       const matchesCsm = csmFilter === 'all' || (csmFilter === 'Unassigned' ? !c.csmName : c.csmName === csmFilter);
       const matchesRag = ragFilter === 'all' || c.ragStatus === ragFilter;
-      return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag;
+      const matchesOpsHealth = opsHealthFilter === 'all' || c.opsWorstRAG === opsHealthFilter;
+      return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag && matchesOpsHealth;
     });
-  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter]);
+  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter, opsHealthFilter]);
 
   // Summary stats - now based on filtered customers
   const stats = useMemo(() => {
