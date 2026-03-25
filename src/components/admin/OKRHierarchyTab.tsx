@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Save, X, Trash2, RefreshCw, Plus, Search, Loader2, FolderTree, Target, BarChart3, HelpCircle, Link2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Save, X, Trash2, RefreshCw, Plus, Search, Loader2, FolderTree, Target, BarChart3, HelpCircle, Link2, Upload } from 'lucide-react';
+import { importV5Departments, type ImportProgress } from '@/lib/v5DepartmentImporter';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -634,6 +635,30 @@ export function OKRHierarchyTab() {
   const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
+
+  const handleImportV5 = async () => {
+    if (!confirm('This will replace the OKR hierarchy for Product Management, Product Engineering, Quality Assurance, Sales, and Security & Technology, and create HR/People, Finance, and Marketing departments.\n\nCustomer Success and Content Management will NOT be touched.\n\nProceed?')) {
+      return;
+    }
+    setImporting(true);
+    try {
+      const result = await importV5Departments((p) => setImportProgress(p));
+      if (result.success) {
+        toast.success(result.summary);
+      } else {
+        toast.warning(`${result.summary}. ${result.errors.length} errors — check console.`);
+        console.error('Import errors:', result.errors);
+      }
+      handleRefresh();
+    } catch (error) {
+      toast.error('Import failed: ' + (error as Error).message);
+    } finally {
+      setImporting(false);
+      setImportProgress(null);
+    }
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -818,10 +843,16 @@ export function OKRHierarchyTab() {
                 {departments.length} departments • {totalIndicators} indicators
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleRefresh}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleImportV5} disabled={importing}>
+                {importing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                {importing ? (importProgress?.step || 'Importing...') : 'Import V5 Structure'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
           </div>
           
           {/* Search */}
