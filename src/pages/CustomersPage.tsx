@@ -164,7 +164,8 @@ export default function CustomersPage() {
       const matchesIndustry = exclude === 'industry' || industryFilter === 'all' || (industryFilter === 'Unassigned' ? !c.industry : c.industry === industryFilter);
       const matchesCsm = exclude === 'csm' || csmFilter === 'all' || (csmFilter === 'Unassigned' ? !c.csmName : c.csmName === csmFilter);
       const matchesRag = exclude === 'rag' || ragFilter === 'all' || c.ragStatus === ragFilter;
-      return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag;
+      const matchesOpsHealth = exclude === 'opsHealth' || opsHealthFilter === 'all' || c.opsWorstRAG === opsHealthFilter;
+      return matchesSearch && matchesTier && matchesStatus && matchesDeployment && matchesRegion && matchesIndustry && matchesCsm && matchesRag && matchesOpsHealth;
     });
   };
 
