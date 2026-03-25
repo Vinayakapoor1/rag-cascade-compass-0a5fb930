@@ -333,6 +333,46 @@ export default function CustomersPage() {
         </Card>
       </div>
 
+      {/* Ops Health Filter Cards */}
+      {customers && customers.length > 0 && (() => {
+        const opsBase = filterExcluding('opsHealth');
+        const greenCount = opsBase.filter(c => c.opsWorstRAG === 'green').length;
+        const amberCount = opsBase.filter(c => c.opsWorstRAG === 'amber').length;
+        const redCount = opsBase.filter(c => c.opsWorstRAG === 'red').length;
+        const notSetCount = opsBase.filter(c => c.opsWorstRAG === 'not-set').length;
+        const cards = [
+          { key: 'green', label: 'On Track', count: greenCount, icon: ShieldCheck, colorClass: 'text-rag-green', bgClass: 'bg-rag-green/10 border-rag-green/30', activeBg: 'bg-rag-green/20 ring-2 ring-rag-green/50' },
+          { key: 'amber', label: 'At Risk', count: amberCount, icon: AlertTriangle, colorClass: 'text-rag-amber', bgClass: 'bg-rag-amber/10 border-rag-amber/30', activeBg: 'bg-rag-amber/20 ring-2 ring-rag-amber/50' },
+          { key: 'red', label: 'Critical', count: redCount, icon: XCircle, colorClass: 'text-rag-red', bgClass: 'bg-rag-red/10 border-rag-red/30', activeBg: 'bg-rag-red/20 ring-2 ring-rag-red/50' },
+          { key: 'not-set', label: 'Not Set', count: notSetCount, icon: HelpCircle, colorClass: 'text-muted-foreground', bgClass: 'bg-muted/40 border-border', activeBg: 'bg-muted/60 ring-2 ring-muted-foreground/40' },
+        ];
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {cards.map(card => {
+              const Icon = card.icon;
+              const isActive = opsHealthFilter === card.key;
+              return (
+                <button
+                  key={card.key}
+                  onClick={() => setOpsHealthFilter(isActive ? 'all' : card.key)}
+                  className={cn(
+                    'flex items-center gap-3 p-4 rounded-lg border transition-all text-left',
+                    isActive ? card.activeBg : card.bgClass,
+                    'hover:shadow-md cursor-pointer'
+                  )}
+                >
+                  <Icon className={cn('h-5 w-5', card.colorClass)} />
+                  <div>
+                    <p className={cn('text-2xl font-bold', card.colorClass)}>{card.count}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{card.label}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Filter Breakdown Stat Cards */}
       {filterBreakdowns.length > 0 && (
         <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${filterBreakdowns.length}, minmax(0, 1fr))` }}>
