@@ -635,6 +635,30 @@ export function OKRHierarchyTab() {
   const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
+
+  const handleImportV5 = async () => {
+    if (!confirm('This will replace the OKR hierarchy for Product Management, Product Engineering, Quality Assurance, Sales, and Security & Technology, and create HR/People, Finance, and Marketing departments.\n\nCustomer Success and Content Management will NOT be touched.\n\nProceed?')) {
+      return;
+    }
+    setImporting(true);
+    try {
+      const result = await importV5Departments((p) => setImportProgress(p));
+      if (result.success) {
+        toast.success(result.summary);
+      } else {
+        toast.warning(`${result.summary}. ${result.errors.length} errors — check console.`);
+        console.error('Import errors:', result.errors);
+      }
+      handleRefresh();
+    } catch (error) {
+      toast.error('Import failed: ' + (error as Error).message);
+    } finally {
+      setImporting(false);
+      setImportProgress(null);
+    }
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
