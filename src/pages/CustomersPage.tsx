@@ -39,7 +39,7 @@ function SparklineTooltip({ active, payload, label }: any) {
           <div key={entry.dataKey} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-              <span className="text-muted-foreground text-[11px]">Health Score</span>
+              <span className="text-muted-foreground text-[11px]">KPI-Driven Score</span>
             </div>
             <span className="font-semibold text-[11px] tabular-nums">{entry.value}%</span>
           </div>
@@ -682,11 +682,11 @@ export default function CustomersPage() {
                         <HoverCardTrigger asChild>
                           <div className="flex flex-col items-center cursor-help">
                             <RAGBadge status={customer.ragStatus} size="md" />
-                            <span className="text-[10px] text-muted-foreground mt-1">Health</span>
+                            <span className="text-[10px] text-muted-foreground mt-1">KPI-Driven</span>
                           </div>
                         </HoverCardTrigger>
                         <HoverCardContent className="w-72 z-50" side="top" align="center">
-                          <p className="text-xs font-semibold mb-2">Health Score Derivation</p>
+                          <p className="text-xs font-semibold mb-2">KPI-Driven Score Derivation</p>
                           {customer.indicatorScore != null ? (
                             <div className="space-y-1.5">
                               <div className="flex justify-between text-xs">
@@ -704,12 +704,12 @@ export default function CustomersPage() {
                                 </div>
                               )}
                               <p className="text-[10px] text-muted-foreground pt-1 border-t border-border/40">
-                                Composite = avg of Indicator + Ops scores
+                                Composite = avg of KPI-Driven + Ops Health scores
                               </p>
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              Health is derived from linked OKR indicators via customer features. No scored indicators yet — link features with KPIs to see health.
+                              KPI-Driven status is derived from linked OKR indicators via customer features. No scored indicators yet — link features with KPIs to see status.
                             </p>
                           )}
                         </HoverCardContent>
@@ -719,11 +719,11 @@ export default function CustomersPage() {
                         <HoverCardTrigger asChild>
                           <div className="flex flex-col items-center cursor-help">
                             <RAGBadge status={customer.healthMetricsRAG} size="md" />
-                            <span className="text-[10px] text-muted-foreground mt-1">Ops</span>
+                            <span className="text-[10px] text-muted-foreground mt-1">Ops Health</span>
                           </div>
                         </HoverCardTrigger>
                         <HoverCardContent className="w-72 z-50" side="top" align="center">
-                          <p className="text-xs font-semibold mb-2">Operational Health Breakdown</p>
+                          <p className="text-xs font-semibold mb-2">Ops Health Breakdown</p>
                           {(customer.healthDimensions?.length ?? 0) > 0 ? (
                             <div className="space-y-1.5">
                               {customer.healthDimensions.map((dim) => (
