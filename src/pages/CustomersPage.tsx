@@ -39,7 +39,7 @@ function SparklineTooltip({ active, payload, label }: any) {
           <div key={entry.dataKey} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-              <span className="text-muted-foreground text-[11px]">Health Score</span>
+              <span className="text-muted-foreground text-[11px]">KPI-Driven Score</span>
             </div>
             <span className="font-semibold text-[11px] tabular-nums">{entry.value}%</span>
           </div>
