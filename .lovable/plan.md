@@ -1,50 +1,23 @@
 
 
-# Add Org Objective Management and Department Mapping
+# Show Only Mapped Org Objectives on Portfolio
 
 ## Problem
 
-The V5 importer created 8 separate org objectives (one per department), but the business only has ~5 org objectives. Multiple departments should map to a single org objective. For example, "Enhance Product Quality" already correctly maps to both Product Engineering and Quality Assurance, but others like HR/People, Finance, and Marketing each got their own unnecessary org objective.
+The portfolio displays all 8 org objectives, but 3 of them (Achieve Financial Excellence, Build and Sustain Talent, Drive Market Penetration) have **zero departments mapped**. These show as empty cards with no data.
 
-## Current DB State
+## Fix
 
-| Org Objective | Departments |
-|---|---|
-| Achieve Financial Excellence and Runway | Finance |
-| Achieve Operational Excellence | Security & Technology |
-| Build and Sustain Talent for 3X Growth | HR / People |
-| Drive Market Penetration and Demand Generation | Marketing |
-| Drive Product Adoption and Retention | Product Management |
-| Enhance Product Quality | Product Engineering, Quality Assurance |
-| Expand Pipeline and Revenue Growth | Sales |
-| Maximize Customer Success and Experience | Customer Success, Content Management |
+Filter out org objectives with no departments at the rendering level in `src/pages/Portfolio.tsx`. The `useOrgObjectives` hook already only returns departments that are mapped, so objectives with `departments.length === 0` are effectively empty.
 
-## Solution
+### Change in `src/pages/Portfolio.tsx`
 
-Add full CRUD for org objectives and a department-to-objective reassignment UI in the existing `OrgObjectivesManager` component and `OKRHierarchyTab`.
+1. **Line ~162 (useMemo)**: After applying all-time values and recalculating progress, filter out any org objective where `departments.length === 0`. This ensures:
+   - The "Organizational Objectives" stat blocks only show the 5 with mapped departments
+   - Portfolio stats (dept count, FO count, KR count, KPI count) exclude empty objectives
+   - The overall health score only averages across objectives that have real data
 
-### Changes to `src/components/admin/OrgObjectivesManager.tsx`
+Single line addition: `objectives = objectives.filter(obj => obj.departments.length > 0);`
 
-1. **Add "Create Org Objective"** button — opens inline form with name, classification (CORE/Enabler), color fields
-2. **Add "Delete" action** per row — with confirmation dialog; only allowed if no departments are mapped (or offers to reassign first)
-3. **Add "Departments" column** — shows count of mapped departments as a badge
-4. **Make Name editable** — inline text input (currently read-only)
-5. **Add Department Mapping section** — below the objectives table, show a table of all departments with a dropdown to select which org objective each belongs to. Saving updates `departments.org_objective_id`.
-
-### Changes to `src/components/admin/OKRHierarchyTab.tsx`
-
-1. **Show org objective grouping in tree** — add a top-level node above departments showing the org objective name, so the tree reads: Org Objective → Department → FO → KR → KPI
-2. **Department edit panel** — add an "Org Objective" dropdown to reassign a department to a different org objective
-
-### No changes to
-
-- Calculation algorithms (`formulaCalculations.ts`, `ragUtils.ts`)
-- `useOrgObjectives.ts` hook (already groups departments under org objectives)
-- Customer Success / Content Management data
-- Any scoring or RAG logic
-
-## Files Modified
-
-1. **`src/components/admin/OrgObjectivesManager.tsx`** — Add create, delete, rename, and department mapping UI
-2. **`src/components/admin/OKRHierarchyTab.tsx`** — Add org objective grouping in tree view and reassignment dropdown in department edit panel
+### No other files change. No algorithm changes.
 
