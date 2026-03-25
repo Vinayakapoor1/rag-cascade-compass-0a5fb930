@@ -709,7 +709,7 @@ export default function CustomersPage() {
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              Health is derived from linked OKR indicators via customer features. No scored indicators yet — link features with KPIs to see health.
+                              KPI-Driven status is derived from linked OKR indicators via customer features. No scored indicators yet — link features with KPIs to see status.
                             </p>
                           )}
                         </HoverCardContent>
