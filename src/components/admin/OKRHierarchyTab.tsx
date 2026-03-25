@@ -793,6 +793,14 @@ export function OKRHierarchyTab() {
     fetchData();
   };
 
+  const toggleObj = (id: string) => {
+    setExpandedObjs(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
   const toggleDept = (id: string) => {
     setExpandedDepts(prev => {
       const next = new Set(prev);
