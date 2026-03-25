@@ -843,10 +843,16 @@ export function OKRHierarchyTab() {
                 {departments.length} departments • {totalIndicators} indicators
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleRefresh}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleImportV5} disabled={importing}>
+                {importing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                {importing ? (importProgress?.step || 'Importing...') : 'Import V5 Structure'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
           </div>
           
           {/* Search */}
