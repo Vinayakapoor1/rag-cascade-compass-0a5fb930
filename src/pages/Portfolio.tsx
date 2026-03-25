@@ -174,6 +174,9 @@ export default function Portfolio() {
         .filter(obj => obj.departments.length > 0);
     }
     
+    // Filter out objectives with no mapped departments
+    objectives = objectives.filter(obj => obj.departments.length > 0);
+    
     // Always apply all-time values overlay
     objectives = applyAllTimeValues(objectives);
     // Recalculate okrProgress and okrHealth for each objective
