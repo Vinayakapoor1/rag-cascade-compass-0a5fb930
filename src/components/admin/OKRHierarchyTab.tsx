@@ -167,17 +167,20 @@ function TreeNode({
 // Edit Panel Components
 function DepartmentEditPanel({ 
   dept, 
+  orgObjectives,
   onSave, 
   onDelete,
   onClose 
 }: { 
   dept: Department; 
+  orgObjectives: OrgObjectiveNode[];
   onSave: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   const [color, setColor] = useState(dept.color);
   const [owner, setOwner] = useState(dept.owner || '');
+  const [orgObjectiveId, setOrgObjectiveId] = useState(dept.org_objective_id || '__none__');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -185,16 +188,20 @@ function DepartmentEditPanel({
     try {
       const { error } = await supabase
         .from('departments')
-        .update({ color, owner: owner || null })
+        .update({ 
+          color, 
+          owner: owner || null,
+          org_objective_id: orgObjectiveId === '__none__' ? null : orgObjectiveId
+        })
         .eq('id', dept.id);
       
       if (error) {
-        console.error('Error updating department color:', error);
+        console.error('Error updating department:', error);
         toast.error('Failed to update department: ' + error.message);
         return;
       }
       
-      toast.success('Department color updated');
+      toast.success('Department updated');
       onSave();
     } catch (error) {
       console.error('Exception updating department:', error);
@@ -223,6 +230,27 @@ function DepartmentEditPanel({
       <Separator />
 
       <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium mb-2 block">Org Objective</label>
+          <Select value={orgObjectiveId} onValueChange={setOrgObjectiveId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select objective..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">
+                <span className="text-muted-foreground">— No objective —</span>
+              </SelectItem>
+              {orgObjectives.map((obj) => (
+                <SelectItem key={obj.id} value={obj.id}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${getColorClass(obj.color)}`} />
+                    {obj.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div>
           <label className="text-sm font-medium mb-2 block">Owner</label>
           <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="e.g., Jane Doe" />
