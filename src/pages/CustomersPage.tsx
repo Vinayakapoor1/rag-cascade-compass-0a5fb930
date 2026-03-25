@@ -682,7 +682,7 @@ export default function CustomersPage() {
                         <HoverCardTrigger asChild>
                           <div className="flex flex-col items-center cursor-help">
                             <RAGBadge status={customer.ragStatus} size="md" />
-                            <span className="text-[10px] text-muted-foreground mt-1">Health</span>
+                            <span className="text-[10px] text-muted-foreground mt-1">KPI-Driven</span>
                           </div>
                         </HoverCardTrigger>
                         <HoverCardContent className="w-72 z-50" side="top" align="center">
