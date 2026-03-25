@@ -1,32 +1,50 @@
 
 
-# Fix: New Departments Not Showing on Dashboard
+# Add Org Objective Management and Department Mapping
 
-## Root Cause
+## Problem
 
-The 3 new org objectives (HR/People, Finance, Marketing) were created with `venture_id: null`. All existing org objectives are linked to venture `8ae3e06d-b59e-44c0-8332-f5b259752f6e`. The `useOrgObjectives` hook filters by `venture_id`, so unlinked objectives are excluded from the dashboard.
+The V5 importer created 8 separate org objectives (one per department), but the business only has ~5 org objectives. Multiple departments should map to a single org objective. For example, "Enhance Product Quality" already correctly maps to both Product Engineering and Quality Assurance, but others like HR/People, Finance, and Marketing each got their own unnecessary org objective.
 
-## Fix
+## Current DB State
 
-### Step 1 — Database migration to set venture_id on new org objectives
+| Org Objective | Departments |
+|---|---|
+| Achieve Financial Excellence and Runway | Finance |
+| Achieve Operational Excellence | Security & Technology |
+| Build and Sustain Talent for 3X Growth | HR / People |
+| Drive Market Penetration and Demand Generation | Marketing |
+| Drive Product Adoption and Retention | Product Management |
+| Enhance Product Quality | Product Engineering, Quality Assurance |
+| Expand Pipeline and Revenue Growth | Sales |
+| Maximize Customer Success and Experience | Customer Success, Content Management |
 
-Run a single UPDATE to assign the correct venture_id to the 3 new org objectives:
+## Solution
 
-```sql
-UPDATE org_objectives 
-SET venture_id = '8ae3e06d-b59e-44c0-8332-f5b259752f6e'
-WHERE id IN (
-  '453a7cdd-fd53-4a70-a081-4f91c6a22d13',  -- Finance
-  'ee346687-42fb-465e-a5a4-9fe8aeea2f48',  -- HR/People
-  '6b6b20dc-1b08-4631-8788-5258706cf4d6'   -- Marketing
-);
-```
+Add full CRUD for org objectives and a department-to-objective reassignment UI in the existing `OrgObjectivesManager` component and `OKRHierarchyTab`.
 
-### Step 2 — Fix the importer to include venture_id for future runs
+### Changes to `src/components/admin/OrgObjectivesManager.tsx`
 
-Update `src/lib/v5DepartmentImporter.ts` to look up the active venture and pass its ID when creating new org objectives, so this doesn't happen again.
+1. **Add "Create Org Objective"** button — opens inline form with name, classification (CORE/Enabler), color fields
+2. **Add "Delete" action** per row — with confirmation dialog; only allowed if no departments are mapped (or offers to reassign first)
+3. **Add "Departments" column** — shows count of mapped departments as a badge
+4. **Make Name editable** — inline text input (currently read-only)
+5. **Add Department Mapping section** — below the objectives table, show a table of all departments with a dropdown to select which org objective each belongs to. Saving updates `departments.org_objective_id`.
+
+### Changes to `src/components/admin/OKRHierarchyTab.tsx`
+
+1. **Show org objective grouping in tree** — add a top-level node above departments showing the org objective name, so the tree reads: Org Objective → Department → FO → KR → KPI
+2. **Department edit panel** — add an "Org Objective" dropdown to reassign a department to a different org objective
+
+### No changes to
+
+- Calculation algorithms (`formulaCalculations.ts`, `ragUtils.ts`)
+- `useOrgObjectives.ts` hook (already groups departments under org objectives)
+- Customer Success / Content Management data
+- Any scoring or RAG logic
 
 ## Files Modified
-1. Database migration (UPDATE 3 rows)
-2. `src/lib/v5DepartmentImporter.ts` — add venture_id to new org objective inserts
+
+1. **`src/components/admin/OrgObjectivesManager.tsx`** — Add create, delete, rename, and department mapping UI
+2. **`src/components/admin/OKRHierarchyTab.tsx`** — Add org objective grouping in tree view and reassignment dropdown in department edit panel
 
