@@ -181,7 +181,7 @@ export default function CustomersPage() {
       csmNames: [...new Set(filterExcluding('csm').map(c => c.csmName || 'Unassigned'))].sort() as string[],
       ragOptions: [...new Set(filterExcluding('rag').map(c => c.ragStatus))].sort() as string[],
     };
-  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter]);
+  }, [customers, searchQuery, tierFilter, statusFilter, deploymentFilter, regionFilter, industryFilter, csmFilter, ragFilter, opsHealthFilter]);
 
   // Filter customers
   const filteredCustomers = useMemo(() => {
