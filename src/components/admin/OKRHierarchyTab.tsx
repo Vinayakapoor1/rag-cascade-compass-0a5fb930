@@ -60,6 +60,14 @@ interface Department {
   functional_objectives: FunctionalObjective[];
 }
 
+interface OrgObjectiveNode {
+  id: string;
+  name: string;
+  color: string;
+  classification: string;
+  departments: Department[];
+}
+
 type SelectedItem = 
   | { type: 'department'; data: Department }
   | { type: 'fo'; data: FunctionalObjective; departmentId: string }
