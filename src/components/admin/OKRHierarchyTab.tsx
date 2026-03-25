@@ -665,8 +665,10 @@ function IndicatorEditPanel({
 // Main Component
 export function OKRHierarchyTab() {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [orgObjectiveNodes, setOrgObjectiveNodes] = useState<OrgObjectiveNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
+  const [expandedObjs, setExpandedObjs] = useState<Set<string>>(new Set());
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
   const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
