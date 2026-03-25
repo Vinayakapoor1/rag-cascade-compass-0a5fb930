@@ -580,7 +580,12 @@ export default function CustomersPage() {
           filteredCustomers.map(customer => {
             const features = customerFeatures[customer.id] || [];
             return (
-              <Card key={customer.id} className="hover:shadow-md transition-shadow">
+              <Card key={customer.id} className={cn(
+                "hover:shadow-md transition-shadow",
+                customer.opsWorstRAG === 'red' && 'border-l-4 border-l-rag-red border-rag-red/30',
+                customer.opsWorstRAG === 'amber' && 'border-l-4 border-l-rag-amber border-rag-amber/30',
+                customer.opsWorstRAG === 'green' && 'border-l-4 border-l-rag-green border-rag-green/30',
+              )}>
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <Link to={`/customers/${customer.id}`} className="flex items-center gap-4 flex-1 min-w-0">
