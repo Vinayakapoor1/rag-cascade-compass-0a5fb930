@@ -704,7 +704,7 @@ export default function CustomersPage() {
                                 </div>
                               )}
                               <p className="text-[10px] text-muted-foreground pt-1 border-t border-border/40">
-                                Composite = avg of Indicator + Ops scores
+                                Composite = avg of KPI-Driven + Ops Health scores
                               </p>
                             </div>
                           ) : (
