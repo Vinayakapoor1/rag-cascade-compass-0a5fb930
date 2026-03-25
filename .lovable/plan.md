@@ -1,66 +1,79 @@
 
 
-# Fix Ops Health Dropdown Labels and Bug Count Selector
+# Import 8-Department OKR Hierarchy from Excel
 
-## Changes
+## Summary
 
-### 1. Bug Count — Replace free-text input with a dropdown
-Replace the `<Input type="number">` with a `Select` dropdown offering 3 specific threshold options:
-- **< 5** (Green, rag_numeric: 1)
-- **5 – 10** (Amber, rag_numeric: 0.5)
-- **> 10** (Red, rag_numeric: 0)
+Parse the uploaded Excel (8 sheets, 7 columns each) and insert/update the OKR hierarchy for 6 departments while strictly preserving Customer Success and Content Management. Three new departments (HR/People, Finance, Marketing) get created; five existing ones get their FO/KR/Indicator hierarchy replaced.
 
-Store weight (1/0.5/0) in `bug_count` column instead of a raw count. The `bugCountRAG` helper in `useCustomerHealthMetrics.ts` already maps weights to RAG — will align it.
+**Algorithms untouched**: `formulaCalculations.ts`, `ragUtils.ts`, and all aggregation/scoring logic remain unchanged. Only hierarchy DATA in the database changes.
 
-### 2. Bug SLA, Promises, NFR SLA — Show percentage thresholds instead of "Green/Amber/Red"
-Replace the current `DEFAULT_BANDS` labels ("Green", "Amber", "Red") with percentage-based labels:
-- **76 – 100%** (Green, rag_numeric: 1)
-- **51 – 75%** (Amber, rag_numeric: 0.5)
-- **0 – 50%** (Red, rag_numeric: 0)
+## Sheet-to-Department Mapping
 
-### 3. Rename "Promises" to "Promises Made vs Kept"
+| Sheet | Department | Org Objective Name | Action |
+|-------|-----------|-------------------|--------|
+| 1 | Product Management | Customer Retention (existing) | Replace FOs/KRs/KPIs |
+| 2 | Product Engineering | Customer Retention (existing) | Replace FOs/KRs/KPIs |
+| 3 | Quality Assurance | Customer Retention (existing) | Replace FOs/KRs/KPIs |
+| 4 | Sales | Customer Retention (existing) | Replace FOs/KRs/KPIs |
+| 5 | Security & Technology | Customer Retention (existing) | Replace FOs/KRs/KPIs |
+| 6 | HR / People | **New org objective** | Create dept + full hierarchy |
+| 7 | Finance | **New org objective** | Create dept + full hierarchy |
+| 8 | Marketing | **New org objective** | Create dept + full hierarchy |
 
----
+**Protected (NO TOUCH):** Customer Success, Content Management — their department IDs, FOs, KRs, indicators, scores, and links are never queried or modified.
 
-## File Changes
+## Implementation Steps
 
-### `src/components/user/CSMDataEntryMatrix.tsx`
+### Step 1 — Write a one-time admin import script
 
-- Add two new band constants:
-  ```typescript
-  const BUG_COUNT_BANDS: KPIBand[] = [
-    { band_label: '< 5', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
-    { band_label: '5 – 10', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
-    { band_label: '> 10', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
-  ];
+Create `src/lib/v5DepartmentImporter.ts` with a function that:
 
-  const PCT_BANDS: KPIBand[] = [
-    { band_label: '76 – 100%', rag_color: 'green', rag_numeric: 1, sort_order: 1 },
-    { band_label: '51 – 75%', rag_color: 'amber', rag_numeric: 0.5, sort_order: 2 },
-    { band_label: '0 – 50%', rag_color: 'red', rag_numeric: 0, sort_order: 3 },
-  ];
-  ```
+1. Takes the parsed Excel data (hardcoded from the 8 sheets since we have the exact content)
+2. Has a `PROTECTED_DEPARTMENTS` list: `['Customer Success', 'Content Management']`
+3. For each of the 6 target departments:
+   - Looks up existing department by name
+   - Deletes existing indicators → key_results → functional_objectives (cascade by ID, scoped to that department only)
+   - Re-inserts FOs with formulas, KRs with formulas, KPIs with formulas from the Excel
+4. For the 3 new departments:
+   - Creates a new `org_objectives` row with the department's top-level theme
+   - Creates the `departments` row linked to it
+   - Inserts full FO → KR → KPI hierarchy
 
-- **Bug Count**: Replace `<Input>` with a `<Select>` using `BUG_COUNT_BANDS`
-- **Bug SLA, NFR SLA, Promises**: Replace `DEFAULT_BANDS` with `PCT_BANDS`
-- Rename "Promises" label to "Promises Made vs Kept"
-- Update `bugRAG` helper (used for RAG dot) to use weight-based logic instead of count-based
-- Update `scoredCount` logic for bug count (check for non-empty string instead of truthy number)
+All data is hardcoded in the script from the parsed Excel content — no file parsing at runtime.
 
-### `src/hooks/useCustomerHealthMetrics.ts`
-- Update `bugCountRAG` / `bugCountScore` to treat stored value as weight (1/0.5/0) instead of raw count
-- Update dimension value display for Bug Count to show threshold label ("< 5", "5 – 10", "> 10")
+### Step 2 — Wire to admin UI
 
-### `src/components/CustomerHealthMetricsForm.tsx`
-- Replace Bug Count `<Input>` with a Select dropdown using the same threshold options
-- Replace Bug SLA, Promises, NFR SLA selectors to show percentage labels
+Add a button in `src/components/admin/OKRHierarchyTab.tsx` labeled "Import V5 8-Department OKR Structure" that triggers the import function. Show progress and results.
 
-### `src/components/CustomerHealthMetricsCard.tsx`
-- Update Bug Count dimension display to show threshold label from weight value
+### Step 3 — Verify data entry routing
 
-### Files Modified
-1. `src/components/user/CSMDataEntryMatrix.tsx`
-2. `src/hooks/useCustomerHealthMetrics.ts`
-3. `src/components/CustomerHealthMetricsForm.tsx`
-4. `src/components/CustomerHealthMetricsCard.tsx`
+Confirm that all 8 departments (including new ones) appear in the data entry navigation and use the correct entry mode:
+- Customer Success → CSM matrix (untouched)
+- Content Management → CM matrix (untouched)
+- Sales → standalone KPI scoring grid
+- All others → default per-indicator data entry
+
+No changes to routing logic needed — it's already name-based.
+
+## What Does NOT Change
+
+- `src/lib/formulaCalculations.ts` — aggregation engine
+- `src/lib/ragUtils.ts` — RAG status derivation
+- `src/hooks/useCustomerHealthMetrics.ts` — ops health scoring
+- `src/components/user/CSMDataEntryMatrix.tsx` — CS/CM data entry UI
+- Any existing scores, links, or history for CS and CM departments
+- All RLS policies, triggers, and DB functions
+
+## Files Modified
+
+1. **`src/lib/v5DepartmentImporter.ts`** (new) — hardcoded import script with all 80 KPIs across 8 departments
+2. **`src/components/admin/OKRHierarchyTab.tsx`** — add import trigger button
+
+## Technical Notes
+
+- Deletion order matters: indicators first, then key_results, then functional_objectives (no FK constraints but cleaner)
+- New org objectives get unique colors from the palette (teal, orange, yellow for the 3 new ones)
+- All indicators default to `tier: 'leading'`, `frequency: 'Monthly'` matching existing conventions
+- Formula strings stored verbatim from Excel for reference/display
 
