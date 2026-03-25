@@ -60,6 +60,14 @@ interface Department {
   functional_objectives: FunctionalObjective[];
 }
 
+interface OrgObjectiveNode {
+  id: string;
+  name: string;
+  color: string;
+  classification: string;
+  departments: Department[];
+}
+
 type SelectedItem = 
   | { type: 'department'; data: Department }
   | { type: 'fo'; data: FunctionalObjective; departmentId: string }
@@ -159,17 +167,20 @@ function TreeNode({
 // Edit Panel Components
 function DepartmentEditPanel({ 
   dept, 
+  orgObjectives,
   onSave, 
   onDelete,
   onClose 
 }: { 
   dept: Department; 
+  orgObjectives: OrgObjectiveNode[];
   onSave: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   const [color, setColor] = useState(dept.color);
   const [owner, setOwner] = useState(dept.owner || '');
+  const [orgObjectiveId, setOrgObjectiveId] = useState(dept.org_objective_id || '__none__');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -177,16 +188,20 @@ function DepartmentEditPanel({
     try {
       const { error } = await supabase
         .from('departments')
-        .update({ color, owner: owner || null })
+        .update({ 
+          color, 
+          owner: owner || null,
+          org_objective_id: orgObjectiveId === '__none__' ? null : orgObjectiveId
+        })
         .eq('id', dept.id);
       
       if (error) {
-        console.error('Error updating department color:', error);
+        console.error('Error updating department:', error);
         toast.error('Failed to update department: ' + error.message);
         return;
       }
       
-      toast.success('Department color updated');
+      toast.success('Department updated');
       onSave();
     } catch (error) {
       console.error('Exception updating department:', error);
@@ -215,6 +230,27 @@ function DepartmentEditPanel({
       <Separator />
 
       <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium mb-2 block">Org Objective</label>
+          <Select value={orgObjectiveId} onValueChange={setOrgObjectiveId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select objective..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">
+                <span className="text-muted-foreground">— No objective —</span>
+              </SelectItem>
+              {orgObjectives.map((obj) => (
+                <SelectItem key={obj.id} value={obj.id}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${getColorClass(obj.color)}`} />
+                    {obj.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div>
           <label className="text-sm font-medium mb-2 block">Owner</label>
           <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="e.g., Jane Doe" />
@@ -629,8 +665,10 @@ function IndicatorEditPanel({
 // Main Component
 export function OKRHierarchyTab() {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [orgObjectiveNodes, setOrgObjectiveNodes] = useState<OrgObjectiveNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
+  const [expandedObjs, setExpandedObjs] = useState<Set<string>>(new Set());
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
   const [expandedFOs, setExpandedFOs] = useState<Set<string>>(new Set());
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
@@ -663,24 +701,24 @@ export function OKRHierarchyTab() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch departments including their own color column
-      const { data: depts, error: deptError } = await supabase
-        .from('departments')
-        .select('id, name, org_objective_id, color, owner');
+      // Fetch org objectives and departments in parallel
+      const [orgRes, deptRes] = await Promise.all([
+        supabase.from('org_objectives').select('id, name, color, classification').order('name'),
+        supabase.from('departments').select('id, name, org_objective_id, color, owner'),
+      ]);
 
-      if (deptError) throw deptError;
+      if (deptRes.error) throw deptRes.error;
 
       const fullDepts: Department[] = [];
+      const orgObjMap = new Map<string, { id: string; name: string; color: string; classification: string }>();
+      for (const obj of orgRes.data || []) {
+        orgObjMap.set(obj.id, obj);
+      }
 
-      for (const dept of depts || []) {
-        // Use department's own color, fallback to org objective color, then gray
+      for (const dept of deptRes.data || []) {
         let color = dept.color || 'gray';
         if (!dept.color && dept.org_objective_id) {
-          const { data: orgObj } = await supabase
-            .from('org_objectives')
-            .select('color')
-            .eq('id', dept.org_objective_id)
-            .single();
+          const orgObj = orgObjMap.get(dept.org_objective_id);
           color = orgObj?.color || 'gray';
         }
 
@@ -715,9 +753,31 @@ export function OKRHierarchyTab() {
       }
 
       setDepartments(fullDepts);
-      // Auto-expand first department
-      if (fullDepts.length > 0) {
-        setExpandedDepts(new Set([fullDepts[0].id]));
+
+      // Build org objective nodes grouped with their departments
+      const objNodes: OrgObjectiveNode[] = [];
+      for (const obj of orgRes.data || []) {
+        objNodes.push({
+          ...obj,
+          departments: fullDepts.filter((d) => d.org_objective_id === obj.id),
+        });
+      }
+      // Add an "Unmapped" group for departments without an org objective
+      const unmapped = fullDepts.filter((d) => !d.org_objective_id);
+      if (unmapped.length > 0) {
+        objNodes.push({
+          id: '__unmapped__',
+          name: 'Unmapped Departments',
+          color: 'gray',
+          classification: '',
+          departments: unmapped,
+        });
+      }
+      setOrgObjectiveNodes(objNodes);
+
+      // Auto-expand first org objective
+      if (objNodes.length > 0) {
+        setExpandedObjs(new Set([objNodes[0].id]));
       }
     } catch (error) {
       toast.error('Failed to load hierarchy');
@@ -731,6 +791,14 @@ export function OKRHierarchyTab() {
   const handleRefresh = () => {
     setSelectedItem(null);
     fetchData();
+  };
+
+  const toggleObj = (id: string) => {
+    setExpandedObjs(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
   const toggleDept = (id: string) => {
@@ -869,86 +937,114 @@ export function OKRHierarchyTab() {
         <CardContent className="p-0">
           <ScrollArea className="h-[500px]">
             <div className="p-2">
-              {departments.map(dept => {
-                if (!filterMatch(dept.name) && 
-                    !dept.functional_objectives.some(fo => filterMatch(fo.name) ||
-                      fo.key_results.some(kr => filterMatch(kr.name) ||
-                        kr.indicators.some(ind => filterMatch(ind.name))))) {
-                  return null;
-                }
-                
+              {orgObjectiveNodes.map(objNode => {
+                const objDepts = objNode.departments;
+                const matchesAnyChild = objDepts.some(dept =>
+                  filterMatch(dept.name) ||
+                  dept.functional_objectives.some(fo => filterMatch(fo.name) ||
+                    fo.key_results.some(kr => filterMatch(kr.name) ||
+                      kr.indicators.some(ind => filterMatch(ind.name))))
+                );
+                if (!filterMatch(objNode.name) && !matchesAnyChild) return null;
+
                 return (
-                  <div key={dept.id}>
+                  <div key={objNode.id}>
                     <TreeNode
-                      icon="📁"
-                      label={dept.name}
-                      colorDot={getColorClass(dept.color)}
-                      badge={`${dept.functional_objectives.length} FOs`}
-                      isSelected={selectedItem?.type === 'department' && selectedItem.data.id === dept.id}
-                      onClick={() => setSelectedItem({ type: 'department', data: dept })}
-                      onExpand={() => toggleDept(dept.id)}
-                      isExpanded={expandedDepts.has(dept.id)}
-                      hasChildren={dept.functional_objectives.length > 0}
+                      icon="🎯"
+                      label={objNode.name}
+                      colorDot={getColorClass(objNode.color)}
+                      badge={`${objNode.departments.length} depts`}
+                      isSelected={false}
+                      onClick={() => toggleObj(objNode.id)}
+                      onExpand={() => toggleObj(objNode.id)}
+                      isExpanded={expandedObjs.has(objNode.id)}
+                      hasChildren={objNode.departments.length > 0}
                       level={0}
                     />
-                    
-                    {expandedDepts.has(dept.id) && dept.functional_objectives.map(fo => {
-                      if (!filterMatch(fo.name) && 
-                          !fo.key_results.some(kr => filterMatch(kr.name) ||
-                            kr.indicators.some(ind => filterMatch(ind.name)))) {
+
+                    {expandedObjs.has(objNode.id) && objDepts.map(dept => {
+                      if (!filterMatch(dept.name) && 
+                          !dept.functional_objectives.some(fo => filterMatch(fo.name) ||
+                            fo.key_results.some(kr => filterMatch(kr.name) ||
+                              kr.indicators.some(ind => filterMatch(ind.name))))) {
                         return null;
                       }
                       
                       return (
-                        <div key={fo.id}>
+                        <div key={dept.id}>
                           <TreeNode
-                            icon="📋"
-                            label={fo.name}
-                            badge={`${fo.key_results.length} KRs`}
-                            isSelected={selectedItem?.type === 'fo' && selectedItem.data.id === fo.id}
-                            onClick={() => setSelectedItem({ type: 'fo', data: fo, departmentId: dept.id })}
-                            onExpand={() => toggleFO(fo.id)}
-                            isExpanded={expandedFOs.has(fo.id)}
-                            hasChildren={fo.key_results.length > 0}
+                            icon="📁"
+                            label={dept.name}
+                            colorDot={getColorClass(dept.color)}
+                            badge={`${dept.functional_objectives.length} FOs`}
+                            isSelected={selectedItem?.type === 'department' && selectedItem.data.id === dept.id}
+                            onClick={() => setSelectedItem({ type: 'department', data: dept })}
+                            onExpand={() => toggleDept(dept.id)}
+                            isExpanded={expandedDepts.has(dept.id)}
+                            hasChildren={dept.functional_objectives.length > 0}
                             level={1}
                           />
                           
-                          {expandedFOs.has(fo.id) && fo.key_results.map(kr => {
-                            if (!filterMatch(kr.name) && 
-                                !kr.indicators.some(ind => filterMatch(ind.name))) {
+                          {expandedDepts.has(dept.id) && dept.functional_objectives.map(fo => {
+                            if (!filterMatch(fo.name) && 
+                                !fo.key_results.some(kr => filterMatch(kr.name) ||
+                                  kr.indicators.some(ind => filterMatch(ind.name)))) {
                               return null;
                             }
                             
                             return (
-                              <div key={kr.id}>
+                              <div key={fo.id}>
                                 <TreeNode
-                                  icon="🎯"
-                                  label={kr.name}
-                                  badge={`${kr.indicators.length} KPIs`}
-                                  isSelected={selectedItem?.type === 'kr' && selectedItem.data.id === kr.id}
-                                  onClick={() => setSelectedItem({ type: 'kr', data: kr, foId: fo.id })}
-                                  onExpand={() => toggleKR(kr.id)}
-                                  isExpanded={expandedKRs.has(kr.id)}
-                                  hasChildren={kr.indicators.length > 0}
+                                  icon="📋"
+                                  label={fo.name}
+                                  badge={`${fo.key_results.length} KRs`}
+                                  isSelected={selectedItem?.type === 'fo' && selectedItem.data.id === fo.id}
+                                  onClick={() => setSelectedItem({ type: 'fo', data: fo, departmentId: dept.id })}
+                                  onExpand={() => toggleFO(fo.id)}
+                                  isExpanded={expandedFOs.has(fo.id)}
+                                  hasChildren={fo.key_results.length > 0}
                                   level={2}
                                 />
                                 
-                                {expandedKRs.has(kr.id) && kr.indicators.map(ind => {
-                                  if (!filterMatch(ind.name)) return null;
-                                  
-                                  const ragStatus = calculateRAGStatus(ind.current_value, ind.target_value);
+                                {expandedFOs.has(fo.id) && fo.key_results.map(kr => {
+                                  if (!filterMatch(kr.name) && 
+                                      !kr.indicators.some(ind => filterMatch(ind.name))) {
+                                    return null;
+                                  }
                                   
                                   return (
-                                    <TreeNode
-                                      key={ind.id}
-                                      icon="📈"
-                                      label={ind.name}
-                                      ragStatus={ragStatus}
-                                      isSelected={selectedItem?.type === 'indicator' && selectedItem.data.id === ind.id}
-                                      onClick={() => setSelectedItem({ type: 'indicator', data: ind, krId: kr.id })}
-                                      hasChildren={false}
-                                      level={3}
-                                    />
+                                    <div key={kr.id}>
+                                      <TreeNode
+                                        icon="🎯"
+                                        label={kr.name}
+                                        badge={`${kr.indicators.length} KPIs`}
+                                        isSelected={selectedItem?.type === 'kr' && selectedItem.data.id === kr.id}
+                                        onClick={() => setSelectedItem({ type: 'kr', data: kr, foId: fo.id })}
+                                        onExpand={() => toggleKR(kr.id)}
+                                        isExpanded={expandedKRs.has(kr.id)}
+                                        hasChildren={kr.indicators.length > 0}
+                                        level={3}
+                                      />
+                                      
+                                      {expandedKRs.has(kr.id) && kr.indicators.map(ind => {
+                                        if (!filterMatch(ind.name)) return null;
+                                        
+                                        const ragStatus = calculateRAGStatus(ind.current_value, ind.target_value);
+                                        
+                                        return (
+                                          <TreeNode
+                                            key={ind.id}
+                                            icon="📈"
+                                            label={ind.name}
+                                            ragStatus={ragStatus}
+                                            isSelected={selectedItem?.type === 'indicator' && selectedItem.data.id === ind.id}
+                                            onClick={() => setSelectedItem({ type: 'indicator', data: ind, krId: kr.id })}
+                                            hasChildren={false}
+                                            level={4}
+                                          />
+                                        );
+                                      })}
+                                    </div>
                                   );
                                 })}
                               </div>
@@ -986,6 +1082,7 @@ export function OKRHierarchyTab() {
             <DepartmentEditPanel 
               key={selectedItem.data.id}
               dept={selectedItem.data} 
+              orgObjectives={orgObjectiveNodes}
               onSave={handleRefresh} 
               onDelete={handleDelete}
               onClose={() => setSelectedItem(null)} 
