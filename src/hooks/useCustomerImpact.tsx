@@ -566,6 +566,13 @@ async function fetchCustomersWithImpact(): Promise<CustomerWithImpact[]> {
       healthMetricsScore: healthScore,
       healthDimensions: healthSummary?.dimensions ?? [],
       indicatorScore,
+      opsWorstRAG: (() => {
+        const dims = healthSummary?.dimensions ?? [];
+        if (dims.length === 0) return 'not-set' as RAGStatus;
+        if (dims.some(d => d.rag === 'red')) return 'red' as RAGStatus;
+        if (dims.some(d => d.rag === 'amber')) return 'amber' as RAGStatus;
+        return 'green' as RAGStatus;
+      })(),
     };
   });
 }
