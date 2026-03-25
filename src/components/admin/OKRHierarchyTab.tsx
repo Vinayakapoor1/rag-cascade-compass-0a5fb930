@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Save, X, Trash2, RefreshCw, Plus, Search, Loader2, FolderTree, Target, BarChart3, HelpCircle, Link2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Save, X, Trash2, RefreshCw, Plus, Search, Loader2, FolderTree, Target, BarChart3, HelpCircle, Link2, Upload } from 'lucide-react';
+import { importV5Departments, type ImportProgress } from '@/lib/v5DepartmentImporter';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
