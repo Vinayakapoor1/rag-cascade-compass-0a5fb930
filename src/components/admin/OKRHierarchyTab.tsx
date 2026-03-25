@@ -1082,6 +1082,7 @@ export function OKRHierarchyTab() {
             <DepartmentEditPanel 
               key={selectedItem.data.id}
               dept={selectedItem.data} 
+              orgObjectives={orgObjectiveNodes}
               onSave={handleRefresh} 
               onDelete={handleDelete}
               onClose={() => setSelectedItem(null)} 
