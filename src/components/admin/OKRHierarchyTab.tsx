@@ -701,24 +701,24 @@ export function OKRHierarchyTab() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch departments including their own color column
-      const { data: depts, error: deptError } = await supabase
-        .from('departments')
-        .select('id, name, org_objective_id, color, owner');
+      // Fetch org objectives and departments in parallel
+      const [orgRes, deptRes] = await Promise.all([
+        supabase.from('org_objectives').select('id, name, color, classification').order('name'),
+        supabase.from('departments').select('id, name, org_objective_id, color, owner'),
+      ]);
 
-      if (deptError) throw deptError;
+      if (deptRes.error) throw deptRes.error;
 
       const fullDepts: Department[] = [];
+      const orgObjMap = new Map<string, { id: string; name: string; color: string; classification: string }>();
+      for (const obj of orgRes.data || []) {
+        orgObjMap.set(obj.id, obj);
+      }
 
-      for (const dept of depts || []) {
-        // Use department's own color, fallback to org objective color, then gray
+      for (const dept of deptRes.data || []) {
         let color = dept.color || 'gray';
         if (!dept.color && dept.org_objective_id) {
-          const { data: orgObj } = await supabase
-            .from('org_objectives')
-            .select('color')
-            .eq('id', dept.org_objective_id)
-            .single();
+          const orgObj = orgObjMap.get(dept.org_objective_id);
           color = orgObj?.color || 'gray';
         }
 
@@ -753,9 +753,31 @@ export function OKRHierarchyTab() {
       }
 
       setDepartments(fullDepts);
-      // Auto-expand first department
-      if (fullDepts.length > 0) {
-        setExpandedDepts(new Set([fullDepts[0].id]));
+
+      // Build org objective nodes grouped with their departments
+      const objNodes: OrgObjectiveNode[] = [];
+      for (const obj of orgRes.data || []) {
+        objNodes.push({
+          ...obj,
+          departments: fullDepts.filter((d) => d.org_objective_id === obj.id),
+        });
+      }
+      // Add an "Unmapped" group for departments without an org objective
+      const unmapped = fullDepts.filter((d) => !d.org_objective_id);
+      if (unmapped.length > 0) {
+        objNodes.push({
+          id: '__unmapped__',
+          name: 'Unmapped Departments',
+          color: 'gray',
+          classification: '',
+          departments: unmapped,
+        });
+      }
+      setOrgObjectiveNodes(objNodes);
+
+      // Auto-expand first org objective
+      if (objNodes.length > 0) {
+        setExpandedObjs(new Set([objNodes[0].id]));
       }
     } catch (error) {
       toast.error('Failed to load hierarchy');
