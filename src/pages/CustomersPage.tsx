@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { CustomerFormDialog } from '@/components/CustomerFormDialog';
 import { RAGBadge } from '@/components/RAGBadge';
-import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server, TrendingUp, Globe, Factory, UserCheck, Settings } from 'lucide-react';
+import { Users, Search, Building2, Activity, Loader2, Filter, Plus, Edit, Trash2, Tag, Cloud, Server, TrendingUp, Globe, Factory, UserCheck, Settings, ShieldCheck, AlertTriangle, XCircle, HelpCircle } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
