@@ -415,6 +415,44 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {/* Ops Health Filter Cards */}
+      {customers && customers.length > 0 && (() => {
+        const opsBase = filterExcluding('opsHealth');
+        const greenCount = opsBase.filter(c => c.opsWorstRAG === 'green').length;
+        const amberCount = opsBase.filter(c => c.opsWorstRAG === 'amber').length;
+        const redCount = opsBase.filter(c => c.opsWorstRAG === 'red').length;
+        const notSetCount = opsBase.filter(c => c.opsWorstRAG === 'not-set').length;
+        const cards = [
+          { key: 'green', label: 'On Track', count: greenCount, icon: ShieldCheck, colorClass: 'text-rag-green', bgClass: 'bg-rag-green/10 border-rag-green/30', activeBg: 'bg-rag-green/20 ring-2 ring-rag-green/50' },
+          { key: 'amber', label: 'At Risk', count: amberCount, icon: AlertTriangle, colorClass: 'text-rag-amber', bgClass: 'bg-rag-amber/10 border-rag-amber/30', activeBg: 'bg-rag-amber/20 ring-2 ring-rag-amber/50' },
+          { key: 'red', label: 'Critical', count: redCount, icon: XCircle, colorClass: 'text-rag-red', bgClass: 'bg-rag-red/10 border-rag-red/30', activeBg: 'bg-rag-red/20 ring-2 ring-rag-red/50' },
+          { key: 'not-set', label: 'Not Set', count: notSetCount, icon: HelpCircle, colorClass: 'text-muted-foreground', bgClass: 'bg-muted/40 border-border', activeBg: 'bg-muted/60 ring-2 ring-muted-foreground/40' },
+        ];
+        return (
+          <div className="grid grid-cols-4 gap-2">
+            {cards.map(card => {
+              const Icon = card.icon;
+              const isActive = opsHealthFilter === card.key;
+              return (
+                <button
+                  key={card.key}
+                  onClick={() => setOpsHealthFilter(isActive ? 'all' : card.key)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-left',
+                    isActive ? card.activeBg : card.bgClass,
+                    'hover:shadow-sm cursor-pointer'
+                  )}
+                >
+                  <Icon className={cn('h-4 w-4', card.colorClass)} />
+                  <span className={cn('text-lg font-bold', card.colorClass)}>{card.count}</span>
+                  <span className="text-[11px] text-muted-foreground font-medium">{card.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4 p-4 bg-muted/30 rounded-lg">
         <div className="flex items-center gap-2">
