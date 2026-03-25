@@ -505,6 +505,14 @@ export async function importV5Departments(
     let departmentId: string;
 
     if (dept.isNew) {
+      // Look up the active venture to link the new org objective
+      const { data: ventureData } = await supabase
+        .from('ventures')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
       // Create new org objective
       onProgress?.({ step: dept.departmentName, detail: 'Creating org objective...' });
       const { data: orgData, error: orgErr } = await supabase
@@ -513,6 +521,7 @@ export async function importV5Departments(
           name: dept.orgObjectiveName,
           color: dept.newOrgColor || 'green',
           classification: 'CORE',
+          venture_id: ventureData?.id || null,
         })
         .select('id')
         .single();
