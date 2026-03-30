@@ -18,6 +18,7 @@ import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 export default function FeaturesPage() {
   const { isAdmin, isDepartmentHead, isCSM, isContentManager, csmId } = useAuth();
+  const { canSee } = useVisibilitySettings();
   const { data: allFeatures, isLoading, refetch } = useFeaturesWithImpact();
 
   // For CSMs or Content Managers, fetch scoped feature IDs
