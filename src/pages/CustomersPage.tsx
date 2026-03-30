@@ -88,6 +88,7 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
 export default function CustomersPage() {
   const { isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, csmId, accessibleCsmIds } = useAuth();
   const { data: allCustomers, isLoading, refetch } = useCustomersWithImpact();
+  const { canSee } = useVisibilitySettings();
 
   // Scope customers by role:
   // - Content managers (non-admin): only managed_services customers
