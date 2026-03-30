@@ -1,102 +1,55 @@
 
 
-# RBAC Visibility Control Panel
+# Add Department-Level Visibility Controls
 
-## What You'll Get
+## What You Want
 
-An admin-only "Visibility Settings" page (accessible from Admin Dashboard) that lets you define which **sections** each **role** can see on each **page**. A simple matrix of toggles: Page × Section × Role.
+Currently the Visibility tab only controls by **Role** (Admin, Dept Head, CSM, etc.). You want to control visibility **per department** — e.g., the CS Department Head sees different sections than the QA Department Head.
 
-## Current Hardcoded Visibility (Today)
+## Current State
 
-```text
-Page                  Section                         Admin  DeptHead  DeptMember  CSM  ContentMgr
-─────────────────────────────────────────────────────────────────────────────────────────────────────
-Portfolio             Org Objectives                   ✅      ✅        ✅        ✅     ✅
-Portfolio             Stats Cards                      ✅      ✅        ✅        ✅     ✅
-Portfolio             RAG Filter Cards                 ✅      ✅        ✅        ✅     ✅
-Portfolio             Departments                      ✅      ✅        ✅        ✅     ✅
-Portfolio             Customer/Feature Counts          ✅      ✅        ✅        ✅     ✅
-Portfolio             Sec+Tech Deployment Cards        ✅      ✅(CS/ST) ❌        ✅     ❌
-Index                 CSM Compliance Widget            ✅      ❌        ❌        ✅     ❌
-Index                 Team Leader Instructions         ❌      ✅        ❌        ❌     ❌
-Index                 Data Management Link             ✅      ❌        ❌        ❌     ❌
-Customers             Add/Edit/Delete Customer         ✅      ✅        ❌        ❌     ❌
-Customers             Ops Health Filters               ✅      ✅        ✅        ✅     ✅
-Features              Add/Edit Feature                 ✅      ❌        ❌        ❌     ❌
-Data Entry Matrix     Sec+Tech Deployment Params       ✅      ✅(CS/ST) ❌        ❌     ❌
-Data Entry Matrix     CM Indicators Sub-section        ✅      ✅(CS)    ❌        ✅     ❌
-Header Nav            Admin Dashboard Button           ✅      ❌        ❌        ❌     ❌
-Header Nav            Enter Data (CSM)                 ❌      ❌        ❌        ✅     ❌
-Header Nav            Enter Data (CM)                  ❌      ❌        ❌        ❌     ✅
-Header Nav            Enter Data (DeptHead/Member)     ❌      ✅        ✅        ❌     ❌
-Admin Dashboard       All tabs                         ✅      ❌        ❌        ❌     ❌
-```
+The `visibility_settings` table has: `page | section | role | is_visible`. There is no department dimension, so all Department Heads see the same things regardless of which department they belong to.
 
-## Implementation Plan
+## Changes
 
-### Step 1 — Create `visibility_settings` table
+### 1. Add `department_id` column to `visibility_settings`
 
 ```sql
-CREATE TABLE visibility_settings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  page text NOT NULL,        -- e.g. 'portfolio', 'customers', 'header'
-  section text NOT NULL,     -- e.g. 'org_objectives', 'rag_filters', 'deployment_cards'
-  role text NOT NULL,        -- e.g. 'admin', 'department_head', 'csm', 'department_member', 'content_manager'
-  is_visible boolean NOT NULL DEFAULT true,
-  updated_at timestamptz DEFAULT now(),
-  UNIQUE(page, section, role)
-);
+ALTER TABLE visibility_settings ADD COLUMN department_id uuid REFERENCES departments(id);
+-- Update unique constraint to include department
+ALTER TABLE visibility_settings DROP CONSTRAINT visibility_settings_page_section_role_key;
+ALTER TABLE visibility_settings ADD CONSTRAINT visibility_settings_page_section_role_dept_key 
+  UNIQUE(page, section, role, department_id);
 ```
 
-Seed it with the current hardcoded defaults from the matrix above (~90 rows). RLS: admins can manage, all authenticated can read.
+- When `department_id` is NULL → applies globally to the role (current behavior)
+- When `department_id` is set → applies only to users of that department
 
-### Step 2 — Create `useVisibilitySettings` hook
+### 2. Update `useVisibilitySettings` hook
 
-A React hook that fetches all visibility settings on mount and provides a helper:
-```ts
-canSee(page: string, section: string): boolean
-```
-It cross-references the user's roles (from `useAuth`) against the DB settings. If no setting exists for a page/section/role combo, it defaults to `true` (backward compatible).
+- Fetch the user's assigned departments from `department_access`
+- When checking `canSee(page, section)`, first check department-specific settings, then fall back to global role settings
+- Priority: department-specific override > global role setting > default true
 
-### Step 3 — Admin Visibility Settings page
+### 3. Redesign the Visibility Admin UI
 
-Add a new tab "Visibility" in the Admin Dashboard. Renders a grouped table:
-- Rows grouped by **Page** (Portfolio, Customers, Features, Header, Data Entry, etc.)
-- Within each page, rows for each **Section**
-- Columns for each **Role** (Admin, Dept Head, Dept Member, CSM, Content Manager)
-- Each cell is a Switch toggle that updates the DB in real-time
+Add a **department selector** (tabs or dropdown) at the top of the Visibility tab:
+- **"Global (All Departments)"** — shows the current Role × Section matrix (department_id = NULL)
+- **Per-department tabs** (Customer Success, QA, Product Engineering, etc.) — shows the same matrix but scoped to that department
 
-### Step 4 — Wire up visibility checks across pages
+Each department tab shows the same Page × Section × Role grid, but settings apply only to users assigned to that department. If a department-specific setting exists, it overrides the global one.
 
-Replace all hardcoded `isAdmin &&`, `isCSM &&`, `isDepartmentHead &&` visibility guards with `canSee('portfolio', 'deployment_cards')` calls from the hook. Pages affected:
+### 4. Seed department-specific defaults
 
-- **`Portfolio.tsx`** — 5 sections (org objectives, stats, RAG filters, departments, deployment cards)
-- **`CustomersPage.tsx`** — add/edit controls, ops health filters
-- **`FeaturesPage.tsx`** — add/edit controls
-- **`AppLayout.tsx`** — header nav buttons
-- **`Index.tsx`** — compliance widget, team leader instructions
-- **`CSMDataEntryMatrix.tsx`** — CM indicators, deployment params
-
-### Step 5 — Route-level protection remains unchanged
-
-`ProtectedRoute` and authentication flow stay exactly as-is. This RBAC layer controls **section visibility within pages**, not page access.
+For the existing special cases (e.g., CS/ST heads see Sec+Tech deployment params but others don't), insert department-specific rows so the current behavior is preserved.
 
 ## What Does NOT Change
-- Authentication flow, 2FA, session management
-- Data scoping (department access, CSM customer filtering)
-- RLS policies on all tables
-- Any calculation or scoring logic
-- Route-level protection
+- Authentication, route protection, RLS policies
+- The `canSee()` API signature stays the same (no code changes needed in consuming pages)
+- All existing global settings remain functional
 
 ## Files Modified
-1. **Database migration** — create `visibility_settings` table + seed defaults
-2. **`src/hooks/useVisibilitySettings.ts`** — new hook
-3. **`src/components/admin/VisibilitySettingsTab.tsx`** — new admin UI component
-4. **`src/pages/AdminDashboard.tsx`** — add Visibility tab
-5. **`src/pages/Portfolio.tsx`** — wrap sections with `canSee()` checks
-6. **`src/pages/CustomersPage.tsx`** — wrap sections with `canSee()` checks
-7. **`src/pages/FeaturesPage.tsx`** — wrap sections with `canSee()` checks
-8. **`src/components/AppLayout.tsx`** — wrap nav buttons with `canSee()` checks
-9. **`src/pages/Index.tsx`** — wrap sections with `canSee()` checks
-10. **`src/components/user/CSMDataEntryMatrix.tsx`** — wrap sub-sections with `canSee()` checks
+1. **Database migration** — add `department_id` column, update unique constraint, seed department-specific defaults
+2. **`src/hooks/useVisibilitySettings.ts`** — add department-aware lookup logic
+3. **`src/components/admin/VisibilitySettingsTab.tsx`** — add department selector tabs, department-scoped toggle grid
 
