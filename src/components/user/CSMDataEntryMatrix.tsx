@@ -1825,7 +1825,7 @@ function CustomerSectionCard({
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
   departmentId, period, isSaved, isSaving, onSaveCustomer, hasUnsavedChanges,
   cmIndicators, cmBands, stIndicators, stBands, previousScores, previousPeriodLabel, lastCheckInDate,
-  remarks, onRemarkChange, onOpsDataChange,
+  remarks, onRemarkChange, onOpsDataChange, canSee,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
