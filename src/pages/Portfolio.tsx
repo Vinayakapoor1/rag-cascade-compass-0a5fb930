@@ -722,6 +722,7 @@ export default function Portfolio() {
       )}
 
       {/* 7. All Departments - Small Stat Blocks */}
+      {canSee('portfolio', 'departments') && (
       <div>
         <h2 className="text-lg font-semibold mb-3">Departments</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -746,6 +747,7 @@ export default function Portfolio() {
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }
