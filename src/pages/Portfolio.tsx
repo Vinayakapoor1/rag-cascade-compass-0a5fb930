@@ -473,6 +473,7 @@ export default function Portfolio() {
       />
 
       {/* 3. Organizational Objectives - Small Stat Blocks */}
+      {canSee('portfolio', 'org_objectives') && (
       <div>
         <h2 className="text-lg font-semibold mb-3">Organizational Objectives</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -488,6 +489,7 @@ export default function Portfolio() {
             ))}
         </div>
       </div>
+      )}
 
       {/* 4. Stats Cards - Structure Overview */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
