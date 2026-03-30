@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, ResponsiveContainer, CartesianGrid, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { RAGStatus } from '@/types/venture';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 const RAG_LINE_COLORS: Record<RAGStatus, string> = {
   green: 'hsl(142, 71%, 45%)',
