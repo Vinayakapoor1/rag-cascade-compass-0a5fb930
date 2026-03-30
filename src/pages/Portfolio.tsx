@@ -123,6 +123,7 @@ export default function Portfolio() {
   const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
   const { user, isAdmin, isCSM, isContentManager, isDepartmentHead, isDepartmentMember, csmId, accessibleDepartments, accessibleCsmIds } = useAuth();
   const { data: allTimeValues } = useAllTimeIndicatorValues();
+  const { canSee } = useVisibilitySettings();
 
   // Auto-select HumanFirewall on first load
   useEffect(() => {
