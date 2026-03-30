@@ -112,7 +112,7 @@ const Index = () => {
                   <Badge variant="outline" className="hidden sm:inline-flex glass-card px-3 py-1">
                     {user.email}
                   </Badge>
-                  {isAdmin && (
+                  {canSee('index', 'data_management_link') && (
                     <Button variant="outline" size="sm" asChild className="glass-card hover-glow border-primary/20">
                       <Link to="/data">
                         <Settings className="h-4 w-4 mr-2" />
