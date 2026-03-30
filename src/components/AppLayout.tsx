@@ -28,6 +28,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, accessibleDepartments, signOut, loading } = useAuth();
+  const { canSee } = useVisibilitySettings();
   const [has2FA, setHas2FA] = useState<boolean | null>(null);
   const [toggling2FA, setToggling2FA] = useState(false);
 
