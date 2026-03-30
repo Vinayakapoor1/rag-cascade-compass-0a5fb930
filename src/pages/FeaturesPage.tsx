@@ -151,10 +151,12 @@ export default function FeaturesPage() {
             View feature impact on OKR hierarchy
           </p>
         </div>
+        {canSee('features', 'add_edit_feature') && (
         <Button onClick={() => setAddDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Feature
         </Button>
+        )}
       </div>
 
       {/* Summary Stats */}

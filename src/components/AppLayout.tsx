@@ -144,7 +144,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     )}
 
                     {/* Admin: Unified Dashboard Button */}
-                    {isAdmin && (
+                    {canSee('header', 'admin_dashboard_button') && (
                       <Link to="/admin">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 bg-primary/10 hover:bg-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />

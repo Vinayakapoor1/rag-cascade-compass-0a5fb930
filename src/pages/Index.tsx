@@ -219,7 +219,7 @@ const Index = () => {
         )}
 
         {/* CSM Compliance Widget - for admins and CSMs */}
-        {user && (isAdmin || isCSM) && <CSMComplianceWidget />}
+        {user && canSee('index', 'csm_compliance_widget') && <CSMComplianceWidget />}
 
         {/* Activity Timeline Widget - Only for logged in users */}
         {user && (

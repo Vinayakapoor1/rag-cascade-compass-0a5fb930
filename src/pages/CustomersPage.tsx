@@ -420,7 +420,7 @@ export default function CustomersPage() {
       )}
 
       {/* Ops Health Filter Cards */}
-      {customers && customers.length > 0 && (() => {
+      {canSee('customers', 'ops_health_filters') && customers && customers.length > 0 && (() => {
         const opsBase = filterExcluding('opsHealth');
         const greenCount = opsBase.filter(c => c.opsWorstRAG === 'green').length;
         const amberCount = opsBase.filter(c => c.opsWorstRAG === 'amber').length;
