@@ -14,6 +14,7 @@ import { AddFeatureDialog } from '@/components/AddFeatureDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 export default function FeaturesPage() {
   const { isAdmin, isDepartmentHead, isCSM, isContentManager, csmId } = useAuth();
