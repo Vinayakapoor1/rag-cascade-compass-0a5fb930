@@ -10,6 +10,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
