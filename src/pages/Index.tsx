@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, LogIn, Settings, Building2, Target, TrendingUp, RefreshCw, Layers, ClipboardCheck } from 'lucide-react';
 import { CSMComplianceWidget } from '@/components/CSMComplianceWidget';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 
