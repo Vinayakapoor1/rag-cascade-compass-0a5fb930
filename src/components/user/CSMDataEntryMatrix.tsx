@@ -2355,7 +2355,7 @@ function CustomerSectionCard({
                 </div>
 
                 {/* ===== Content Management Indicators Sub-Section ===== */}
-                {cmIndicators.length > 0 && (
+                {cmIndicators.length > 0 && canSee('data_entry', 'cm_indicators_subsection') && (
                   <CMSubSectionBlock
                     customerId={section.id}
                     cmIndicators={cmIndicators}
