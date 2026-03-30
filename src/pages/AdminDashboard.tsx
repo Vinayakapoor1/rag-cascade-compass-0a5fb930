@@ -36,6 +36,10 @@ export default function AdminDashboard() {
                         <FileText className="h-4 w-4" />
                         Reports
                     </TabsTrigger>
+                    <TabsTrigger value="visibility" className="gap-2">
+                        <Eye className="h-4 w-4" />
+                        Visibility
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="audit" className="mt-4">
