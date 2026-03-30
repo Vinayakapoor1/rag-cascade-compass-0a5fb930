@@ -608,6 +608,7 @@ export default function Portfolio() {
       )}
 
       {/* 5. RAG Filtering Cards */}
+      {canSee('portfolio', 'rag_filter_cards') && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-4">
           <p className="text-xs font-medium text-muted-foreground mb-2">Overall Health</p>
@@ -704,6 +705,7 @@ export default function Portfolio() {
           </div>
         </div>
       </div>
+      )}
 
       {/* 6. Filter Active Banner */}
       {filterStatus && (
