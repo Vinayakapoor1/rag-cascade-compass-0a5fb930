@@ -19,6 +19,7 @@ import { RAGStatus, OrgObjectiveColor, OrgObjectiveClassification } from '@/type
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { VentureSelector } from '@/components/VentureSelector';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 // Calculate percentage using rollup: Indicators → KR (formula) → FO (formula) → Dept (AVG) → Org (AVG)
 function calculateOrgObjectivePercentage(objective: DBOrgObjective): number {
