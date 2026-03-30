@@ -195,7 +195,7 @@ const Index = () => {
         )}
 
         {/* Team Leader Instructions - Only for department heads (not admins) */}
-        {user && isDepartmentHead && !isAdmin && (
+        {user && canSee('index', 'team_leader_instructions') && (
           <div className="card-premium p-6 border-primary/20">
             <div className="flex items-start gap-5 relative z-10">
               <div className="p-4 rounded-2xl bg-primary/10 animate-float">
