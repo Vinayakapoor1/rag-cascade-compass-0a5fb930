@@ -124,7 +124,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     )}
 
                     {/* Content Manager: Enter Data Button */}
-                    {isContentManager && !isAdmin && (
+                    {canSee('header', 'enter_data_cm') && (
                       <Link to="/content-management/data-entry">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
