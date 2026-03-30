@@ -1,50 +1,69 @@
 
 
-# Execute Vinayak's Backup + CS/CM OKR Updates
+# Map All Non-Sales Departments to Customers & Features for Scoring
 
-## Step 1 — Create "Vinayak's Backup"
+## Current State
 
-Call the `daily-backup` edge function to snapshot all 14 tables. Then insert a labeled activity log entry:
+| Department | Indicators | Feature Links | Scoring Method |
+|---|---|---|---|
+| Customer Success | 10 | 170 (all 10 × 17 features) | CSM Feature Matrix ✅ |
+| Content Management | 10 | 0 | ❌ No feature links |
+| Quality Assurance | 10 | 0 | ❌ No feature links |
+| Product Engineering | 10 | 0 | ❌ No feature links |
+| Product Management | 10 | 0 | ❌ No feature links |
+| Security & Technology | 10 | 0 | ❌ No feature links |
+| HR / People | 10 | 0 | ❌ No feature links |
+| Finance | 10 | 0 | ❌ No feature links |
+| Marketing | 10 | 0 | ❌ No feature links |
+| Sales | 10 | 0 | KPI Scoring Grid (standalone — correct) |
 
+**Only Customer Success** has its indicators linked to the 17 features. All other non-Sales departments have zero feature links, which means their data entry page shows "No Feature-Linked Indicators" and CSMs cannot score them via the feature matrix.
+
+## What Needs to Happen
+
+For **8 departments** (all except Sales), every indicator needs to be linked to the 17 core features (excluding "CM Direct Score" which is Content Management's standalone feature). This mirrors exactly how Customer Success is set up.
+
+**Total new links to create**: 8 departments × 10 indicators × 17 features = **1,360 rows** in `indicator_feature_links`.
+
+Content Management already has "CM Direct Score" as its 18th feature — its 10 indicators should be linked to the same 17 core features as CS.
+
+## Steps
+
+### Step 1 — Insert indicator_feature_links for all 8 non-Sales departments
+
+For each department's 10 indicators, create a link to each of the 17 core features. This is a bulk INSERT into `indicator_feature_links` with `impact_weight = 1.0`.
+
+SQL pattern:
 ```sql
-INSERT INTO activity_logs (action, entity_type, entity_name, metadata)
-VALUES ('create', 'import', 'Vinayak''s Backup', '{"label": "vinayak_backup", "timestamp": "2026-03-30"}');
+INSERT INTO indicator_feature_links (indicator_id, feature_id, impact_weight)
+SELECT i.id, f.id, 1.0
+FROM indicators i
+JOIN key_results kr ON i.key_result_id = kr.id
+JOIN functional_objectives fo ON kr.functional_objective_id = fo.id
+JOIN departments d ON fo.department_id = d.id
+CROSS JOIN features f
+WHERE d.name != 'Sales'
+AND f.name != 'CM Direct Score'
+AND NOT EXISTS (
+  SELECT 1 FROM indicator_feature_links ifl
+  WHERE ifl.indicator_id = i.id AND ifl.feature_id = f.id
+);
 ```
 
-This marks the backup so it can be found by searching for "Vinayak's Backup" in activity logs, with the corresponding data snapshot in `daily_backups`.
+### Step 2 — No code changes needed
 
-## Step 2 — Update CS Key Results (5 renames + 4 formula changes)
+The CSM data entry matrix (`CSMDataEntryMatrix.tsx`) already reads from `indicator_feature_links` to build the scoring grid. Once the links exist, each department's data entry page will automatically show the feature matrix with all 17 features × 10 indicators for scoring.
 
-Match KRs by current name via join to `functional_objectives → departments` where department name = 'Customer Success'. Update `name` and `formula` columns only — IDs untouched.
+### Step 3 — Verify the existing customer-feature mappings cover all customers
 
-| Current Name (partial) | New Name | Formula Change |
-|---|---|---|
-| "KR: Increase product usage by 25% for all key customers..." | "Increase product usage by 25%" | No |
-| "Conduct QBRs for 100% Key Accounts" | "Achieve 100% QBR coverage for all key accounts per quarter" | → `Current QBR Coverage Rate % / 100 × 100` |
-| "Achieve CSAT ≥ 90% for 100% Key Accounts Quarterly" | "Achieve CSAT score ≥90% across all key accounts each quarter" | → `Current CSAT Coverage % / 100 × 100` |
-| "Check-in with all key accounts monthly" | "Achieve confirmed renewal intent from ≥80% of accounts up for renewal" | → `Current Renewal Commitment Signal % / 80 × 100` |
-| "Maintain up-to-date SOPs and processes" | "Achieve 100% SOP compliance rate across all CS processes" | → `Current SOP Compliance Rate % / 100 × 100` |
+82 customers already have `customer_features` entries for the 17 features. This means when a CSM opens any non-Sales department's data entry page, they'll see the full Customer × Feature × Indicator matrix ready for scoring.
 
-## Step 3 — Update CM Key Results (5 renames, no formula changes)
-
-Match KRs via department name = 'Content Management'. Update `name` column only.
-
-| Current Name (partial) | New Name |
-|---|---|
-| "Produce and launch 3 new high-impact content assets..." | "Achieve ≥3 new high-impact content assets launched per quarter..." |
-| "Achieve 90% engagement and completion..." | "Achieve ≥90% content engagement rate..." |
-| "Co-create at least 3 industry-specific content packs..." | "Launch ≥3 industry-specific content packs..." |
-| "Reduce content production cycle time by 25% and improve..." | "Reduce content production cycle time by 25% from baseline" |
-| "Implement version control, rights management..." | "Achieve 100% of content assets managed under version control..." |
-
-## What does NOT change
-- All indicator names, values, formulas, and links
-- All functional objective names and formulas
-- All customer health metrics, feature scores, and history
-- All KR IDs (foreign keys preserved)
-- All algorithms and calculation logic
+## What Does NOT Change
+- Customer Success mappings (already has 170 links — untouched)
+- Sales department (stays on KPI Scoring Grid with no feature mapping)
+- All algorithms, formulas, and RAG calculations
+- All existing scored data
 
 ## Files Modified
-- Zero code files — database data updates only via insert tool
-- Edge function call for backup
+- **Zero code files** — database INSERT only into `indicator_feature_links`
 
