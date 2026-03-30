@@ -133,8 +133,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                       </Link>
                     )}
 
-                    {/* Department Head / Member: Enter Data Button - route directly if single department */}
-                    {(isDepartmentHead || isDepartmentMember) && !isAdmin && !isCSM && (
+                    {/* Department Head / Member: Enter Data Button */}
+                    {canSee('header', 'enter_data_dept') && (
                       <Link to={accessibleDepartments.length === 1 ? `/department/${accessibleDepartments[0]}/data-entry` : '/data'}>
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
