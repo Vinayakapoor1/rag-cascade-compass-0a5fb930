@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,6 +136,7 @@ type BandMap = Record<string, KPIBand[]>; // indicator_id -> bands
 
 export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }: CSMDataEntryMatrixProps) {
   const { user, isAdmin, isDepartmentHead, isDepartmentMember, accessibleCsmIds } = useAuth();
+  const { canSee } = useVisibilitySettings();
   const { logActivity } = useActivityLog();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1664,6 +1666,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           remarks={remarks}
           onRemarkChange={(key, text) => setRemarks(prev => ({ ...prev, [key]: text }))}
           onOpsDataChange={(custId, data) => { opsHealthDataRef.current[custId] = data; }}
+          canSee={canSee}
         />
       ))}
 
@@ -1810,6 +1813,7 @@ interface CustomerSectionCardProps {
   remarks: RemarkMap;
   onRemarkChange: (key: string, text: string) => void;
   onOpsDataChange: (customerId: string, data: { bugCount: string; bugSla: string; promises: string; nfrSla: string; notes: string }) => void;
+  canSee: (page: string, section: string) => boolean;
 }
 
 // Check if this is CM direct mode (no real features, just placeholder)
@@ -1822,7 +1826,7 @@ function CustomerSectionCard({
   applyToRow, applyToColumn, clearRow, clearColumn, getFeatureRowAvg, getCustomerOverallAvg,
   departmentId, period, isSaved, isSaving, onSaveCustomer, hasUnsavedChanges,
   cmIndicators, cmBands, stIndicators, stBands, previousScores, previousPeriodLabel, lastCheckInDate,
-  remarks, onRemarkChange, onOpsDataChange,
+  remarks, onRemarkChange, onOpsDataChange, canSee,
 }: CustomerSectionCardProps) {
   const custAvg = getCustomerOverallAvg(section);
   const custRag = custAvg != null ? percentToRAG(Math.round(custAvg)) : null;
@@ -2353,7 +2357,7 @@ function CustomerSectionCard({
                 </div>
 
                 {/* ===== Content Management Indicators Sub-Section ===== */}
-                {cmIndicators.length > 0 && (
+                {cmIndicators.length > 0 && canSee('data_entry', 'cm_indicators_subsection') && (
                   <CMSubSectionBlock
                     customerId={section.id}
                     cmIndicators={cmIndicators}
@@ -2366,7 +2370,7 @@ function CustomerSectionCard({
                 )}
 
                 {/* ===== Sec+Tech Deployment Indicators Sub-Section ===== */}
-                {stIndicators.length > 0 && (
+                {stIndicators.length > 0 && canSee('data_entry', 'sectech_deployment_params') && (
                   <DeploymentSubSectionBlock
                     customerId={section.id}
                     stIndicators={stIndicators}

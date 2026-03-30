@@ -10,6 +10,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, accessibleDepartments, signOut, loading } = useAuth();
+  const { canSee } = useVisibilitySettings();
   const [has2FA, setHas2FA] = useState<boolean | null>(null);
   const [toggling2FA, setToggling2FA] = useState(false);
 
@@ -112,7 +114,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 {user ? (
                   <div className="flex items-center gap-2">
                     {/* CSM: Enter Data Button */}
-                    {isCSM && !isAdmin && (
+                    {canSee('header', 'enter_data_csm') && (
                       <Link to="/csm/data-entry">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
@@ -122,7 +124,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     )}
 
                     {/* Content Manager: Enter Data Button */}
-                    {isContentManager && !isAdmin && (
+                    {canSee('header', 'enter_data_cm') && (
                       <Link to="/content-management/data-entry">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
@@ -131,8 +133,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                       </Link>
                     )}
 
-                    {/* Department Head / Member: Enter Data Button - route directly if single department */}
-                    {(isDepartmentHead || isDepartmentMember) && !isAdmin && !isCSM && (
+                    {/* Department Head / Member: Enter Data Button */}
+                    {canSee('header', 'enter_data_dept') && (
                       <Link to={accessibleDepartments.length === 1 ? `/department/${accessibleDepartments[0]}/data-entry` : '/data'}>
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
@@ -142,7 +144,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     )}
 
                     {/* Admin: Unified Dashboard Button */}
-                    {isAdmin && (
+                    {canSee('header', 'admin_dashboard_button') && (
                       <Link to="/admin">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 bg-primary/10 hover:bg-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />

@@ -15,12 +15,14 @@ import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { LayoutDashboard, LogIn, Settings, Building2, Target, TrendingUp, RefreshCw, Layers, ClipboardCheck } from 'lucide-react';
 import { CSMComplianceWidget } from '@/components/CSMComplianceWidget';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 
 const Index = () => {
   const { data: rawOrgObjectives, isLoading, error, refetch } = useOrgObjectives();
   const { user, isAdmin, isDepartmentHead, isCSM, accessibleDepartments, loading: authLoading } = useAuth();
+  const { canSee } = useVisibilitySettings();
 
   // Scope departments: admins see all, others see only accessible departments
   const orgObjectives = useMemo(() => {
@@ -110,7 +112,7 @@ const Index = () => {
                   <Badge variant="outline" className="hidden sm:inline-flex glass-card px-3 py-1">
                     {user.email}
                   </Badge>
-                  {isAdmin && (
+                  {canSee('index', 'data_management_link') && (
                     <Button variant="outline" size="sm" asChild className="glass-card hover-glow border-primary/20">
                       <Link to="/data">
                         <Settings className="h-4 w-4 mr-2" />
@@ -193,7 +195,7 @@ const Index = () => {
         )}
 
         {/* Team Leader Instructions - Only for department heads (not admins) */}
-        {user && isDepartmentHead && !isAdmin && (
+        {user && canSee('index', 'team_leader_instructions') && (
           <div className="card-premium p-6 border-primary/20">
             <div className="flex items-start gap-5 relative z-10">
               <div className="p-4 rounded-2xl bg-primary/10 animate-float">
@@ -217,7 +219,7 @@ const Index = () => {
         )}
 
         {/* CSM Compliance Widget - for admins and CSMs */}
-        {user && (isAdmin || isCSM) && <CSMComplianceWidget />}
+        {user && canSee('index', 'csm_compliance_widget') && <CSMComplianceWidget />}
 
         {/* Activity Timeline Widget - Only for logged in users */}
         {user && (

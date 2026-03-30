@@ -19,6 +19,7 @@ import { RAGStatus, OrgObjectiveColor, OrgObjectiveClassification } from '@/type
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { VentureSelector } from '@/components/VentureSelector';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 // Calculate percentage using rollup: Indicators → KR (formula) → FO (formula) → Dept (AVG) → Org (AVG)
 function calculateOrgObjectivePercentage(objective: DBOrgObjective): number {
@@ -122,6 +123,7 @@ export default function Portfolio() {
   const [selectedVentureId, setSelectedVentureId] = useState<string | null>(null);
   const { user, isAdmin, isCSM, isContentManager, isDepartmentHead, isDepartmentMember, csmId, accessibleDepartments, accessibleCsmIds } = useAuth();
   const { data: allTimeValues } = useAllTimeIndicatorValues();
+  const { canSee } = useVisibilitySettings();
 
   // Auto-select HumanFirewall on first load
   useEffect(() => {
@@ -471,6 +473,7 @@ export default function Portfolio() {
       />
 
       {/* 3. Organizational Objectives - Small Stat Blocks */}
+      {canSee('portfolio', 'org_objectives') && (
       <div>
         <h2 className="text-lg font-semibold mb-3">Organizational Objectives</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -486,8 +489,10 @@ export default function Portfolio() {
             ))}
         </div>
       </div>
+      )}
 
       {/* 4. Stats Cards - Structure Overview */}
+      {canSee('portfolio', 'stats_cards') && (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className={cn(
           'stats-card p-4',
@@ -565,6 +570,7 @@ export default function Portfolio() {
             </div>
           </div>
         </div>
+        {canSee('portfolio', 'customer_feature_counts') && (<>
         <Link to="/customers">
           <div className="stats-card p-4 h-full group">
             <div className="flex items-center justify-between">
@@ -597,9 +603,12 @@ export default function Portfolio() {
             </div>
           </div>
         </Link>
+        </>)}
       </div>
+      )}
 
       {/* 5. RAG Filtering Cards */}
+      {canSee('portfolio', 'rag_filter_cards') && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-4">
           <p className="text-xs font-medium text-muted-foreground mb-2">Overall Health</p>
@@ -696,6 +705,7 @@ export default function Portfolio() {
           </div>
         </div>
       </div>
+      )}
 
       {/* 6. Filter Active Banner */}
       {filterStatus && (
@@ -712,6 +722,7 @@ export default function Portfolio() {
       )}
 
       {/* 7. All Departments - Small Stat Blocks */}
+      {canSee('portfolio', 'departments') && (
       <div>
         <h2 className="text-lg font-semibold mb-3">Departments</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -736,6 +747,7 @@ export default function Portfolio() {
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }

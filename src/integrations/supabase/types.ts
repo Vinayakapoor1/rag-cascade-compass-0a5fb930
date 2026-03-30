@@ -1612,6 +1612,33 @@ export type Database = {
         }
         Relationships: []
       }
+      visibility_settings: {
+        Row: {
+          id: string
+          is_visible: boolean
+          page: string
+          role: string
+          section: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          is_visible?: boolean
+          page: string
+          role: string
+          section: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          is_visible?: boolean
+          page?: string
+          role?: string
+          section?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

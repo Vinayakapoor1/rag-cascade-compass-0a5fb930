@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, ResponsiveContainer, CartesianGrid, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { RAGStatus } from '@/types/venture';
+import { useVisibilitySettings } from '@/hooks/useVisibilitySettings';
 
 const RAG_LINE_COLORS: Record<RAGStatus, string> = {
   green: 'hsl(142, 71%, 45%)',
@@ -87,6 +88,7 @@ function CustomerSparkline({ data, ragStatus }: { data: TrendDataPoint[]; ragSta
 export default function CustomersPage() {
   const { isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, csmId, accessibleCsmIds } = useAuth();
   const { data: allCustomers, isLoading, refetch } = useCustomersWithImpact();
+  const { canSee } = useVisibilitySettings();
 
   // Scope customers by role:
   // - Content managers (non-admin): only managed_services customers
@@ -290,10 +292,12 @@ export default function CustomersPage() {
             Manage customers, view features, and track KPI impact
           </p>
         </div>
+        {canSee('customers', 'add_edit_customer') && (
         <Button onClick={() => { setEditingCustomer(null); setCustomerFormOpen(true); }} className="gap-2">
           <Plus className="h-4 w-4" />
           Add Customer
         </Button>
+        )}
       </div>
 
       {/* Summary Stats */}
@@ -416,7 +420,7 @@ export default function CustomersPage() {
       )}
 
       {/* Ops Health Filter Cards */}
-      {customers && customers.length > 0 && (() => {
+      {canSee('customers', 'ops_health_filters') && customers && customers.length > 0 && (() => {
         const opsBase = filterExcluding('opsHealth');
         const greenCount = opsBase.filter(c => c.opsWorstRAG === 'green').length;
         const amberCount = opsBase.filter(c => c.opsWorstRAG === 'amber').length;
