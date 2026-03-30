@@ -1,69 +1,102 @@
 
 
-# Map All Non-Sales Departments to Customers & Features for Scoring
+# RBAC Visibility Control Panel
 
-## Current State
+## What You'll Get
 
-| Department | Indicators | Feature Links | Scoring Method |
-|---|---|---|---|
-| Customer Success | 10 | 170 (all 10 × 17 features) | CSM Feature Matrix ✅ |
-| Content Management | 10 | 0 | ❌ No feature links |
-| Quality Assurance | 10 | 0 | ❌ No feature links |
-| Product Engineering | 10 | 0 | ❌ No feature links |
-| Product Management | 10 | 0 | ❌ No feature links |
-| Security & Technology | 10 | 0 | ❌ No feature links |
-| HR / People | 10 | 0 | ❌ No feature links |
-| Finance | 10 | 0 | ❌ No feature links |
-| Marketing | 10 | 0 | ❌ No feature links |
-| Sales | 10 | 0 | KPI Scoring Grid (standalone — correct) |
+An admin-only "Visibility Settings" page (accessible from Admin Dashboard) that lets you define which **sections** each **role** can see on each **page**. A simple matrix of toggles: Page × Section × Role.
 
-**Only Customer Success** has its indicators linked to the 17 features. All other non-Sales departments have zero feature links, which means their data entry page shows "No Feature-Linked Indicators" and CSMs cannot score them via the feature matrix.
+## Current Hardcoded Visibility (Today)
 
-## What Needs to Happen
+```text
+Page                  Section                         Admin  DeptHead  DeptMember  CSM  ContentMgr
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+Portfolio             Org Objectives                   ✅      ✅        ✅        ✅     ✅
+Portfolio             Stats Cards                      ✅      ✅        ✅        ✅     ✅
+Portfolio             RAG Filter Cards                 ✅      ✅        ✅        ✅     ✅
+Portfolio             Departments                      ✅      ✅        ✅        ✅     ✅
+Portfolio             Customer/Feature Counts          ✅      ✅        ✅        ✅     ✅
+Portfolio             Sec+Tech Deployment Cards        ✅      ✅(CS/ST) ❌        ✅     ❌
+Index                 CSM Compliance Widget            ✅      ❌        ❌        ✅     ❌
+Index                 Team Leader Instructions         ❌      ✅        ❌        ❌     ❌
+Index                 Data Management Link             ✅      ❌        ❌        ❌     ❌
+Customers             Add/Edit/Delete Customer         ✅      ✅        ❌        ❌     ❌
+Customers             Ops Health Filters               ✅      ✅        ✅        ✅     ✅
+Features              Add/Edit Feature                 ✅      ❌        ❌        ❌     ❌
+Data Entry Matrix     Sec+Tech Deployment Params       ✅      ✅(CS/ST) ❌        ❌     ❌
+Data Entry Matrix     CM Indicators Sub-section        ✅      ✅(CS)    ❌        ✅     ❌
+Header Nav            Admin Dashboard Button           ✅      ❌        ❌        ❌     ❌
+Header Nav            Enter Data (CSM)                 ❌      ❌        ❌        ✅     ❌
+Header Nav            Enter Data (CM)                  ❌      ❌        ❌        ❌     ✅
+Header Nav            Enter Data (DeptHead/Member)     ❌      ✅        ✅        ❌     ❌
+Admin Dashboard       All tabs                         ✅      ❌        ❌        ❌     ❌
+```
 
-For **8 departments** (all except Sales), every indicator needs to be linked to the 17 core features (excluding "CM Direct Score" which is Content Management's standalone feature). This mirrors exactly how Customer Success is set up.
+## Implementation Plan
 
-**Total new links to create**: 8 departments × 10 indicators × 17 features = **1,360 rows** in `indicator_feature_links`.
+### Step 1 — Create `visibility_settings` table
 
-Content Management already has "CM Direct Score" as its 18th feature — its 10 indicators should be linked to the same 17 core features as CS.
-
-## Steps
-
-### Step 1 — Insert indicator_feature_links for all 8 non-Sales departments
-
-For each department's 10 indicators, create a link to each of the 17 core features. This is a bulk INSERT into `indicator_feature_links` with `impact_weight = 1.0`.
-
-SQL pattern:
 ```sql
-INSERT INTO indicator_feature_links (indicator_id, feature_id, impact_weight)
-SELECT i.id, f.id, 1.0
-FROM indicators i
-JOIN key_results kr ON i.key_result_id = kr.id
-JOIN functional_objectives fo ON kr.functional_objective_id = fo.id
-JOIN departments d ON fo.department_id = d.id
-CROSS JOIN features f
-WHERE d.name != 'Sales'
-AND f.name != 'CM Direct Score'
-AND NOT EXISTS (
-  SELECT 1 FROM indicator_feature_links ifl
-  WHERE ifl.indicator_id = i.id AND ifl.feature_id = f.id
+CREATE TABLE visibility_settings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  page text NOT NULL,        -- e.g. 'portfolio', 'customers', 'header'
+  section text NOT NULL,     -- e.g. 'org_objectives', 'rag_filters', 'deployment_cards'
+  role text NOT NULL,        -- e.g. 'admin', 'department_head', 'csm', 'department_member', 'content_manager'
+  is_visible boolean NOT NULL DEFAULT true,
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(page, section, role)
 );
 ```
 
-### Step 2 — No code changes needed
+Seed it with the current hardcoded defaults from the matrix above (~90 rows). RLS: admins can manage, all authenticated can read.
 
-The CSM data entry matrix (`CSMDataEntryMatrix.tsx`) already reads from `indicator_feature_links` to build the scoring grid. Once the links exist, each department's data entry page will automatically show the feature matrix with all 17 features × 10 indicators for scoring.
+### Step 2 — Create `useVisibilitySettings` hook
 
-### Step 3 — Verify the existing customer-feature mappings cover all customers
+A React hook that fetches all visibility settings on mount and provides a helper:
+```ts
+canSee(page: string, section: string): boolean
+```
+It cross-references the user's roles (from `useAuth`) against the DB settings. If no setting exists for a page/section/role combo, it defaults to `true` (backward compatible).
 
-82 customers already have `customer_features` entries for the 17 features. This means when a CSM opens any non-Sales department's data entry page, they'll see the full Customer × Feature × Indicator matrix ready for scoring.
+### Step 3 — Admin Visibility Settings page
+
+Add a new tab "Visibility" in the Admin Dashboard. Renders a grouped table:
+- Rows grouped by **Page** (Portfolio, Customers, Features, Header, Data Entry, etc.)
+- Within each page, rows for each **Section**
+- Columns for each **Role** (Admin, Dept Head, Dept Member, CSM, Content Manager)
+- Each cell is a Switch toggle that updates the DB in real-time
+
+### Step 4 — Wire up visibility checks across pages
+
+Replace all hardcoded `isAdmin &&`, `isCSM &&`, `isDepartmentHead &&` visibility guards with `canSee('portfolio', 'deployment_cards')` calls from the hook. Pages affected:
+
+- **`Portfolio.tsx`** — 5 sections (org objectives, stats, RAG filters, departments, deployment cards)
+- **`CustomersPage.tsx`** — add/edit controls, ops health filters
+- **`FeaturesPage.tsx`** — add/edit controls
+- **`AppLayout.tsx`** — header nav buttons
+- **`Index.tsx`** — compliance widget, team leader instructions
+- **`CSMDataEntryMatrix.tsx`** — CM indicators, deployment params
+
+### Step 5 — Route-level protection remains unchanged
+
+`ProtectedRoute` and authentication flow stay exactly as-is. This RBAC layer controls **section visibility within pages**, not page access.
 
 ## What Does NOT Change
-- Customer Success mappings (already has 170 links — untouched)
-- Sales department (stays on KPI Scoring Grid with no feature mapping)
-- All algorithms, formulas, and RAG calculations
-- All existing scored data
+- Authentication flow, 2FA, session management
+- Data scoping (department access, CSM customer filtering)
+- RLS policies on all tables
+- Any calculation or scoring logic
+- Route-level protection
 
 ## Files Modified
-- **Zero code files** — database INSERT only into `indicator_feature_links`
+1. **Database migration** — create `visibility_settings` table + seed defaults
+2. **`src/hooks/useVisibilitySettings.ts`** — new hook
+3. **`src/components/admin/VisibilitySettingsTab.tsx`** — new admin UI component
+4. **`src/pages/AdminDashboard.tsx`** — add Visibility tab
+5. **`src/pages/Portfolio.tsx`** — wrap sections with `canSee()` checks
+6. **`src/pages/CustomersPage.tsx`** — wrap sections with `canSee()` checks
+7. **`src/pages/FeaturesPage.tsx`** — wrap sections with `canSee()` checks
+8. **`src/components/AppLayout.tsx`** — wrap nav buttons with `canSee()` checks
+9. **`src/pages/Index.tsx`** — wrap sections with `canSee()` checks
+10. **`src/components/user/CSMDataEntryMatrix.tsx`** — wrap sub-sections with `canSee()` checks
 
