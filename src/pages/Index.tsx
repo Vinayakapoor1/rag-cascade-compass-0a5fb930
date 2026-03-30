@@ -22,6 +22,7 @@ import { OrgObjectiveColor, RAGStatus } from '@/types/venture';
 const Index = () => {
   const { data: rawOrgObjectives, isLoading, error, refetch } = useOrgObjectives();
   const { user, isAdmin, isDepartmentHead, isCSM, accessibleDepartments, loading: authLoading } = useAuth();
+  const { canSee } = useVisibilitySettings();
 
   // Scope departments: admins see all, others see only accessible departments
   const orgObjectives = useMemo(() => {
