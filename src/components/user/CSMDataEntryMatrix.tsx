@@ -1666,6 +1666,7 @@ export function CSMDataEntryMatrix({ departmentId, period, managedServicesOnly }
           remarks={remarks}
           onRemarkChange={(key, text) => setRemarks(prev => ({ ...prev, [key]: text }))}
           onOpsDataChange={(custId, data) => { opsHealthDataRef.current[custId] = data; }}
+          canSee={canSee}
         />
       ))}
 
