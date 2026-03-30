@@ -91,6 +91,10 @@ export default function AdminDashboard() {
                         </Card>
                     </div>
                 </TabsContent>
+
+                <TabsContent value="visibility" className="mt-4">
+                    <VisibilitySettingsTab />
+                </TabsContent>
             </Tabs>
         </div>
     );
