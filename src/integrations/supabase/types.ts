@@ -1614,6 +1614,7 @@ export type Database = {
       }
       visibility_settings: {
         Row: {
+          department_id: string | null
           id: string
           is_visible: boolean
           page: string
@@ -1622,6 +1623,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          department_id?: string | null
           id?: string
           is_visible?: boolean
           page: string
@@ -1630,6 +1632,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          department_id?: string | null
           id?: string
           is_visible?: boolean
           page?: string
@@ -1637,7 +1640,15 @@ export type Database = {
           section?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "visibility_settings_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
