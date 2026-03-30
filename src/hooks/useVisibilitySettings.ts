@@ -8,18 +8,11 @@ interface VisibilitySetting {
   section: string;
   role: string;
   is_visible: boolean;
+  department_id: string | null;
 }
 
-const ROLE_MAP: Record<string, string> = {
-  admin: 'admin',
-  department_head: 'department_head',
-  department_member: 'department_member',
-  csm: 'csm',
-  content_manager: 'content_manager',
-};
-
 export function useVisibilitySettings() {
-  const { isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager } = useAuth();
+  const { isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager, user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: settings } = useQuery({
@@ -27,26 +20,48 @@ export function useVisibilitySettings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('visibility_settings')
-        .select('page, section, role, is_visible');
+        .select('page, section, role, is_visible, department_id');
       if (error) throw error;
       return data as VisibilitySetting[];
     },
     staleTime: 60_000,
   });
 
-  // Build a lookup map: "page|section|role" -> boolean
-  const [lookupMap, setLookupMap] = useState<Map<string, boolean>>(new Map());
+  // Fetch user's department assignments
+  const { data: userDepartments } = useQuery({
+    queryKey: ['user_department_access', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('department_access')
+        .select('department_id')
+        .eq('user_id', user.id);
+      if (error) throw error;
+      return data.map(d => d.department_id);
+    },
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
+
+  // Build lookup maps: global and department-specific
+  const [globalMap, setGlobalMap] = useState<Map<string, boolean>>(new Map());
+  const [deptMap, setDeptMap] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     if (!settings) return;
-    const map = new Map<string, boolean>();
+    const gMap = new Map<string, boolean>();
+    const dMap = new Map<string, boolean>();
     settings.forEach(s => {
-      map.set(`${s.page}|${s.section}|${s.role}`, s.is_visible);
+      if (s.department_id) {
+        dMap.set(`${s.page}|${s.section}|${s.role}|${s.department_id}`, s.is_visible);
+      } else {
+        gMap.set(`${s.page}|${s.section}|${s.role}`, s.is_visible);
+      }
     });
-    setLookupMap(map);
+    setGlobalMap(gMap);
+    setDeptMap(dMap);
   }, [settings]);
 
-  // Get user's active roles
   const getUserRoles = useCallback((): string[] => {
     const roles: string[] = [];
     if (isAdmin) roles.push('admin');
@@ -58,35 +73,105 @@ export function useVisibilitySettings() {
   }, [isAdmin, isDepartmentHead, isDepartmentMember, isCSM, isContentManager]);
 
   /**
-   * Check if the current user can see a specific section on a page.
-   * If ANY of the user's roles has is_visible=true, they can see it.
-   * If no setting exists, defaults to true (backward compatible).
+   * Check visibility. Priority: department-specific override > global role setting > default true.
+   * If ANY of the user's roles+departments grants visibility, they can see it.
    */
   const canSee = useCallback((page: string, section: string): boolean => {
     const roles = getUserRoles();
-    if (roles.length === 0) return true; // No roles = viewer, default visible
+    if (roles.length === 0) return true;
 
+    const depts = userDepartments || [];
     let hasAnySetting = false;
+
     for (const role of roles) {
-      const key = `${page}|${section}|${role}`;
-      if (lookupMap.has(key)) {
-        hasAnySetting = true;
-        if (lookupMap.get(key) === true) return true;
+      // Check department-specific settings first
+      for (const deptId of depts) {
+        const dKey = `${page}|${section}|${role}|${deptId}`;
+        if (deptMap.has(dKey)) {
+          hasAnySetting = true;
+          if (deptMap.get(dKey) === true) return true;
+        }
+      }
+
+      // Check global setting
+      const gKey = `${page}|${section}|${role}`;
+      if (globalMap.has(gKey)) {
+        // Only use global if no dept-specific override exists for this role
+        const hasDeptOverride = depts.some(d => deptMap.has(`${page}|${section}|${role}|${d}`));
+        if (!hasDeptOverride) {
+          hasAnySetting = true;
+          if (globalMap.get(gKey) === true) return true;
+        }
       }
     }
 
-    // If no settings exist for this combo, default to true
     return !hasAnySetting;
-  }, [getUserRoles, lookupMap]);
+  }, [getUserRoles, globalMap, deptMap, userDepartments]);
 
-  const updateSetting = useCallback(async (page: string, section: string, role: string, isVisible: boolean) => {
-    const { error } = await supabase
-      .from('visibility_settings')
-      .upsert(
-        { page, section, role, is_visible: isVisible, updated_at: new Date().toISOString() },
-        { onConflict: 'page,section,role' }
-      );
-    if (error) throw error;
+  const updateSetting = useCallback(async (
+    page: string, section: string, role: string, isVisible: boolean, departmentId?: string | null
+  ) => {
+    const row: Record<string, unknown> = {
+      page, section, role, is_visible: isVisible, updated_at: new Date().toISOString(),
+    };
+    if (departmentId) {
+      row.department_id = departmentId;
+    }
+
+    // Use raw upsert — the unique index handles conflict resolution
+    const { error } = await supabase.rpc('upsert_visibility_setting' as never, {
+      p_page: page,
+      p_section: section,
+      p_role: role,
+      p_is_visible: isVisible,
+      p_department_id: departmentId || null,
+    } as never);
+
+    if (error) {
+      // Fallback: try direct upsert with manual conflict handling
+      const { data: existing } = await supabase
+        .from('visibility_settings')
+        .select('id')
+        .eq('page', page)
+        .eq('section', section)
+        .eq('role', role)
+        .is('department_id', departmentId ? undefined as never : null)
+        .maybeSingle();
+
+      if (departmentId) {
+        const { data: existingDept } = await supabase
+          .from('visibility_settings')
+          .select('id')
+          .eq('page', page)
+          .eq('section', section)
+          .eq('role', role)
+          .eq('department_id', departmentId)
+          .maybeSingle();
+
+        if (existingDept) {
+          await supabase
+            .from('visibility_settings')
+            .update({ is_visible: isVisible, updated_at: new Date().toISOString() })
+            .eq('id', existingDept.id);
+        } else {
+          await supabase
+            .from('visibility_settings')
+            .insert({ page, section, role, is_visible: isVisible, department_id: departmentId });
+        }
+      } else {
+        if (existing) {
+          await supabase
+            .from('visibility_settings')
+            .update({ is_visible: isVisible, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+        } else {
+          await supabase
+            .from('visibility_settings')
+            .insert({ page, section, role, is_visible: isVisible });
+        }
+      }
+    }
+
     queryClient.invalidateQueries({ queryKey: ['visibility_settings'] });
   }, [queryClient]);
 
