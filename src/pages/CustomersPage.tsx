@@ -292,10 +292,12 @@ export default function CustomersPage() {
             Manage customers, view features, and track KPI impact
           </p>
         </div>
+        {canSee('customers', 'add_edit_customer') && (
         <Button onClick={() => { setEditingCustomer(null); setCustomerFormOpen(true); }} className="gap-2">
           <Plus className="h-4 w-4" />
           Add Customer
         </Button>
+        )}
       </div>
 
       {/* Summary Stats */}
