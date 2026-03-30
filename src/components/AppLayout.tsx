@@ -114,7 +114,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 {user ? (
                   <div className="flex items-center gap-2">
                     {/* CSM: Enter Data Button */}
-                    {isCSM && !isAdmin && (
+                    {canSee('header', 'enter_data_csm') && (
                       <Link to="/csm/data-entry">
                         <Button variant="outline" size="sm" className="glass-card hover-glow border-primary/20 text-foreground">
                           <Settings className="h-4 w-4 sm:mr-2 text-foreground" />
