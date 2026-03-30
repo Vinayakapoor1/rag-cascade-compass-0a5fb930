@@ -2368,7 +2368,7 @@ function CustomerSectionCard({
                 )}
 
                 {/* ===== Sec+Tech Deployment Indicators Sub-Section ===== */}
-                {stIndicators.length > 0 && (
+                {stIndicators.length > 0 && canSee('data_entry', 'sectech_deployment_params') && (
                   <DeploymentSubSectionBlock
                     customerId={section.id}
                     stIndicators={stIndicators}
